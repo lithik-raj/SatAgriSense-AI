@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SENTINEL-EARTH AI | Geo-Agricultural Decision Platform</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <!-- Three.js, Chart.js CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Leaflet 2D Satellite Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #050a15;
+      --bg-panel: rgba(10, 18, 35, 0.95);
+      --border-panel: rgba(0, 240, 255, 0.22);
+      --cyan-glow: #00f0ff;
+      --green-glow: #32cd32;
+      --forest-dark: #006400;
+      --soil-brown: #8b4513;
+      --water-blue: #1e90ff;
+      --alert-red: #ff3366;
+      --text-main: #f0f4f8;
+      --text-muted: #8a99ad;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); overflow-x: hidden; min-height: 100vh; }
+
+    /* ====== HEADER ====== */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; height: 64px;
+      background: rgba(5, 10, 21, 0.98); backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-panel);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; z-index: 200;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand i { font-size: 24px; color: var(--cyan-glow); filter: drop-shadow(0 0 10px var(--cyan-glow)); animation: spinGlobe 12s linear infinite; }
+    @keyframes spinGlobe { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .brand h1 { font-family: 'Orbitron', sans-serif; font-size: 16px; background: linear-gradient(135deg, #ffffff, #00f0ff, #7000ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .nav-tabs { display: flex; gap: 6px; }
+    .tab-btn {
+      background: transparent; border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-muted); padding: 7px 13px; border-radius: 20px;
+      cursor: pointer; font-weight: 600; font-size: 12px; transition: all 0.3s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .tab-btn.active, .tab-btn:hover { color: var(--cyan-glow); border-color: var(--cyan-glow); box-shadow: 0 0 10px rgba(0,240,255,0.3); }
+    .tab-btn.pdf-btn { background: linear-gradient(135deg, #00f0ff22, #7000ff22); border-color: var(--cyan-glow); color: var(--cyan-glow); }
+
+    .voice-toggle-wrapper { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .3s; border-radius: 20px; }
+    .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--cyan-glow); }
+    input:checked + .slider:before { transform: translateX(16px); }
+
+    /* ====== MAIN LAYOUT ====== */
+    .app-viewport {
+      margin-top: 64px; display: grid;
+      grid-template-columns: 1fr 400px;
+      height: calc(100vh - 64px);
+    }
+
+    /* ====== LEFT: MAP VIEW ====== */
+    #map-view-container { width: 100%; height: 100%; position: relative; background: #020509; overflow: hidden; }
+    canvas#globe-canvas { width: 100% !important; height: 100% !important; display: block; }
+    #leaflet-map { width: 100%; height: 100%; display: none; }
+
+    /* ====== ENV CONDITIONS SIDEBAR (collapsible left side) ====== */
+    .env-sidebar {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 230px;
+      background: rgba(5,10,21,0.92); border-right: 1px solid var(--border-panel);
+      backdrop-filter: blur(16px); z-index: 50; transform: translateX(-100%);
+      transition: transform 0.4s ease; overflow-y: auto; padding: 14px 12px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .env-sidebar.open { transform: translateX(0); }
+    .env-toggle-btn {
+      position: absolute; left: 10px; bottom: 100px; z-index: 51;
+      background: linear-gradient(135deg, #00f0ff, #7000ff);
+      border: none; color: #fff; padding: 8px 10px; border-radius: 8px;
+      cursor: pointer; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; gap: 5px;
+      box-shadow: 0 4px 15px rgba(0,240,255,0.4);
+      writing-mode: vertical-rl; text-orientation: mixed;
+    }
+    .env-section-title {
+      font-size: 10px; font-weight: 700; color: var(--cyan-glow);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .env-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; background: rgba(0,0,0,0.35); border-radius: 6px; border-left: 2px solid var(--cyan-glow); font-size: 11px; margin-bottom: 3px; }
+    .env-row .label { color: var(--text-muted); }
+    .env-row .val { color: #fff; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 10px; }
+
+    /* ====== SEARCH OVERLAY ====== */
+    .search-overlay-box {
+      position: absolute; top: 16px; left: 240px;
+      background: var(--bg-panel); border: 1px solid var(--border-panel);
+      padding: 14px 16px; border-radius: 14px; backdrop-filter: blur(14px);
+      width: 360px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    }
+    .search-bar-row { display: flex; gap: 6px; margin-top: 8px; }
+    .search-input {
+      flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.18);
+      color: #fff; padding: 9px 12px; border-radius: 8px; font-size: 12px; outline: none;
+    }
+    .search-input:focus { border-color: var(--cyan-glow); box-shadow: 0 0 8px rgba(0,240,255,0.3); }
+    .btn-icon {
+      background: var(--cyan-glow); color: #000; border: none;
+      width: 38px; min-width: 38px; border-radius: 8px; cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .btn-icon:hover { transform: scale(1.08); }
+    .btn-icon.mic-listening { background: var(--alert-red); color: #fff; animation: pulseMic 1s infinite; }
+    @keyframes pulseMic { 0% { box-shadow: 0 0 0 0 rgba(255,51,102,0.7); } 70% { box-shadow: 0 0 0 10px rgba(255,51,102,0); } 100% { box-shadow: 0 0 0 0 rgba(255,51,102,0); } }
+
+    /* ====== SENTINEL BADGES ====== */
+    .sentinel-badges {
+      position: absolute; bottom: 20px; left: 16px; display: flex; gap: 8px; z-index: 10; flex-wrap: wrap;
+    }
+    .sensor-chip {
+      background: rgba(10,18,35,0.88); border: 1px solid rgba(0,240,255,0.3);
+      padding: 5px 10px; border-radius: 20px; font-size: 10px; display: flex; align-items: center; gap: 5px;
+      backdrop-filter: blur(8px); color: #ccc;
+    }
+    .sensor-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green-glow); box-shadow: 0 0 6px var(--green-glow); animation: pulse-dot 2s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* ====== CV SATELLITE IMAGE PANEL ====== */
+    .satellite-cv-panel {
+      position: absolute; bottom: 70px; right: 10px; width: 280px;
+      background: var(--bg-panel); border: 1px solid var(--border-panel);
+      border-radius: 12px; backdrop-filter: blur(12px); z-index: 50; overflow: hidden;
+    }
+    .cv-panel-header {
+      padding: 8px 12px; background: rgba(0,240,255,0.08);
+      border-bottom: 1px solid var(--border-panel);
+      font-size: 11px; font-weight: 700; color: var(--cyan-glow);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .cv-tabs { display: flex; gap: 4px; margin: 6px 8px; }
+    .cv-tab {
+      flex: 1; padding: 4px 6px; border-radius: 6px; font-size: 10px; font-weight: 700;
+      background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+      color: #aaa; cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .cv-tab.active { background: rgba(0,240,255,0.2); border-color: var(--cyan-glow); color: var(--cyan-glow); }
+    #cv-image-display { width: 100%; height: 140px; object-fit: cover; display: block; }
+    .cv-legend { display: flex; gap: 6px; padding: 6px 8px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 3px; font-size: 9px; color: #ccc; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ====== WATER PH BADGE ====== */
+    .water-ph-badge {
+      margin: 4px 8px 8px; background: rgba(30,144,255,0.15);
+      border: 1px solid rgba(30,144,255,0.4); border-radius: 8px;
+      padding: 5px 10px; font-size: 11px; color: #7ec8ff;
+      display: none; align-items: center; gap: 6px;
+    }
+    .water-ph-badge.visible { display: flex; }
+
+    /* ====== RIGHT DASHBOARD ====== */
+    .dashboard-panel {
+      background: var(--bg-panel); border-left: 1px solid var(--border-panel);
+      overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+      padding: 14px; backdrop-filter: blur(16px);
+    }
+    .card {
+      background: rgba(15,25,45,0.8); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 14px; transition: border-color 0.3s;
+    }
+    .card:hover { border-color: rgba(0,240,255,0.25); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .card-title { font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .status-tag { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 700; }
+    .tag-optimal { background: rgba(50,205,50,0.2); color: var(--green-glow); }
+    .tag-critical { background: rgba(255,51,102,0.2); color: var(--alert-red); }
+    .tag-warning { background: rgba(255,165,0,0.2); color: #ffa500; }
+
+    /* ====== ML CROP YIELD CARD ====== */
+    .crop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .crop-metric { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; }
+    .crop-metric.cyan { border-left: 3px solid var(--cyan-glow); }
+    .crop-metric.green { border-left: 3px solid var(--green-glow); }
+    .metric-val { font-size: 20px; font-weight: 800; font-family: 'Orbitron'; color: #fff; }
+    .metric-label { font-size: 9px; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; }
+
+    /* ====== ACCURACY PROGRESS BAR ====== */
+    .acc-bar-wrap { margin-top: 8px; }
+    .acc-bar-bg { background: rgba(255,255,255,0.1); border-radius: 6px; height: 8px; overflow: hidden; }
+    .acc-bar-fill { height: 100%; border-radius: 6px; transition: width 0.8s ease; }
+
+    /* ====== FACTORY ALERT ====== */
+    .factory-alert-box {
+      background: rgba(255,51,102,0.1); border: 1px solid var(--alert-red);
+      border-radius: 12px; padding: 12px; display: none;
+    }
+    .real-estate-badge {
+      background: linear-gradient(135deg, #ff9900, #ff3366); color: #fff;
+      font-size: 9px; font-weight: 800; padding: 3px 6px; border-radius: 4px;
+      display: inline-block; margin-bottom: 6px; letter-spacing: 0.5px;
+    }
+
+    /* ====== NDVI CARD ====== */
+    .ndvi-dominant-card {
+      padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-panel);
+      background: rgba(0,240,255,0.06); display: flex; align-items: center; gap: 10px;
+    }
+    .ndvi-score-box {
+      font-family: 'Orbitron'; font-size: 22px; font-weight: 800;
+      padding: 8px 12px; border-radius: 8px; background: rgba(0,0,0,0.5); min-width: 80px; text-align: center;
+    }
+
+    /* ====== TELEMETRY ====== */
+    .telemetry-list { display: flex; flex-direction: column; gap: 6px; }
+    .telemetry-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; background: rgba(0,0,0,0.28); border-radius: 6px; border-left: 2px solid var(--cyan-glow); font-size: 11px; }
+    .telemetry-item .label { color: #aaa; }
+    .telemetry-item strong { color: #fff; font-family: 'Orbitron'; font-size: 11px; }
+
+    /* ====== HISTORY SLIDE ====== */
+    .history-slide {
+      position: fixed; top: 64px; left: -100%; width: 500px;
+      height: calc(100vh - 64px); background: rgba(5,10,21,0.98);
+      border-right: 2px solid var(--cyan-glow); backdrop-filter: blur(22px);
+      z-index: 300; transition: left 0.4s cubic-bezier(0.1,0.9,0.2,1);
+      overflow-y: auto; padding: 20px;
+    }
+    .history-slide.open { left: 0; }
+    .history-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 12px; }
+    .history-table th { color: var(--cyan-glow); font-weight: 700; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border-panel); font-size: 10px; text-transform: uppercase; }
+    .history-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc; }
+    .history-table tr:hover td { background: rgba(0,240,255,0.05); }
+
+    /* ====== THREE DECISION ARENAS ====== */
+    .arenas-info { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    .arena-badge {
+      text-align: center; padding: 6px; border-radius: 8px;
+      background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+    }
+    .arena-badge .a-name { font-size: 9px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+    .arena-badge .a-val { font-family: 'Orbitron'; font-size: 16px; font-weight: 800; margin-top: 2px; }
+
+    /* ====== PDF DRAWER ====== */
+    .pdf-drawer {
+      position: fixed; top: 64px; right: -520px; width: 500px;
+      height: calc(100vh - 64px); background: rgba(5,10,21,0.99);
+      backdrop-filter: blur(22px); border-left: 2px solid var(--cyan-glow);
+      z-index: 300; transition: right 0.4s cubic-bezier(0.1,0.9,0.2,1);
+      padding: 20px; overflow-y: auto;
+    }
+    .pdf-drawer.open { right: 0; }
+    .pdf-preview-box {
+      background: #fff; color: #111; padding: 20px; border-radius: 10px;
+      font-size: 11px; line-height: 1.7; margin-top: 14px;
+    }
+    .pdf-preview-box h2 { font-family: 'Orbitron',sans-serif; font-size: 13px; color: #0070f3; margin-bottom: 6px; border-bottom: 2px solid #0070f3; padding-bottom: 4px; }
+    .pdf-preview-box .section { margin-bottom: 10px; }
+    .pdf-preview-box .section h3 { font-size: 11px; font-weight: 800; color: #333; margin-bottom: 4px; }
+    .pdf-preview-box p, .pdf-preview-box li { margin-bottom: 2px; }
+    .pdf-preview-box hr { border: 0; border-top: 1px solid #ddd; margin: 8px 0; }
+
+    /* ====== CHATBOT ====== */
+    .floating-assistant-symbol {
+      position: fixed; bottom: 24px; right: 24px; width: 58px; height: 58px;
+      border-radius: 50%; background: linear-gradient(135deg, #00f0ff, #7000ff);
+      box-shadow: 0 0 25px rgba(0,240,255,0.6), 0 0 50px rgba(112,0,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 22px; cursor: pointer; z-index: 400;
+      animation: floatUpDown 2.8s ease-in-out infinite;
+    }
+    @keyframes floatUpDown { 0% { transform: translateY(0px); box-shadow: 0 0 25px rgba(0,240,255,0.6); } 50% { transform: translateY(-16px); box-shadow: 0 0 35px rgba(0,240,255,0.9); } 100% { transform: translateY(0px); box-shadow: 0 0 25px rgba(0,240,255,0.6); } }
+
+    .ai-modal {
+      position: fixed; bottom: 94px; right: 24px; width: 380px; height: 520px;
+      background: rgba(8,14,28,0.97); border: 1px solid var(--cyan-glow);
+      border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+      backdrop-filter: blur(18px); display: none; flex-direction: column; z-index: 350;
+    }
+    .ai-modal.open { display: flex; }
+    .ai-header { background: rgba(0,240,255,0.08); padding: 12px 16px; border-bottom: 1px solid rgba(0,240,255,0.2); display: flex; justify-content: space-between; align-items: center; border-radius: 16px 16px 0 0; }
+    .ai-chat-body { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+    .chat-msg { padding: 10px 12px; border-radius: 10px; max-width: 90%; line-height: 1.5; }
+    .chat-msg.user { align-self: flex-end; background: rgba(0,240,255,0.18); border: 1px solid rgba(0,240,255,0.4); color: #fff; }
+    .chat-msg.bot { align-self: flex-start; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #dde4ee; }
+    .ai-input-row { padding: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 6px; }
+
+    /* ====== TABS - HISTORY + ENV ====== */
+    .dash-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
+    .dash-tab { flex: 1; padding: 7px; border-radius: 8px; font-size: 11px; font-weight: 700; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #888; cursor: pointer; text-align: center; transition: all 0.2s; }
+    .dash-tab.active { background: rgba(0,240,255,0.15); border-color: var(--cyan-glow); color: var(--cyan-glow); }
+
+    /* ====== LOCATION TYPE BADGE ====== */
+    .loc-type-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; margin-bottom: 8px; }
+    .loc-badge-ocean { background: rgba(30,144,255,0.2); color: var(--water-blue); border: 1px solid rgba(30,144,255,0.4); }
+    .loc-badge-agri { background: rgba(50,205,50,0.2); color: var(--green-glow); border: 1px solid rgba(50,205,50,0.4); }
+    .loc-badge-polar { background: rgba(200,230,255,0.2); color: #b0d4ff; border: 1px solid rgba(200,230,255,0.4); }
+    .loc-badge-desert { background: rgba(200,150,50,0.2); color: #e6a040; border: 1px solid rgba(200,150,50,0.4); }
+    .loc-badge-hazard { background: rgba(255,51,102,0.2); color: var(--alert-red); border: 1px solid rgba(255,51,102,0.4); }
+
+    /* ====== LOW ACCURACY ALTERNATIVE BOX ====== */
+    .alt-crop-box { 
+      background: rgba(255,165,0,0.1); border: 1px solid #ffa500;
+      border-radius: 12px; padding: 12px; display: none; margin-top: 4px;
+    }
+    .alt-crop-box.show { display: block; }
+
+    /* ====== HISTORY CHART ====== */
+    .history-chart-wrap { position: relative; height: 120px; margin-top: 8px; }
+
+    /* ====== LOADING OVERLAY ====== */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(5,10,21,0.9);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; flex-direction: column; gap: 16px;
+      transition: opacity 0.5s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-ring { width: 60px; height: 60px; border: 3px solid rgba(0,240,255,0.2); border-top-color: var(--cyan-glow); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-family: 'Orbitron'; font-size: 14px; color: var(--cyan-glow); }
+
+    /* ====== CLIMATE CHANGE SUGGESTION ====== */
+    .climate-suggest { background: rgba(112,0,255,0.1); border: 1px solid rgba(112,0,255,0.4); border-radius: 8px; padding: 8px 10px; font-size: 11px; color: #c8a0ff; margin-top: 6px; display: flex; gap: 6px; align-items: flex-start; }
+
+    /* ====== SCROLLBAR ====== */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.3); border-radius: 4px; }
+
+    /* ====== RESPONSIVE ====== */
+    @media (max-width: 1000px) {
+      .app-viewport { grid-template-columns: 1fr; }
+      .dashboard-panel { display: none; }
+    }
+
+    /* Animated scan line on map */
+    .scan-line {
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan-glow), transparent);
+      z-index: 8; animation: scanDown 4s linear infinite;
+    }
+    @keyframes scanDown { 0% { top: 0; opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+    /* Location pin tooltip */
+    .loc-tooltip {
+      position: absolute; background: rgba(10,18,35,0.95); border: 1px solid var(--cyan-glow);
+      border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #fff;
+      pointer-events: none; z-index: 60; display: none; max-width: 200px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-ring"></div>
+  <div class="loading-text">SENTINEL-EARTH INITIALIZING...</div>
+  <div style="font-size:11px; color:var(--text-muted);">Loading satellite data & ML models</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="brand">
+    <i class="fa-solid fa-earth-americas"></i>
+    <div>
+      <h1>SENTINEL-EARTH AI</h1>
+      <div style="font-size:9px;color:var(--text-muted);">Geo-Agricultural · CV · ML · DL Platform</div>
+    </div>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" id="tab-3d" onclick="switchMapMode('3d',event)">
+      <i class="fa-solid fa-globe"></i> 3D Globe
+    </button>
+    <button class="tab-btn" id="tab-2d" onclick="switchMapMode('2d',event)">
+      <i class="fa-solid fa-satellite"></i> 2D Satellite
+    </button>
+    <button class="tab-btn" onclick="toggleHistory()">
+      <i class="fa-solid fa-clock-rotate-left"></i> History
+    </button>
+    <button class="tab-btn pdf-btn" onclick="togglePdfDrawer()">
+      <i class="fa-solid fa-file-pdf"></i> PDF Report
+    </button>
+  </div>
+
+  <div class="voice-toggle-wrapper">
+    <i class="fa-solid fa-volume-high" style="color:var(--cyan-glow);font-size:13px;"></i>
+    <span style="font-size:11px;">Voice</span>
+    <label class="switch">
+      <input type="checkbox" id="voice-toggle" checked/>
+      <span class="slider"></span>
+    </label>
+  </div>
+</header>
+
+<!-- App Viewport -->
+<div class="app-viewport">
+
+  <!-- Left: Map Container -->
+  <div id="map-view-container">
+    <canvas id="globe-canvas"></canvas>
+    <div id="leaflet-map"></div>
+    <div class="scan-line" id="scan-line"></div>
+
+    <!-- ENV Conditions Sidebar (collapsible) -->
+    <div class="env-sidebar" id="env-sidebar">
+      <div class="env-section-title"><i class="fa-solid fa-cloud-sun"></i> Climate & Weather</div>
+      <div class="env-row"><span class="label">🌡️ Temperature</span><span class="val" id="env-temp">--</span></div>
+      <div class="env-row"><span class="label">💧 Humidity</span><span class="val" id="env-hum">--</span></div>
+      <div class="env-row"><span class="label">🌧️ Rainfall</span><span class="val" id="env-rain">--</span></div>
+      <div class="env-row"><span class="label">💨 Wind</span><span class="val" id="env-wind">--</span></div>
+
+      <div class="env-section-title" style="margin-top:8px;"><i class="fa-solid fa-seedling"></i> Soil Conditions</div>
+      <div class="env-row"><span class="label">🌱 Soil Moisture</span><span class="val" id="env-moist">--</span></div>
+      <div class="env-row"><span class="label">🧪 Soil pH</span><span class="val" id="env-ph">--</span></div>
+      <div class="env-row"><span class="label">🚰 Water Depth</span><span class="val" id="env-water">--</span></div>
+
+      <div class="env-section-title" style="margin-top:8px;"><i class="fa-solid fa-leaf"></i> Vegetation</div>
+      <div class="env-row"><span class="label">🌿 NDVI Score</span><span class="val" id="env-ndvi">--</span></div>
+      <div class="env-row"><span class="label">🏷️ NDVI Level</span><span class="val" id="env-ndvi-level">--</span></div>
+
+      <div class="env-section-title" style="margin-top:8px;"><i class="fa-solid fa-industry"></i> Air Quality</div>
+      <div class="env-row"><span class="label">🏭 Factory Dist</span><span class="val" id="env-factory">--</span></div>
+      <div class="env-row"><span class="label">☁️ NO₂ Level</span><span class="val" id="env-no2">Low</span></div>
+
+      <div class="env-section-title" style="margin-top:8px;"><i class="fa-solid fa-water"></i> Water Bodies</div>
+      <div class="env-row"><span class="label">💧 Water pH</span><span class="val" id="env-water-ph">--</span></div>
+      <div class="env-row"><span class="label">🌊 Water Type</span><span class="val" id="env-water-type" style="font-size:9px;">--</span></div>
+    </div>
+
+    <!-- ENV Toggle Button -->
+    <button class="env-toggle-btn" onclick="toggleEnvSidebar()" id="env-toggle-btn" title="Environmental Conditions">
+      <i class="fa-solid fa-leaf"></i>
+      <span>ENV</span>
+    </button>
+
+    <!-- Search Overlay -->
+    <div class="search-overlay-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10px;color:var(--cyan-glow);font-weight:700;text-transform:uppercase;">
+          <i class="fa-solid fa-location-dot"></i> Target Location
+        </span>
+        <span id="coord-display" style="font-family:'Orbitron';font-size:10px;color:#fff;">Lat: 11.02°, Lon: 76.96°</span>
+      </div>
+      <div class="search-bar-row">
+        <input type="text" id="location-input" class="search-input"
+          value="Coimbatore, Tamil Nadu, India"
+          placeholder="Type location or use mic..."
+          onkeypress="if(event.key==='Enter') searchLocationByName()"/>
+        <button id="mic-btn" class="btn-icon" onclick="startVoiceInput()" title="Voice Input">
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+        <button class="btn-icon" onclick="searchLocationByName()" title="Search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+        <button class="btn-icon" onclick="speakCurrentLocation()" title="Speak Location" style="background:rgba(0,240,255,0.3);color:#00f0ff;border:1px solid var(--cyan-glow);">
+          <i class="fa-solid fa-volume-high"></i>
+        </button>
+      </div>
+      <div id="voice-status" style="font-size:10px;color:var(--text-muted);margin-top:5px;">
+        <i class="fa-solid fa-circle-info"></i> Search or click globe to analyze any location. Voice commands active.
+      </div>
+    </div>
+
+    <!-- CV Satellite Image Panel -->
+    <div class="satellite-cv-panel" id="cv-panel">
+      <div class="cv-panel-header">
+        <span><i class="fa-solid fa-satellite-dish"></i> 2D Satellite Analysis</span>
+        <span id="cv-location-tag" style="font-size:9px;color:var(--cyan-glow);font-weight:bold;"></span>
+      </div>
+      <!-- Dedicated 2D Image Search Box with Voice input & exact location name display -->
+      <div style="padding: 6px 8px; background: rgba(0,0,0,0.4); border-bottom: 1px solid var(--border-panel);">
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <input type="text" id="cv-search-input" class="search-input" style="padding: 5px 8px; font-size: 11px; height: 28px;"
+            placeholder="Search location in 2D..."
+            onkeypress="if(event.key==='Enter') searchLocationBy2DBox()"/>
+          <button class="btn-icon" style="width: 28px; min-width: 28px; height: 28px; font-size: 11px;" onclick="startVoiceInput2D()" title="Voice search in 2D">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+          <button class="btn-icon" style="width: 28px; min-width: 28px; height: 28px; font-size: 11px;" onclick="searchLocationBy2DBox()" title="Search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+        </div>
+      </div>
+      <div class="cv-tabs">
+        <div class="cv-tab active" onclick="switchCVTab('satellite',this)">Satellite</div>
+        <div class="cv-tab" onclick="switchCVTab('landcover',this)">Land Cover</div>
+        <div class="cv-tab" onclick="switchCVTab('ndvi',this)">NDVI Heat</div>
+      </div>
+      <img id="cv-image-display" src="" alt="Satellite imagery loading..."/>
+      <div class="water-ph-badge" id="water-ph-badge">
+        <i class="fa-solid fa-water"></i>
+        <span id="water-ph-text">Water pH: --</span>
+        <span id="water-type-text" style="color:#aaa;font-size:10px;"></span>
+      </div>
+      <div class="cv-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#006400;"></div>Forest</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#50cd32;"></div>Agriculture</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#8b4513;"></div>Soil</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1e90ff;"></div>Water</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f5f5f5;border:1px solid #ccc;"></div>Ice</div>
+      </div>
+    </div>
+
+    <!-- Location Tooltip -->
+    <div class="loc-tooltip" id="loc-tooltip"></div>
+
+    <!-- Sentinel Badges -->
+    <div class="sentinel-badges">
+      <div class="sensor-chip"><span class="dot"></span> Sentinel-1 SAR</div>
+      <div class="sensor-chip"><span class="dot"></span> Sentinel-2 NDVI</div>
+      <div class="sensor-chip"><span class="dot"></span> Sentinel-3 Ocean</div>
+      <div class="sensor-chip"><span class="dot"></span> Sentinel-5P NO₂</div>
+    </div>
+  </div>
+
+  <!-- Right Dashboard Panel -->
+  <div class="dashboard-panel">
+
+    <!-- Location Type Badge -->
+    <div id="loc-type-badge" class="loc-type-badge loc-badge-agri">
+      <i class="fa-solid fa-location-dot"></i>
+      <span id="loc-type-text">Prime Fertile Agricultural Zone</span>
+    </div>
+
+    <!-- ML Crop Yield Card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-wheat-awn" style="color:#f1c40f;"></i> ML Crop Yield Prediction</span>
+        <span id="yield-status-tag" class="status-tag tag-optimal">OPTIMAL</span>
+      </div>
+      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:3px;" id="rec-crop-name">Pearl Millet (Bajra)</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;" id="yield-reason">Favorable agricultural conditions.</div>
+      <div class="crop-grid">
+        <div class="crop-metric cyan">
+          <div class="metric-val" id="yield-val">4.01</div>
+          <div class="metric-label">Yield (Tons/Ha)</div>
+        </div>
+        <div class="crop-metric green">
+          <div class="metric-val" id="accuracy-val">88.9%</div>
+          <div class="metric-label">Yield Accuracy</div>
+        </div>
+      </div>
+      <div class="acc-bar-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:3px;">
+          <span>Accuracy Score</span><span id="acc-pct-label">88.9%</span>
+        </div>
+        <div class="acc-bar-bg">
+          <div class="acc-bar-fill" id="acc-bar" style="width:88.9%;background:linear-gradient(90deg,#32cd32,#00f0ff);"></div>
+        </div>
+      </div>
+
+      <!-- Alternative Crops when low accuracy -->
+      <div class="alt-crop-box" id="alt-crop-box">
+        <div style="font-size:10px;font-weight:700;color:#ffa500;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> LOW YIELD ACCURACY (&lt;50%) - Alternative Options</div>
+        <div id="alt-crop-list" style="font-size:11px;color:#ffcc88;line-height:1.6;"></div>
+      </div>
+    </div>
+
+    <!-- Factory Alert -->
+    <div id="factory-alert-card" class="factory-alert-box">
+      <span class="real-estate-badge"><i class="fa-solid fa-building"></i> REAL ESTATE & COMMERCIAL ALTERNATIVE</span>
+      <div style="font-size:12px;font-weight:800;color:var(--alert-red);margin-bottom:6px;" id="factory-alert-title">Industrial Hazard Detected</div>
+      <div style="font-size:11px;color:#fff;line-height:1.5;margin-bottom:8px;" id="factory-alert-desc"></div>
+      <ul id="factory-alt-list" style="padding-left:16px;font-size:10px;color:#ffccd5;line-height:1.7;"></ul>
+    </div>
+
+    <!-- NDVI Dominant Card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-leaf" style="color:var(--green-glow);"></i> NDVI Vegetation Index</span>
+        <span style="font-size:10px;color:var(--text-muted);">Canopy Status</span>
+      </div>
+      <div class="ndvi-dominant-card">
+        <div class="ndvi-score-box" id="ndvi-score-display" style="color:#00e676;">0.72</div>
+        <div>
+          <div style="font-size:13px;font-weight:800;color:#fff;" id="ndvi-level-title">HIGH NDVI</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;" id="ndvi-status-desc">Rich Dense Vegetation</div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:9px;background:rgba(0,230,118,0.2);color:#00e676;padding:2px 6px;border-radius:4px;" id="ndvi-pct-badge">-- %</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:10px;text-align:center;">
+        <div style="background:rgba(0,230,118,0.15);border-radius:6px;padding:5px;"><div style="color:#00e676;font-weight:800;" id="cv-forest">--</div><div style="color:#aaa;">Forest %</div></div>
+        <div style="background:rgba(80,205,50,0.15);border-radius:6px;padding:5px;"><div style="color:#50cd32;font-weight:800;" id="cv-agri">--</div><div style="color:#aaa;">Agri %</div></div>
+        <div style="background:rgba(30,144,255,0.15);border-radius:6px;padding:5px;"><div style="color:#1e90ff;font-weight:800;" id="cv-water">--</div><div style="color:#aaa;">Water %</div></div>
+      </div>
+    </div>
+
+    <!-- Live Telemetry -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-square-poll-vertical" style="color:var(--cyan-glow);"></i> Live Weather & Soil Telemetry</span>
+        <span id="telemetry-pulse" style="font-size:9px;color:var(--green-glow);display:flex;align-items:center;gap:3px;"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--green-glow);animation:pulse-dot 1.5s infinite;display:inline-block;"></span>LIVE</span>
+      </div>
+      <div class="telemetry-list">
+        <div class="telemetry-item"><span class="label">🌡️ Temperature</span><strong id="tel-temp">28.5 °C</strong></div>
+        <div class="telemetry-item"><span class="label">💧 Humidity</span><strong id="tel-hum">65 %</strong></div>
+        <div class="telemetry-item"><span class="label">🌱 Soil Moisture (0-7cm)</span><strong id="tel-moist">38.5 %</strong></div>
+        <div class="telemetry-item"><span class="label">🧪 Soil pH Level</span><strong id="tel-ph">6.5</strong></div>
+        <div class="telemetry-item"><span class="label">🚰 Underground Water</span><strong id="tel-water">14.2 m</strong></div>
+        <div class="telemetry-item"><span class="label">🌧️ Rainfall Est.</span><strong id="tel-rain">--</strong></div>
+      </div>
+    </div>
+
+    <!-- Climate Change Suggestion -->
+    <div class="climate-suggest" id="climate-suggest">
+      <i class="fa-solid fa-globe-europe" style="color:#c8a0ff;margin-top:1px;"></i>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#c8a0ff;margin-bottom:2px;">Climate Change Advisory</div>
+        <div id="climate-text" style="font-size:10px;line-height:1.5;">Implement drip fertigation and crop rotation.</div>
+      </div>
+    </div>
+
+    <!-- Three Decision Arenas -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--cyan-glow);"></i> Three Decision Arenas</span>
+        <span style="font-size:10px;color:var(--text-muted);">Readiness Index</span>
+      </div>
+      <div class="arenas-info">
+        <div class="arena-badge">
+          <div class="a-name">🌾 Agri</div>
+          <div class="a-val" id="arena-agri-val" style="color:#32cd32;">92</div>
+          <div style="font-size:8px;color:#aaa;">%</div>
+        </div>
+        <div class="arena-badge">
+          <div class="a-name">🏙️ Cities</div>
+          <div class="a-val" id="arena-city-val" style="color:#00f0ff;">74</div>
+          <div style="font-size:8px;color:#aaa;">%</div>
+        </div>
+        <div class="arena-badge">
+          <div class="a-name">🌿 Env</div>
+          <div class="a-val" id="arena-env-val" style="color:#ffa500;">88</div>
+          <div style="font-size:8px;color:#aaa;">%</div>
+        </div>
+      </div>
+      <div style="height:130px;position:relative;">
+        <canvas id="arenasChart"></canvas>
+      </div>
+      <!-- Area readiness illustration -->
+      <div id="arenas-readiness-text" style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.5;background:rgba(0,0,0,0.2);border-radius:6px;padding:7px;"></div>
+    </div>
+
+    <!-- Historical Comparison Card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-calendar-days" style="color:#ffa500;"></i> Historical Comparison</span>
+        <span style="font-size:10px;color:var(--text-muted);">1 Year Prior</span>
+      </div>
+      <div class="history-chart-wrap">
+        <canvas id="historyChart"></canvas>
+      </div>
+      <div id="history-shift-text" style="font-size:10px;color:#aaa;margin-top:6px;padding:6px;background:rgba(0,0,0,0.2);border-radius:6px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:10px;">
+        <div style="background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.3);border-radius:6px;padding:6px;">
+          <div style="color:#ffa500;font-weight:700;margin-bottom:3px;">📅 1 Year Ago</div>
+          <div style="color:#ccc;" id="hist-temp-old">Temp: --</div>
+          <div style="color:#ccc;" id="hist-moist-old">Moisture: --</div>
+          <div style="color:#ccc;" id="hist-ndvi-old">NDVI: --</div>
+        </div>
+        <div style="background:rgba(0,240,255,0.1);border:1px solid rgba(0,240,255,0.3);border-radius:6px;padding:6px;">
+          <div style="color:var(--cyan-glow);font-weight:700;margin-bottom:3px;">📍 Current</div>
+          <div style="color:#ccc;" id="hist-temp-now">Temp: --</div>
+          <div style="color:#ccc;" id="hist-moist-now">Moisture: --</div>
+          <div style="color:#ccc;" id="hist-ndvi-now">NDVI: --</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dashboard-panel -->
+</div><!-- end app-viewport -->
+
+<!-- History Slide Panel -->
+<div class="history-slide" id="history-slide">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="font-size:16px;color:var(--cyan-glow);display:flex;align-items:center;gap:8px;">
+      <i class="fa-solid fa-clock-rotate-left"></i> Scan History Log
+    </h2>
+    <button onclick="toggleHistory()" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer;">&times;</button>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Last 15 location analyses from SQLite database</div>
+  <div id="history-table-wrap">
+    <table class="history-table" id="history-table">
+      <thead>
+        <tr>
+          <th>Location</th><th>Crop</th><th>Accuracy</th><th>Temp</th><th>pH</th><th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">Loading history...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PDF Report Drawer -->
+<div id="pdf-drawer" class="pdf-drawer">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="font-size:16px;color:var(--cyan-glow);"><i class="fa-solid fa-file-pdf"></i> Executive PDF Report</h2>
+    <button onclick="togglePdfDrawer()" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer;">&times;</button>
+  </div>
+
+  <button onclick="downloadPDFReport()" style="width:100%;background:linear-gradient(135deg,#00f0ff,#7000ff);color:#fff;border:none;padding:12px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13px;margin-bottom:10px;box-shadow:0 4px 15px rgba(0,240,255,0.4);">
+    <i class="fa-solid fa-download"></i> Download PDF Report
+  </button>
+
+  <div id="pdf-report-content" class="pdf-preview-box">
+    <h2>SENTINEL-EARTH GEO-AGRICULTURAL REPORT</h2>
+    <div style="color:#777;font-size:10px;margin-bottom:10px;">Sentinel-1/2/3/5P · ML/DL/CV Engine · <span id="pdf-date"></span></div>
+
+    <div class="section">
+      <h3>📍 Location Details</h3>
+      <p><strong>Name:</strong> <span id="pdf-loc-name">Coimbatore, India</span></p>
+      <p><strong>Coordinates:</strong> <span id="pdf-coords">Lat: 11.02°, Lon: 76.96°</span></p>
+      <p><strong>Location Type:</strong> <span id="pdf-loc-type">Prime Fertile Agricultural Zone</span></p>
+    </div><hr/>
+
+    <div class="section">
+      <h3>🌾 ML Crop Yield Prediction</h3>
+      <p><strong>Recommended Crop:</strong> <span id="pdf-crop-name" style="color:#0070f3;font-weight:bold;"></span></p>
+      <p><strong>Predicted Yield:</strong> <span id="pdf-yield-val"></span> Tons/Hectare</p>
+      <p><strong>Yield Accuracy:</strong> <span id="pdf-acc-val"></span></p>
+    </div><hr/>
+
+    <div class="section">
+      <h3>🌡️ Live Telemetry Data</h3>
+      <ul style="padding-left:16px;">
+        <li>Temperature: <span id="pdf-temp"></span></li>
+        <li>Humidity: <span id="pdf-hum"></span></li>
+        <li>Soil Moisture (0-7cm): <span id="pdf-moist"></span></li>
+        <li>Soil pH Level: <span id="pdf-ph"></span></li>
+        <li>Underground Water Depth: <span id="pdf-water"></span></li>
+      </ul>
+    </div><hr/>
+
+    <div class="section">
+      <h3>🌿 NDVI Vegetation Index</h3>
+      <p><strong>Dominant NDVI:</strong> <span id="pdf-ndvi"></span></p>
+      <p><strong>Forest Cover:</strong> <span id="pdf-forest"></span></p>
+      <p><strong>Agriculture Cover:</strong> <span id="pdf-agri-cov"></span></p>
+      <p><strong>Water Body:</strong> <span id="pdf-water-cov"></span></p>
+    </div><hr/>
+
+    <div class="section">
+      <h3>📊 Three Decision Arenas</h3>
+      <p>Precision Agriculture: <strong><span id="pdf-agri-score"></span>%</strong></p>
+      <p>Urban Planning: <strong><span id="pdf-city-score"></span>%</strong></p>
+      <p>Environmental Monitoring: <strong><span id="pdf-env-score"></span>%</strong></p>
+    </div><hr/>
+
+    <div class="section">
+      <h3>💡 Climate Change Advisory</h3>
+      <p id="pdf-climate"></p>
+    </div><hr/>
+
+    <div class="section">
+      <h3>📅 Historical Comparison (1 Year Ago)</h3>
+      <p id="pdf-hist-shift"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Floating AI Assistant (Bottom Right) -->
+<div class="floating-assistant-symbol" onclick="toggleAIChat()" title="Open Sentinel AI Chatbot">
+  <i class="fa-solid fa-robot"></i>
+</div>
+
+<!-- AI Chatbot Modal -->
+<div id="ai-modal" class="ai-modal">
+  <div class="ai-header">
+    <h3 style="font-size:13px;color:#fff;display:flex;align-items:center;gap:6px;">
+      <i class="fa-solid fa-brain" style="color:var(--cyan-glow);"></i>
+      Sentinel AI Assistant
+      <span style="font-size:9px;color:var(--text-muted);">Powered by HuggingFace LLM</span>
+    </h3>
+    <button onclick="toggleAIChat()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">&times;</button>
+  </div>
+  <div id="chat-body" class="ai-chat-body">
+    <div class="chat-msg bot">
+      👋 Hello! I'm your <strong>Sentinel-Earth AI Advisor</strong>.<br/>
+      Ask me about crops, soil pH, factory proximity, NDVI, water levels, or any agricultural question!
+    </div>
+  </div>
+  <div class="ai-input-row">
+    <input type="text" id="chat-input" class="search-input"
+      placeholder="Ask about crop yield, soil, satellite data..."
+      onkeypress="if(event.key==='Enter') sendChatMessage()"/>
+    <button class="btn-icon" onclick="startVoiceChatInput()" title="Voice Chat" style="background:rgba(0,240,255,0.2);color:#00f0ff;border:1px solid var(--cyan-glow);">
+      <i class="fa-solid fa-microphone"></i>
+    </button>
+    <button class="btn-icon" onclick="sendChatMessage()">
+      <i class="fa-solid fa-paper-plane"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ========================================================== -->
+<!-- APPLICATION JAVASCRIPT                                      -->
+<!-- ========================================================== -->
+<script>
+  const API_BASE = "http://localhost:5000/api";
+  let currentLocationContext = { lat: 11.0168, lon: 76.9558, name: "Coimbatore, Tamil Nadu, India", country: "India" };
+  let activeMapMode = '3d';
+  let leafletMapInstance = null;
+  let leafletMarker = null;
+  let cvImageData = { satellite: '', landcover: '', ndvi: '' };
+  let activeCVTab = 'satellite';
+  let arenasChartInstance = null;
+  let historyChartInstance = null;
+  let lastMLData = null;
+
+  // ============================================================
+  // LOADING SCREEN
+  // ============================================================
+  window.addEventListener('load', function() {
+    setTimeout(() => {
+      document.getElementById('loading-overlay').classList.add('hidden');
+    }, 2500);
+  });
+
+  // ============================================================
+  // VOICE INPUT (Speech-to-Text)
+  // ============================================================
+  function startVoiceInput() {
+    const micBtn = document.getElementById('mic-btn');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("Speech Recognition not supported. Type location instead."); return; }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    micBtn.classList.add('mic-listening');
+    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-microphone" style="color:red;"></i> Listening... speak location name now';
+
+    recognition.onresult = function(e) {
+      micBtn.classList.remove('mic-listening');
+      const spoken = e.results[0][0].transcript.trim();
+      document.getElementById('location-input').value = spoken;
+      document.getElementById('voice-status').innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "${spoken}" - Searching...`;
+      searchLocationByName();
+    };
+    recognition.onerror = function() {
+      micBtn.classList.remove('mic-listening');
+      document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-times" style="color:red;"></i> Voice error. Try again.';
+    };
+    recognition.start();
+  }
+
+  function startVoiceChatInput() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.onresult = function(e) {
+      document.getElementById('chat-input').value = e.results[0][0].transcript.trim();
+      sendChatMessage();
+    };
+    recognition.start();
+  }
+
+  // ============================================================
+  // TEXT-TO-SPEECH OUTPUT
+  // ============================================================
+  function speakCurrentLocation() {
+    if (!document.getElementById('voice-toggle').checked) return;
+    const loc = document.getElementById('location-input').value;
+    if (!loc || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(
+      `Selected location: ${loc}. Latitude ${currentLocationContext.lat.toFixed(2)}, Longitude ${currentLocationContext.lon.toFixed(2)}.`
+    );
+    utter.rate = 0.95;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function speakText(text) {
+    if (!document.getElementById('voice-toggle').checked) return;
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.92;
+    window.speechSynthesis.speak(utter);
+  }
+
+  // ============================================================
+  // THREE.JS 3D GLOBE - REALISTIC RENDERING
+  // ============================================================
+  let scene, camera, renderer, globeMesh, cloudMesh, pinMarkerMesh, controls, raycaster, mouse;
+  let glowMesh, atmosphereMesh;
+
+  function init3DGlobe() {
+    const container = document.getElementById('map-view-container');
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
+    camera.position.z = 260;
+
+    renderer = new THREE.WebGLRenderer({
+      canvas: document.getElementById('globe-canvas'),
+      antialias: true, alpha: true
+    });
+    renderer.setSize(w, h);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+
+    // Starfield background
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 3000;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i++) starPos[i] = (Math.random() - 0.5) * 1500;
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.8, transparent: true, opacity: 0.8 });
+    scene.add(new THREE.Points(starGeo, starMat));
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0x333366, 1.2));
+    const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.0);
+    sunLight.position.set(300, 100, 200);
+    scene.add(sunLight);
+    const rimLight = new THREE.DirectionalLight(0x1040ff, 0.5);
+    rimLight.position.set(-200, -100, -200);
+    scene.add(rimLight);
+
+    const tLoader = new THREE.TextureLoader();
+    const earthTex = tLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg');
+    const bumpTex = tLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/elev_bump_4k.jpg');
+    const specTex = tLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/water_4k.png');
+    const cloudTex = tLoader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/fair_clouds_4k.png');
+
+    // Earth globe
+    const globeGeo = new THREE.SphereGeometry(80, 96, 96);
+    const globeMat = new THREE.MeshPhongMaterial({
+      map: earthTex, bumpMap: bumpTex, bumpScale: 2.0,
+      specularMap: specTex, specular: new THREE.Color(0x333366), shininess: 25
+    });
+    globeMesh = new THREE.Mesh(globeGeo, globeMat);
+    scene.add(globeMesh);
+
+    // Cloud layer
+    const cloudGeo = new THREE.SphereGeometry(81.5, 64, 64);
+    const cloudMat = new THREE.MeshPhongMaterial({
+      map: cloudTex, transparent: true, opacity: 0.35, depthWrite: false
+    });
+    cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+    scene.add(cloudMesh);
+
+    // Atmosphere glow
+    const atmGeo = new THREE.SphereGeometry(83, 32, 32);
+    const atmMat = new THREE.MeshPhongMaterial({
+      color: 0x0033ff, transparent: true, opacity: 0.08,
+      side: THREE.FrontSide, depthWrite: false
+    });
+    atmosphereMesh = new THREE.Mesh(atmGeo, atmMat);
+    scene.add(atmosphereMesh);
+
+    // Location pin marker
+    const pinGeo = new THREE.SphereGeometry(2.8, 16, 16);
+    const pinMat = new THREE.MeshBasicMaterial({ color: 0xff3366 });
+    pinMarkerMesh = new THREE.Mesh(pinGeo, pinMat);
+    scene.add(pinMarkerMesh);
+
+    // Pin glow ring
+    const ringGeo = new THREE.RingGeometry(3.2, 5.5, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3366, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    glowMesh = new THREE.Mesh(ringGeo, ringMat);
+    scene.add(glowMesh);
+
+    // OrbitControls
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.4;
+    controls.minDistance = 120;
+    controls.maxDistance = 400;
+
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+    renderer.domElement.addEventListener('click', onGlobeClick);
+    window.addEventListener('resize', onWindowResize);
+
+    update3DPinPosition(11.0168, 76.9558);
+    animateGlobe();
+  }
+
+  function animateGlobe() {
+    requestAnimationFrame(animateGlobe);
+    controls.update();
+    if (cloudMesh) cloudMesh.rotation.y += 0.0003;
+    // Animate pin glow ring
+    if (glowMesh) {
+      glowMesh.material.opacity = 0.3 + 0.3 * Math.sin(Date.now() * 0.004);
+      glowMesh.scale.setScalar(1 + 0.15 * Math.sin(Date.now() * 0.003));
+    }
+    renderer.render(scene, camera);
+  }
+
+  function update3DPinPosition(lat, lon) {
+    const R = 82;
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lon + 180) * (Math.PI / 180);
+    const x = -(R * Math.sin(phi) * Math.cos(theta));
+    const z =  (R * Math.sin(phi) * Math.sin(theta));
+    const y =  (R * Math.cos(phi));
+    pinMarkerMesh.position.set(x, y, z);
+    if (glowMesh) {
+      glowMesh.position.set(x, y, z);
+      glowMesh.lookAt(0, 0, 0);
+    }
+  }
+
+  function onGlobeClick(event) {
+    if (activeMapMode !== '3d') return;
+    controls.autoRotate = false;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObject(globeMesh);
+    if (hits.length > 0) {
+      const p = hits[0].point;
+      const R = 80;
+      const lat = 90 - (Math.acos(p.y / R) * 180 / Math.PI);
+      const lon = ((270 + (Math.atan2(p.x, p.z) * 180 / Math.PI)) % 360) - 180;
+      reverseGeocode(lat, lon);
+    }
+  }
+
+  function onWindowResize() {
+    const c = document.getElementById('map-view-container');
+    if (camera) { camera.aspect = c.clientWidth / c.clientHeight; camera.updateProjectionMatrix(); }
+    if (renderer) renderer.setSize(c.clientWidth, c.clientHeight);
+    if (leafletMapInstance) setTimeout(() => leafletMapInstance.invalidateSize(), 100);
+  }
+
+  // ============================================================
+  // 2D LEAFLET SATELLITE MAP
+  // ============================================================
+  function init2DSatelliteMap() {
+    if (leafletMapInstance) return;
+    leafletMapInstance = L.map('leaflet-map', { zoomControl: true }).setView([currentLocationContext.lat, currentLocationContext.lon], 7);
+
+    // High-res Esri Satellite
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Esri World Imagery', maxZoom: 19
+    }).addTo(leafletMapInstance);
+
+    // Custom marker icon
+    const myIcon = L.divIcon({
+      html: '<div style="background:linear-gradient(135deg,#ff3366,#ff9900);width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(255,51,102,0.8);animation:pulse-dot 1.5s infinite;"></div>',
+      className: '', iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+    leafletMarker = L.marker([currentLocationContext.lat, currentLocationContext.lon], { icon: myIcon }).addTo(leafletMapInstance);
+    leafletMarker.bindPopup(`<b>${currentLocationContext.name}</b>`).openPopup();
+
+    leafletMapInstance.on('click', function(e) {
+      reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+  }
+
+  // ============================================================
+  // MAP MODE SWITCHER
+  // ============================================================
+  function switchMapMode(mode, event) {
+    activeMapMode = mode;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    if (event) event.currentTarget.classList.add('active');
+
+    if (mode === '3d') {
+      document.getElementById('globe-canvas').style.display = 'block';
+      document.getElementById('leaflet-map').style.display = 'none';
+      document.getElementById('scan-line').style.display = 'block';
+    } else {
+      document.getElementById('globe-canvas').style.display = 'none';
+      document.getElementById('leaflet-map').style.display = 'block';
+      document.getElementById('scan-line').style.display = 'none';
+      init2DSatelliteMap();
+      setTimeout(() => leafletMapInstance.invalidateSize(), 200);
+    }
+  }
+
+  // ============================================================
+  // CV SATELLITE IMAGE PANEL TABS
+  // ============================================================
+  function switchCVTab(tab, el) {
+    activeCVTab = tab;
+    document.querySelectorAll('.cv-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    const img = document.getElementById('cv-image-display');
+    if (tab === 'satellite' && cvImageData.satellite) img.src = cvImageData.satellite;
+    else if (tab === 'landcover' && cvImageData.landcover) img.src = cvImageData.landcover;
+    else if (tab === 'ndvi' && cvImageData.ndvi) img.src = cvImageData.ndvi;
+  }
+
+  // ============================================================
+  // ENV SIDEBAR TOGGLE
+  // ============================================================
+  function toggleEnvSidebar() {
+    const sidebar = document.getElementById('env-sidebar');
+    const btn = document.getElementById('env-toggle-btn');
+    sidebar.classList.toggle('open');
+    // Adjust search box position
+    const searchBox = document.querySelector('.search-overlay-box');
+    if (sidebar.classList.contains('open')) {
+      searchBox.style.left = '246px';
+    } else {
+      searchBox.style.left = '16px';
+    }
+  }
+
+  // ============================================================
+  // HISTORY PANEL
+  // ============================================================
+  function toggleHistory() {
+    const slide = document.getElementById('history-slide');
+    slide.classList.toggle('open');
+    if (slide.classList.contains('open')) loadHistory();
+  }
+
+  function loadHistory() {
+    fetch(`${API_BASE}/history`)
+      .then(r => r.json())
+      .then(data => {
+        const tbody = document.getElementById('history-tbody');
+        if (!data.history || data.history.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px;">No history yet. Analyze locations to see history.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.history.map(h => `
+          <tr>
+            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${h.name}">${h.name.split(',')[0]}</td>
+            <td style="color:#a8d8a8;">${h.recommended_crop ? h.recommended_crop.split('(')[0].trim() : '--'}</td>
+            <td style="color:${parseFloat(h.yield_accuracy) >= 50 ? '#32cd32' : '#ff3366'};font-weight:700;">${h.yield_accuracy ? h.yield_accuracy.toFixed(1) + '%' : '--'}</td>
+            <td>${h.temp_c ? h.temp_c + '°C' : '--'}</td>
+            <td>${h.soil_ph || '--'}</td>
+            <td style="color:var(--text-muted);">${h.created_at ? h.created_at.split('.')[0].replace('T',' ') : '--'}</td>
+          </tr>
+        `).join('');
+      })
+      .catch(() => {
+        document.getElementById('history-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ff6666;padding:16px;">Could not load history. Backend offline.</td></tr>';
+      });
+  }
+
+  // ============================================================
+  // PDF DRAWER
+  // ============================================================
+  function togglePdfDrawer() {
+    document.getElementById('pdf-drawer').classList.toggle('open');
+    document.getElementById('pdf-date').textContent = new Date().toLocaleString();
+  }
+
+  function downloadPDFReport() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(0, 20, 50);
+    doc.rect(0, 0, pageW, 30, 'F');
+    doc.setFontSize(14); doc.setTextColor(0, 240, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text("SENTINEL-EARTH GEO-AGRICULTURAL REPORT", 14, 14);
+    doc.setFontSize(9); doc.setTextColor(150, 180, 200);
+    doc.text(`Generated: ${new Date().toLocaleString()} | Satellite: Sentinel-1/2/3/5P | AI: ML/DL/CV Engine`, 14, 22);
+
+    doc.setTextColor(0, 0, 0);
+    let y = 40;
+
+    // Location
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 112, 243);
+    doc.text("LOCATION DETAILS", 14, y); y += 7;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+    doc.text(`Name: ${currentLocationContext.name}`, 14, y); y += 5;
+    doc.text(`Coordinates: Lat ${currentLocationContext.lat.toFixed(4)}°, Lon ${currentLocationContext.lon.toFixed(4)}°`, 14, y); y += 5;
+    doc.text(`Location Type: ${document.getElementById('pdf-loc-type').textContent}`, 14, y); y += 10;
+
+    // ML Crop
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 112, 243);
+    doc.text("ML CROP YIELD PREDICTION", 14, y); y += 7;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+    doc.text(`Recommended Crop: ${document.getElementById('rec-crop-name').textContent}`, 14, y); y += 5;
+    doc.text(`Predicted Yield: ${document.getElementById('yield-val').textContent} Tons/Hectare`, 14, y); y += 5;
+    doc.text(`Yield Accuracy Score: ${document.getElementById('accuracy-val').textContent}`, 14, y); y += 10;
+
+    // Telemetry
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 112, 243);
+    doc.text("LIVE WEATHER & SOIL TELEMETRY", 14, y); y += 7;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+    ['tel-temp','tel-hum','tel-moist','tel-ph','tel-water','tel-rain'].forEach(id => {
+      const el = document.getElementById(id);
+      const label = el.previousElementSibling ? el.previousElementSibling.textContent : id;
+      doc.text(`${label}: ${el.textContent}`, 18, y); y += 5;
+    });
+    y += 5;
+
+    // NDVI
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 112, 243);
+    doc.text("NDVI VEGETATION INDEX", 14, y); y += 7;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+    doc.text(`Dominant NDVI: ${document.getElementById('ndvi-score-display').textContent} (${document.getElementById('ndvi-level-title').textContent})`, 14, y); y += 5;
+    doc.text(`Forest: ${document.getElementById('cv-forest').textContent} | Agriculture: ${document.getElementById('cv-agri').textContent} | Water: ${document.getElementById('cv-water').textContent}`, 14, y); y += 10;
+
+    // Arenas
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 112, 243);
+    doc.text("THREE DECISION ARENAS", 14, y); y += 7;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+    doc.text(`Precision Agriculture: ${document.getElementById('arena-agri-val').textContent}%`, 14, y); y += 5;
+    doc.text(`Urban Planning: ${document.getElementById('arena-city-val').textContent}%`, 14, y); y += 5;
+    doc.text(`Environmental Monitoring: ${document.getElementById('arena-env-val').textContent}%`, 14, y); y += 10;
+
+    // Climate
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 112, 243);
+    doc.text("CLIMATE CHANGE ADVISORY", 14, y); y += 7;
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+    const climateText = document.getElementById('climate-text').textContent;
+    const climateLines = doc.splitTextToSize(climateText, pageW - 28);
+    doc.text(climateLines, 14, y); y += climateLines.length * 5 + 5;
+
+    // Footer
+    doc.setFillColor(0, 20, 50);
+    doc.rect(0, 285, pageW, 12, 'F');
+    doc.setFontSize(8); doc.setTextColor(100, 160, 200);
+    doc.text("SENTINEL-EARTH AI Platform | Sentinel-1/2/3/5P Satellite Data | ML/DL/CV Engine | HuggingFace LLM", 14, 292);
+
+    doc.save(`Sentinel_Earth_${currentLocationContext.lat.toFixed(2)}_${currentLocationContext.lon.toFixed(2)}_${Date.now()}.pdf`);
+  }
+
+  // ============================================================
+  // AI CHATBOT
+  // ============================================================
+  function toggleAIChat() {
+    document.getElementById('ai-modal').classList.toggle('open');
+  }
+
+  function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const chatBody = document.getElementById('chat-body');
+
+    // User message
+    const userDiv = document.createElement('div');
+    userDiv.className = 'chat-msg user';
+    userDiv.textContent = text;
+    chatBody.appendChild(userDiv);
+    input.value = '';
+    chatBody.scrollTop = chatBody.scrollHeight;
+
+    // Bot typing indicator
+    const botDiv = document.createElement('div');
+    botDiv.className = 'chat-msg bot';
+    botDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing your question...';
+    chatBody.appendChild(botDiv);
+    chatBody.scrollTop = chatBody.scrollHeight;
+
+    // Build rich context
+    const ctx = {
+      ...currentLocationContext,
+      recommended_crop: lastMLData ? lastMLData.recommended_crop : 'Unknown',
+      soil_ph: document.getElementById('tel-ph').textContent,
+      underground_water_depth: document.getElementById('tel-water').textContent,
+      ndvi_avg: document.getElementById('ndvi-score-display').textContent,
+      dominant_ndvi: document.getElementById('ndvi-level-title').textContent,
+      factory_dist_km: lastMLData ? lastMLData.factory_info.distance_km : 10
+    };
+
+    fetch(`${API_BASE}/hf-chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: text, context: ctx })
+    })
+    .then(r => r.json())
+    .then(data => {
+      const reply = data.response || 'No response received.';
+      botDiv.innerHTML = reply.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      chatBody.scrollTop = chatBody.scrollHeight;
+      // Speak only short responses
+      if (reply.length < 300) speakText(reply.replace(/[*#]/g, ''));
+    })
+    .catch(() => {
+      botDiv.innerHTML = '⚠️ Could not reach backend. Ensure Flask server is running on port 5000.';
+    });
+  }
+
+  // ============================================================
+  // GEOCODING FUNCTIONS
+  // ============================================================
+  function searchLocationBy2DBox() {
+    const query = document.getElementById('cv-search-input').value.trim();
+    if (!query) return;
+    document.getElementById('location-input').value = query;
+    searchLocationByName();
+  }
+
+  function startVoiceInput2D() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("Speech Recognition not supported in this browser."); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-microphone" style="color:red;"></i> 2D Voice listening... speak place now';
+    recognition.onresult = function(e) {
+      const spoken = e.results[0][0].transcript.trim();
+      document.getElementById('cv-search-input').value = spoken;
+      document.getElementById('location-input').value = spoken;
+      searchLocationByName();
+    };
+    recognition.start();
+  }
+
+  function searchLocationByName() {
+    const query = document.getElementById('location-input').value.trim();
+    if (!query) return;
+    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
+
+    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          triggerLocationAnalysis(lat, lon, data[0].display_name, data[0].address?.country || 'Global');
+        } else {
+          document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-times" style="color:red;"></i> Location not found. Try another name.';
+        }
+      })
+      .catch(() => {
+        document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-times" style="color:red;"></i> Geocoding error.';
+      });
+  }
+
+  function reverseGeocode(lat, lon) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+      .then(r => r.json())
+      .then(data => {
+        const name = data.display_name || `Zone (${lat.toFixed(2)}, ${lon.toFixed(2)})`;
+        const country = data.address?.country || 'Global';
+        triggerLocationAnalysis(lat, lon, name, country);
+      })
+      .catch(() => triggerLocationAnalysis(lat, lon, `Zone (${lat.toFixed(2)}, ${lon.toFixed(2)})`, 'Global'));
+  }
+
+  // ============================================================
+  // MAIN: TRIGGER LOCATION ANALYSIS
+  // ============================================================
+  function triggerLocationAnalysis(lat, lon, name, country) {
+    currentLocationContext = { lat, lon, name, country };
+
+    document.getElementById('coord-display').textContent = `Lat: ${lat.toFixed(3)}°, Lon: ${lon.toFixed(3)}°`;
+    document.getElementById('location-input').value = name;
+    // Keep 2D satellite image search box in sync with selected location name
+    const cvInput = document.getElementById('cv-search-input');
+    if (cvInput) cvInput.value = name;
+    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching satellite & ML data...';
+
+    // Update 3D pin
+    if (globeMesh) {
+      update3DPinPosition(lat, lon);
+      if (controls) controls.autoRotate = false;
+    }
+
+    // Update 2D map
+    if (leafletMapInstance) {
+      leafletMapInstance.setView([lat, lon], 8);
+      if (leafletMarker) leafletMarker.setLatLng([lat, lon]).openPopup();
+    }
+
+    speakCurrentLocation();
+
+    // Update CV panel location tag
+    document.getElementById('cv-location-tag').textContent = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+
+    // Fetch from backend
+    fetch(`${API_BASE}/analyze-location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lon, name, country })
+    })
+    .then(r => r.json())
+    .then(data => {
+      updateDashboardUI(data);
+      document.getElementById('voice-status').innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Analysis complete for ${name.split(',')[0]}`;
+    })
+    .catch(err => {
+      console.error('API Error:', err);
+      document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-exclamation-triangle" style="color:orange;"></i> Backend offline — showing cached data.';
+    });
+  }
+
+  // ============================================================
+  // UPDATE DASHBOARD UI FROM API RESPONSE
+  // ============================================================
+  function updateDashboardUI(data) {
+    const ml = data.ml_crop_yield_prediction;
+    const tel = data.live_telemetry;
+    const ndvi = data.computer_vision.dominant_ndvi;
+    const cv = data.computer_vision;
+    const hist = data.historical_1_year_comparison;
+    lastMLData = ml;
+
+    // ---- Location type badge ----
+    const ltBadge = document.getElementById('loc-type-badge');
+    const ltText = document.getElementById('loc-type-text');
+    ltText.textContent = ml.location_type;
+    ltBadge.className = 'loc-type-badge ';
+    if (ml.location_type.toLowerCase().includes('ocean')) ltBadge.className += 'loc-badge-ocean';
+    else if (ml.location_type.toLowerCase().includes('polar')) ltBadge.className += 'loc-badge-polar';
+    else if (ml.location_type.toLowerCase().includes('desert')) ltBadge.className += 'loc-badge-desert';
+    else if (ml.location_type.toLowerCase().includes('hazard')) ltBadge.className += 'loc-badge-hazard';
+    else ltBadge.className += 'loc-badge-agri';
+
+    // ---- ML Crop Yield ----
+    document.getElementById('rec-crop-name').textContent = ml.recommended_crop;
+    document.getElementById('yield-val').textContent = ml.predicted_yield_tons_ha;
+    document.getElementById('accuracy-val').textContent = ml.yield_accuracy + '%';
+    document.getElementById('yield-reason').textContent = ml.reason;
+    document.getElementById('acc-pct-label').textContent = ml.yield_accuracy + '%';
+
+    const accNum = parseFloat(ml.yield_accuracy);
+    const bar = document.getElementById('acc-bar');
+    bar.style.width = accNum + '%';
+    if (accNum >= 75) bar.style.background = 'linear-gradient(90deg,#32cd32,#00f0ff)';
+    else if (accNum >= 50) bar.style.background = 'linear-gradient(90deg,#ffa500,#f1c40f)';
+    else bar.style.background = 'linear-gradient(90deg,#ff3366,#ff9900)';
+
+    // Status tag
+    const st = document.getElementById('yield-status-tag');
+    st.textContent = ml.status || 'ANALYZED';
+    st.className = 'status-tag ' + (accNum >= 75 ? 'tag-optimal' : accNum >= 50 ? 'tag-warning' : 'tag-critical');
+
+    // ---- Low Accuracy Alternative Box ----
+    const altBox = document.getElementById('alt-crop-box');
+    if (ml.is_low_accuracy && ml.alternative_box) {
+      altBox.classList.add('show');
+      const actions = ml.alternative_box.recommended_actions || [];
+      document.getElementById('alt-crop-list').innerHTML = actions.map(a => `• ${a}`).join('<br/>');
+    } else {
+      altBox.classList.remove('show');
+    }
+
+    // ---- Factory Alert Card ----
+    const factCard = document.getElementById('factory-alert-card');
+    if (ml.is_low_accuracy && ml.alternative_box) {
+      factCard.style.display = 'block';
+      document.getElementById('factory-alert-title').textContent = ml.alternative_box.alert || 'Hazard Detected';
+      document.getElementById('factory-alert-desc').textContent = ml.reason || '';
+      const acts = ml.alternative_box.recommended_actions || [];
+      document.getElementById('factory-alt-list').innerHTML = acts.map(a => `<li>${a}</li>`).join('');
+    } else {
+      factCard.style.display = 'none';
+    }
+
+    // ---- NDVI ----
+    document.getElementById('ndvi-score-display').textContent = ndvi.score;
+    document.getElementById('ndvi-score-display').style.color = ndvi.color;
+    document.getElementById('ndvi-level-title').textContent = ndvi.level;
+    document.getElementById('ndvi-status-desc').textContent = ndvi.status;
+    document.getElementById('ndvi-pct-badge').textContent = ndvi.percentage + '% coverage';
+
+    // CV land cover
+    document.getElementById('cv-forest').textContent = cv.land_cover_stats.forest.toFixed(1) + '%';
+    document.getElementById('cv-agri').textContent = cv.land_cover_stats.agriculture.toFixed(1) + '%';
+    document.getElementById('cv-water').textContent = cv.land_cover_stats.water.toFixed(1) + '%';
+
+    // CV Images
+    cvImageData.satellite = cv.rgb_image;
+    cvImageData.landcover = cv.land_cover_mask;
+    cvImageData.ndvi = cv.ndvi_heatmap;
+    const imgEl = document.getElementById('cv-image-display');
+    if (activeCVTab === 'satellite') imgEl.src = cvImageData.satellite;
+    else if (activeCVTab === 'landcover') imgEl.src = cvImageData.landcover;
+    else imgEl.src = cvImageData.ndvi;
+
+    // Water pH badge
+    if (cv.water_body && cv.water_body.detected) {
+      const wBadge = document.getElementById('water-ph-badge');
+      wBadge.classList.add('visible');
+      document.getElementById('water-ph-text').textContent = `Water pH: ${cv.water_body.ph_level}`;
+      document.getElementById('water-type-text').textContent = `(${cv.water_body.type})`;
+    } else {
+      document.getElementById('water-ph-badge').classList.remove('visible');
+    }
+
+    // ---- Live Telemetry ----
+    document.getElementById('tel-temp').textContent = tel.temperature;
+    document.getElementById('tel-hum').textContent = tel.humidity;
+    document.getElementById('tel-moist').textContent = tel.soil_moisture;
+    document.getElementById('tel-ph').textContent = tel.soil_ph;
+    document.getElementById('tel-water').textContent = tel.underground_water_depth;
+    document.getElementById('tel-rain').textContent = tel.rainfall || (data.sentinel_satellites?.live_metrics?.rain_mm_est || '--');
+
+    // ---- ENV Sidebar ----
+    document.getElementById('env-temp').textContent = tel.temperature;
+    document.getElementById('env-hum').textContent = tel.humidity;
+    document.getElementById('env-rain').textContent = tel.rainfall || '--';
+    document.getElementById('env-wind').textContent = data.sentinel_satellites?.live_metrics?.wind_kmh ? data.sentinel_satellites.live_metrics.wind_kmh + ' km/h' : '--';
+    document.getElementById('env-moist').textContent = tel.soil_moisture;
+    document.getElementById('env-ph').textContent = tel.soil_ph;
+    document.getElementById('env-water').textContent = tel.underground_water_depth;
+    document.getElementById('env-ndvi').textContent = ndvi.score;
+    document.getElementById('env-ndvi-level').textContent = ndvi.level.split(' ')[0];
+    document.getElementById('env-factory').textContent = ml.factory_info ? ml.factory_info.distance_km + ' km' : '--';
+    document.getElementById('env-water-ph').textContent = cv.water_body ? cv.water_body.ph_level : '--';
+    document.getElementById('env-water-type').textContent = cv.water_body ? cv.water_body.type.split('/')[0].trim() : '--';
+
+    // ---- Three Decision Arenas ----
+    document.getElementById('arena-agri-val').textContent = ml.arenas.agriculture;
+    document.getElementById('arena-city-val').textContent = ml.arenas.cities;
+    document.getElementById('arena-env-val').textContent = ml.arenas.environment;
+    renderArenasChart(ml.arenas);
+
+    // Arenas readiness text
+    const aName = currentLocationContext.name.split(',')[0];
+    const readinessLines = [
+      `📍 <strong>${aName}</strong> analysis:`,
+      `🌾 <strong>Precision Agriculture</strong>: ${ml.arenas.agriculture >= 70 ? 'High readiness' : ml.arenas.agriculture >= 40 ? 'Moderate potential' : 'Low viability'} (${ml.arenas.agriculture}%)`,
+      `🏙️ <strong>Urban Planning</strong>: ${ml.arenas.cities >= 70 ? 'Suitable for development' : 'Limited urban suitability'} (${ml.arenas.cities}%)`,
+      `🌿 <strong>Environmental Monitoring</strong>: ${ml.arenas.environment >= 80 ? 'Excellent biodiversity' : 'Moderate ecosystem'} (${ml.arenas.environment}%)`
+    ];
+    document.getElementById('arenas-readiness-text').innerHTML = readinessLines.join('<br/>');
+
+    // ---- Climate Change ----
+    document.getElementById('climate-text').textContent = ml.climate_change_suggestion || 'Implement sustainable land management practices.';
+
+    // ---- Historical Comparison ----
+    if (hist) {
+      document.getElementById('history-shift-text').textContent = hist.land_cover_shift || '';
+      document.getElementById('hist-temp-old').textContent = `Temp: ${hist.temp_c}°C`;
+      document.getElementById('hist-moist-old').textContent = `Moisture: ${hist.soil_moisture_pct}%`;
+      document.getElementById('hist-ndvi-old').textContent = `NDVI: ${hist.ndvi}`;
+      document.getElementById('hist-temp-now').textContent = tel.temperature;
+      document.getElementById('hist-moist-now').textContent = tel.soil_moisture;
+      document.getElementById('hist-ndvi-now').textContent = `NDVI: ${ndvi.score}`;
+      renderHistoryChart(hist, tel, ndvi.score);
+    }
+
+    // ---- PDF Update ----
+    document.getElementById('pdf-loc-name').textContent = currentLocationContext.name;
+    document.getElementById('pdf-coords').textContent = `Lat: ${currentLocationContext.lat.toFixed(4)}°, Lon: ${currentLocationContext.lon.toFixed(4)}°`;
+    document.getElementById('pdf-loc-type').textContent = ml.location_type;
+    document.getElementById('pdf-crop-name').textContent = ml.recommended_crop;
+    document.getElementById('pdf-yield-val').textContent = ml.predicted_yield_tons_ha;
+    document.getElementById('pdf-acc-val').textContent = ml.yield_accuracy + '%';
+    document.getElementById('pdf-temp').textContent = tel.temperature;
+    document.getElementById('pdf-hum').textContent = tel.humidity;
+    document.getElementById('pdf-moist').textContent = tel.soil_moisture;
+    document.getElementById('pdf-ph').textContent = tel.soil_ph;
+    document.getElementById('pdf-water').textContent = tel.underground_water_depth;
+    document.getElementById('pdf-ndvi').textContent = `${ndvi.score} (${ndvi.level})`;
+    document.getElementById('pdf-forest').textContent = cv.land_cover_stats.forest.toFixed(1) + '%';
+    document.getElementById('pdf-agri-cov').textContent = cv.land_cover_stats.agriculture.toFixed(1) + '%';
+    document.getElementById('pdf-water-cov').textContent = cv.land_cover_stats.water.toFixed(1) + '%';
+    document.getElementById('pdf-agri-score').textContent = ml.arenas.agriculture;
+    document.getElementById('pdf-city-score').textContent = ml.arenas.cities;
+    document.getElementById('pdf-env-score').textContent = ml.arenas.environment;
+    document.getElementById('pdf-climate').textContent = ml.climate_change_suggestion || '';
+    document.getElementById('pdf-hist-shift').textContent = hist ? hist.land_cover_shift : '';
+
+    // Announce via voice
+    if (document.getElementById('voice-toggle').checked && accNum < 50) {
+      speakText(`Warning: Low crop yield accuracy of ${ml.yield_accuracy} percent for ${currentLocationContext.name.split(',')[0]}. ${ml.reason}`);
+    }
+  }
+
+  // ============================================================
+  // CHART: THREE DECISION ARENAS
+  // ============================================================
+  function renderArenasChart(arenas) {
+    const ctx = document.getElementById('arenasChart').getContext('2d');
+    if (arenasChartInstance) arenasChartInstance.destroy();
+    arenasChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['🌾 Precision Agri', '🏙️ Urban Planning', '🌿 Env Monitor'],
+        datasets: [{
+          data: [arenas.agriculture, arenas.cities, arenas.environment],
+          backgroundColor: [
+            'rgba(50,205,50,0.75)', 'rgba(0,240,255,0.75)', 'rgba(255,153,0,0.75)'
+          ],
+          borderColor: ['#32cd32', '#00f0ff', '#ff9900'],
+          borderWidth: 2, borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true, max: 100,
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            ticks: { color: '#8a99ad', font: { size: 9 } }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#fff', font: { size: 9, weight: 'bold' } }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.parsed.y}% readiness`
+            }
+          }
+        },
+        animation: { duration: 800, easing: 'easeInOutQuart' }
+      }
+    });
+  }
+
+  // ============================================================
+  // CHART: HISTORICAL COMPARISON
+  // ============================================================
+  function renderHistoryChart(hist, tel, currentNdvi) {
+    const ctx = document.getElementById('historyChart').getContext('2d');
+    if (historyChartInstance) historyChartInstance.destroy();
+
+    const tempNow = parseFloat(tel.temperature);
+    const tempOld = hist.temp_c;
+    const moistNow = parseFloat(tel.soil_moisture);
+    const moistOld = hist.soil_moisture_pct;
+    const ndviNow = parseFloat(currentNdvi);
+    const ndviOld = hist.ndvi;
+
+    historyChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Temp (°C)', 'Moisture (%)', 'NDVI (×100)'],
+        datasets: [
+          {
+            label: '1 Year Ago',
+            data: [tempOld, moistOld, ndviOld * 100],
+            backgroundColor: 'rgba(255,165,0,0.6)',
+            borderColor: '#ffa500', borderWidth: 1, borderRadius: 4
+          },
+          {
+            label: 'Current',
+            data: [tempNow, moistNow, ndviNow * 100],
+            backgroundColor: 'rgba(0,240,255,0.6)',
+            borderColor: '#00f0ff', borderWidth: 1, borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a99ad', font: { size: 8 } } },
+          x: { grid: { display: false }, ticks: { color: '#ccc', font: { size: 8 } } }
+        },
+        plugins: {
+          legend: { labels: { color: '#ccc', font: { size: 9 } } }
+        },
+        animation: { duration: 600 }
+      }
+    });
+  }
+
+  // ============================================================
+  // AUTO TELEMETRY LIVE UPDATE (every 30s)
+  // ============================================================
+  function startLiveTelemetryPulse() {
+    setInterval(() => {
+      const temp = document.getElementById('tel-temp');
+      const hum = document.getElementById('tel-hum');
+      if (temp.textContent !== '--') {
+        // Simulate micro-variation for live feel
+        const t = parseFloat(temp.textContent) + (Math.random() - 0.5) * 0.3;
+        const h = parseFloat(hum.textContent) + (Math.random() - 0.5) * 0.8;
+        temp.textContent = t.toFixed(1) + ' °C';
+        hum.textContent = Math.min(99, Math.max(10, h)).toFixed(1) + ' %';
+        // Sync env sidebar
+        document.getElementById('env-temp').textContent = temp.textContent;
+        document.getElementById('env-hum').textContent = hum.textContent;
+      }
+    }, 8000);
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  window.onload = function() {
+    document.getElementById('pdf-date').textContent = new Date().toLocaleString();
+    init3DGlobe();
+    startLiveTelemetryPulse();
+    // Default location analysis on load
+    triggerLocationAnalysis(11.0168, 76.9558, "Coimbatore, Tamil Nadu, India", "India");
+  };
+</script>
+</body>
+</html>
