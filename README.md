@@ -1,48 +1,50 @@
-# 🛰️ SENTINEL-EARTH AI
-### Geo-Agricultural Decision Platform
+# 🛰️ SatAgriSense AI
+
+### Satellite-Based Agricultural Intelligence Platform
 
 **Tagline:** Observe Earth. Understand Nature. Empower Decisions.
 
-**Live Demo:** https://hack10project.vercel.app/  
-**GitHub:** https://github.com/lithik-raj/SatAgriSense-AI
+**Live Demo:** [https://hack10project.vercel.app/](https://hack10project.vercel.app/)
+**GitHub Repository:** [https://github.com/lithik-raj/SatAgriSense-AI](https://github.com/lithik-raj/SatAgriSense-AI)
 
 ## 🌍 Overview
-SENTINEL-EARTH AI is a geospatial AI platform designed to support agriculture and environmental monitoring using satellite imagery, vegetation analysis, and machine-learning-based decision support.
+
+SatAgriSense AI is a geospatial AI platform designed to support smart agriculture and environmental monitoring through satellite imagery, vegetation analysis, and machine-learning-based decision support.
 
 ## 🎯 Problem Statement
-Farmers and environmental analysts need reliable information about vegetation health, soil conditions, weather, and land-use changes. Traditional monitoring can be time-consuming and may lack a unified view of these factors.
+
+Traditional agricultural monitoring can be time-consuming and may lack integrated information about vegetation health, soil conditions, weather, and land-use changes.
 
 ## 💡 Proposed Solution
-The platform brings geospatial visualization, NDVI analysis, environmental indicators, crop recommendations, and yield estimation together in one dashboard.
+
+SatAgriSense AI combines satellite visualization, NDVI analysis, environmental indicators, crop recommendations, and yield estimation in a unified dashboard.
 
 ## ✨ Key Features
-- 🛰️ **Satellite Visualization:** Interactive maps, location search, and satellite-layer interfaces.
-- 🌿 **NDVI Analysis:** Evaluates vegetation greenness using satellite reflectance.
-- 🌾 **Crop Recommendation:** Displays crop-suitability suggestions.
-- 📊 **Yield Estimation:** Presents estimated agricultural yield.
-- 🌡️ **Environmental Indicators:** Temperature, humidity, soil moisture, rainfall, and related indicators.
-- 🌳 **Land-Cover Monitoring:** Supports exploration of vegetation, water bodies, forests, and urban areas.
-- 📅 **Historical Comparison:** Interface for comparing observations across time.
-- 🤖 **AI Agricultural Assistant:** Interface for agriculture and satellite-related questions.
-- 📄 **Reports and History:** PDF-report and scan-history interfaces.
 
-*Feature availability depends on the actual backend and data-source integrations.*
+- 🛰️ Satellite imagery and geospatial visualization
+- 🌿 NDVI-based vegetation health analysis
+- 🌾 Crop recommendation and yield estimation
+- 🌡️ Soil and environmental indicators
+- 🌳 Land-cover and environmental monitoring
+- 📅 Historical comparison interface
+- 🤖 AI-powered agricultural assistant interface
+- 📊 Decision-support dashboard
+- 📄 PDF reports and scan-history interfaces
+
+*Actual functionality depends on the implemented backend and connected data sources.*
 
 ## 🧮 NDVI Formula
 
 **NDVI = (NIR − Red) / (NIR + Red)**
 
-- **NIR:** Near-infrared reflectance.
-- **Red:** Red-band reflectance.
+NIR represents near-infrared reflectance, while Red represents red-light reflectance. Higher positive NDVI values often indicate greener vegetation.
 
-NDVI values range from −1 to +1. Higher positive values often indicate greener vegetation.
-
-## 🏗️ System Workflow
+## 🔄 Workflow
 
 1. Select a geographical location.
-2. View available satellite imagery.
+2. Explore satellite imagery and map layers.
 3. Analyze vegetation using NDVI.
-4. Review soil and environmental indicators.
+4. Review environmental indicators.
 5. View crop recommendations and yield estimates.
 6. Compare historical observations when available.
 7. Review insights through the dashboard and AI assistant.
@@ -50,48 +52,50 @@ NDVI values range from −1 to +1. Higher positive values often indicate greener
 ## 🧰 Technology Stack
 
 - **Deployment:** Vercel
-- **Satellite Data:** Sentinel satellite interfaces
-- **Geospatial Analysis:** NDVI and land-cover visualization
+- **Satellite Analysis:** Sentinel satellite interfaces
+- **Vegetation Analysis:** NDVI
 - **Machine Learning:** Crop recommendation and yield-estimation interfaces
-- **AI:** Hugging Face LLM interface
+- **AI Assistant:** Hugging Face LLM interface
 - **Storage:** SQLite-backed history interface
 - **Visualization:** Interactive maps and 3D globe
 - **Reporting:** PDF-report interface
 
-*Verify exact frameworks, dependencies, and integrations against the source code.*
+*Verify exact dependencies and live integrations against the source code.*
 
-## 🌱 Applications
-- Precision agriculture and crop planning
-- Vegetation and land-use monitoring
-- Environmental assessment
-- Water-resource observation
-- Location-based agricultural decision support
+## 🎯 Applications
+
+- Precision agriculture
+- Crop planning and yield assessment
+- Vegetation monitoring
+- Land-use analysis
+- Environmental monitoring
+- Water-resource assessment
 
 ## ⚠️ Limitations
-- Satellite data may be affected by clouds and acquisition delays.
-- NDVI alone cannot diagnose crop disease or guarantee yield.
-- Yield predictions depend on suitable training data and validation.
+
+- Satellite observations can be affected by cloud cover and acquisition delays.
+- NDVI alone cannot diagnose crop diseases or guarantee yield.
+- Prediction quality depends on training data and validation.
 - Environmental readings require reliable data sources.
 - Dashboard values may be illustrative unless verified against live APIs.
 
 ## 🚀 Future Enhancements
-- Integrate verified Sentinel-2 and other satellite-data APIs.
-- Add historical NDVI time-series and change detection.
-- Improve crop recommendations using soil and weather datasets.
-- Validate yield predictions with real agricultural records.
+
+- Integrate verified Sentinel-2 satellite-data APIs.
+- Add time-series NDVI analysis and land-cover change detection.
+- Improve crop recommendations using soil and weather data.
+- Validate yield predictions using real agricultural records.
 - Add weather forecasts, alerts, and IoT sensor integration.
-- Support regional languages and detailed downloadable reports.
+- Support regional languages for farmers.
 
-## ▶️ Try the Application
+## ▶️ Live Application
 
-**Live Demo:** https://hack10project.vercel.app/
-
-For local execution, follow the dependency installation and environment-variable instructions documented in the source repository.
+[https://hack10project.vercel.app/](https://hack10project.vercel.app/)
 
 ## 📌 Project Information
 
-- **Project:** SENTINEL-EARTH AI
-- **Domain:** Geospatial AI, Remote Sensing, Machine Learning, Computer Vision, and Smart Agriculture
-- **Primary Goal:** Support agricultural and environmental decisions through satellite-based insights.
+- **Project Name:** SatAgriSense AI
+- **Domain:** Geospatial AI, Remote Sensing, Machine Learning, and Smart Agriculture
+- **Objective:** Support agricultural and environmental decisions through satellite-based intelligence.
 
 *Built to explore how satellite intelligence and AI can support smarter agriculture and environmental monitoring.*
