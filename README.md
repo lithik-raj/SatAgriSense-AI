@@ -5,6 +5,7 @@
 **Tagline:** Observe Earth. Understand Nature. Empower Decisions.
 
 **Live Demo:** [https://hack10project.vercel.app/](https://hack10project.vercel.app/)
+
 **GitHub Repository:** [https://github.com/lithik-raj/SatAgriSense-AI](https://github.com/lithik-raj/SatAgriSense-AI)
 
 ## 🌍 Overview
