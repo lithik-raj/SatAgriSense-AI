@@ -6,7 +6,6 @@ import json
 if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
     DB_PATH = "/tmp/agri_sentinel.db"
 else:
-    # Test if directory is writable; fallback to /tmp if not
     backend_dir = os.path.dirname(os.path.abspath(__file__))
     try:
         test_file = os.path.join(backend_dir, ".write_test")
@@ -66,6 +65,22 @@ def init_db():
         )
         """)
         
+        # Seed initial diverse crop recommendations if database is fresh
+        cursor.execute("SELECT COUNT(*) FROM locations")
+        if cursor.fetchone()[0] == 0:
+            seed_locations = [
+                (11.0168, 76.9558, "Coimbatore Agricultural Basin, Tamil Nadu", "India", 28.5, 75.0, 6.8, 14.5, 0.65, 98.2, "Sugarcane (High Biomass Co-0238)"),
+                (36.7783, -119.4179, "Salinas Valley, California", "USA", 21.0, 60.0, 6.2, 22.0, 0.62, 99.1, "Strawberries (Sweet Charlie / Camarosa)"),
+                (30.9010, 75.8573, "Ludhiana Plains, Punjab", "India", 24.5, 65.0, 7.2, 12.0, 0.72, 98.5, "Wheat (Rabi HD-2967) / Basmati Paddy"),
+                (11.4102, 76.6950, "Ooty Hill Slopes, Nilgiris, Tamil Nadu", "India", 16.5, 85.0, 5.2, 8.5, 0.78, 98.8, "Tea (Nilgiri Orthodox) & Coffee (Arabica)"),
+                (15.0000, 88.0000, "Bay of Bengal Deep Marine Zone", "India", 29.0, 85.0, 8.2, 0.0, -0.25, 0.0, "NO CROP CAN BE GROWN (Ocean / Marine Saline Water)"),
+                (-3.4653, -62.2159, "Amazon Ecological Sanctuary, Amazonas", "Brazil", 26.5, 90.0, 5.5, 6.0, 0.88, 0.0, "NO CROP CAN BE GROWN (Protected Natural Forest Reserve)")
+            ]
+            cursor.executemany("""
+                INSERT INTO locations (lat, lon, name, country, temp_c, humidity, soil_ph, underground_water_depth, ndvi_avg, yield_accuracy, recommended_crop)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, seed_locations)
+
         conn.commit()
         conn.close()
         print("Database initialized successfully at:", DB_PATH)
@@ -85,7 +100,7 @@ def save_location_record(lat, lon, name, country, temp, humidity, soil_ph, water
     except Exception as e:
         print("Save location DB non-critical warning:", str(e))
 
-def get_recent_locations(limit=10):
+def get_recent_locations(limit=15):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
