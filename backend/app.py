@@ -33,7 +33,122 @@ def api_status():
             "/api/analyze-location [POST]",
             "/api/hf-chat [POST]",
             "/api/history [GET]",
-            "/api/sentinel-status [GET]"
+            "/api/sentinel-status [GET]",
+            "/api/building-suitability [POST]"
+        ]
+    })
+
+@app.route("/api/building-suitability", methods=["POST"])
+def building_suitability():
+    """Analyze whether a location's land is suitable for building/construction."""
+    data = request.json or {}
+    lat = float(data.get("lat", 11.0168))
+    lon = float(data.get("lon", 76.9558))
+    soil_ph = float(str(data.get("soil_ph", 6.5)).replace("pH","").strip())
+    soil_moisture = float(str(data.get("soil_moisture", 40.0)).replace("%","").strip())
+    water_depth = float(str(data.get("water_depth", 14.0)).replace("m","").strip())
+    location_type = str(data.get("location_type", "Prime Fertile Agricultural Zone"))
+    ndvi_score = float(str(data.get("ndvi_score", 0.5)))
+    loc_name = data.get("name", "Selected Region")
+    lt = location_type.lower()
+
+    score = 0
+    positives = []
+    issues = []
+
+    # --- Water table assessment ---
+    if water_depth > 20:
+        score += 30
+        positives.append(f"Deep water table ({water_depth}m) — excellent foundation stability")
+    elif water_depth > 12:
+        score += 22
+        positives.append(f"Adequate water table ({water_depth}m) — standard foundation")
+    elif water_depth > 6:
+        score += 10
+        issues.append(f"Moderate water table ({water_depth}m) — waterproof basement required")
+    else:
+        issues.append(f"Very shallow water table ({water_depth}m) — high flood/seepage risk; pile foundations mandatory")
+
+    # --- Soil pH ---
+    if 5.5 <= soil_ph <= 8.5:
+        score += 20
+        positives.append(f"Soil pH {soil_ph} is in construction-safe range (5.5–8.5)")
+    else:
+        issues.append(f"Soil pH {soil_ph} is outside ideal range — ground treatment needed")
+
+    # --- Soil moisture ---
+    if soil_moisture < 30:
+        score += 20
+        positives.append(f"Low soil moisture ({soil_moisture}%) — excellent for foundation compaction")
+    elif soil_moisture < 55:
+        score += 10
+        positives.append(f"Moderate soil moisture ({soil_moisture}%) — standard drainage required")
+    else:
+        issues.append(f"High soil moisture ({soil_moisture}%) — extensive drainage and waterproofing needed")
+
+    # --- Location type ---
+    if any(kw in lt for kw in ["ocean","sea","water","marine","river"]):
+        score = 0
+        issues.append("Water body / ocean — construction impossible without reclamation")
+    elif any(kw in lt for kw in ["polar","permafrost","arctic"]):
+        score = 8
+        issues.append("Permafrost zone — only specialized arctic foundations are feasible at extreme cost")
+    elif any(kw in lt for kw in ["desert","arid"]):
+        score += 10
+        issues.append("Sandy desert soil — requires deep anchored foundations and dust control")
+    elif any(kw in lt for kw in ["industrial","hazard","factory"]):
+        score += 5
+        issues.append("Industrial zone — mandatory soil contamination test before construction")
+    else:
+        score += 20
+        positives.append("Stable agricultural land — suitable structural base for construction")
+
+    # --- NDVI vegetation density ---
+    if ndvi_score > 0.6:
+        issues.append("High vegetation density — land clearing and root removal required")
+    elif ndvi_score < 0.15:
+        score += 10
+        positives.append("Low vegetation — minimal clearing needed")
+
+    score = max(0, min(100, score))
+
+    if score >= 70:
+        rating = "✅ HIGHLY SUITABLE"; rating_color = "green"
+    elif score >= 50:
+        rating = "⚠️ MODERATELY SUITABLE"; rating_color = "orange"
+    elif score >= 25:
+        rating = "⚠️ LOW SUITABILITY"; rating_color = "orange"
+    else:
+        rating = "❌ NOT SUITABLE"; rating_color = "red"
+
+    foundation_type = (
+        "Shallow strip / raft foundation (<1.5m)" if water_depth > 18 and soil_moisture < 40
+        else "Medium depth foundation (2–3m)" if water_depth > 10
+        else "Deep pile foundation (>4m)"
+    )
+
+    return jsonify({
+        "location": {"lat": lat, "lon": lon, "name": loc_name},
+        "suitability_score": score,
+        "rating": rating,
+        "rating_color": rating_color,
+        "recommendation": (
+            "This land has favorable parameters for construction/building development. Proceed with standard EIA."
+            if score >= 70 else
+            "Construction is feasible with proper engineering measures. Obtain geotechnical survey."
+            if score >= 50 else
+            "Significant engineering interventions required. Consult structural engineer before development."
+            if score >= 25 else
+            "Construction not recommended without major site remediation work."
+        ),
+        "positive_factors": positives,
+        "issues": issues,
+        "construction_requirements": [
+            f"Foundation type recommended: {foundation_type}",
+            "Soil Bearing Capacity Test (CBR / plate load test) mandatory",
+            "Structural geological survey before breaking ground",
+            "Environmental Impact Assessment (EIA) required",
+            f"Soil pH adjustment {'not required' if 5.5 <= soil_ph <= 8.5 else f'needed (current: {soil_ph})'}",
         ]
     })
 

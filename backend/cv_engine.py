@@ -1,8 +1,24 @@
-import cv2
 import numpy as np
 import base64
 import io
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageFilter
+
+# cv2 is optional — PIL fallback used for Vercel/serverless deployment
+try:
+    import cv2
+    _HAVE_CV2 = True
+except ImportError:
+    _HAVE_CV2 = False
+
+def _apply_jet_colormap(gray_uint8):
+    """Pure NumPy JET colormap (fallback when cv2 is unavailable)."""
+    t = gray_uint8.astype(np.float32) / 255.0
+    r = np.clip(1.5 - np.abs(4.0 * t - 3.0), 0, 1)
+    g = np.clip(1.5 - np.abs(4.0 * t - 2.0), 0, 1)
+    b = np.clip(1.5 - np.abs(4.0 * t - 1.0), 0, 1)
+    return np.stack([(r * 255).astype(np.uint8),
+                     (g * 255).astype(np.uint8),
+                     (b * 255).astype(np.uint8)], axis=-1)
 
 def generate_satellite_imagery(lat, lon, width=500, height=350):
     """
@@ -64,7 +80,13 @@ def generate_satellite_imagery(lat, lon, width=500, height=350):
     # Add realistic texture noise
     texture = np.random.randint(-15, 15, (height, width, 3), dtype=np.int16)
     rgb = np.clip(rgb.astype(np.int16) + texture, 0, 255).astype(np.uint8)
-    rgb = cv2.GaussianBlur(rgb, (3, 3), 0)
+    # Gaussian blur for realistic satellite texture
+    if _HAVE_CV2:
+        rgb = cv2.GaussianBlur(rgb, (3, 3), 0)
+    else:
+        img_pil = Image.fromarray(rgb)
+        img_pil = img_pil.filter(ImageFilter.GaussianBlur(1))
+        rgb = np.array(img_pil)
 
     # 2. DL Land Cover Classification Mask (Exact colors requested)
     # Light Green (#50CD32) -> Ag, Dark Green (#006400) -> Forest, Blue (#1E90FF) -> Water, Brown (#8B4513) -> Soil, White (#FFFFFF) -> Ice
@@ -132,8 +154,11 @@ def generate_satellite_imagery(lat, lon, width=500, height=350):
 
     # NDVI Heatmap Visualization
     ndvi_norm = np.clip((ndvi + 1) / 2 * 255, 0, 255).astype(np.uint8)
-    ndvi_heatmap = cv2.applyColorMap(ndvi_norm, cv2.COLORMAP_JET)
-    ndvi_heatmap_rgb = cv2.cvtColor(ndvi_heatmap, cv2.COLOR_BGR2RGB)
+    if _HAVE_CV2:
+        ndvi_heatmap = cv2.applyColorMap(ndvi_norm, cv2.COLORMAP_JET)
+        ndvi_heatmap_rgb = cv2.cvtColor(ndvi_heatmap, cv2.COLOR_BGR2RGB)
+    else:
+        ndvi_heatmap_rgb = _apply_jet_colormap(ndvi_norm)
 
     # Water Body pH Level Estimation
     if water_pct > 0.5:

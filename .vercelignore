@@ -1,0 +1,6 @@
+# Vercel ignore — do not deploy these files
+backend/__pycache__/
+backend/*.db
+backend/*.pyc
+*.bat
+.gitignore

@@ -820,7 +820,9 @@
 <!-- APPLICATION JAVASCRIPT                                      -->
 <!-- ========================================================== -->
 <script>
-  const API_BASE = "http://localhost:5000/api";
+  const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '5000')
+    ? "http://localhost:5000/api"
+    : "/api";
   let currentLocationContext = { lat: 11.0168, lon: 76.9558, name: "Coimbatore, Tamil Nadu, India", country: "India" };
   let activeMapMode = '3d';
   let leafletMapInstance = null;
@@ -830,6 +832,9 @@
   let arenasChartInstance = null;
   let historyChartInstance = null;
   let lastMLData = null;
+  let lastCVData = null;       // stores last cv_engine result for 2D overlay
+  let ndviOverlayLayer = null; // Leaflet NDVI image overlay layer
+  let nearbyMarkersGroup = null; // Leaflet nearby places layer
 
   // ============================================================
   // LOADING SCREEN
@@ -1044,8 +1049,11 @@
     if (hits.length > 0) {
       const p = hits[0].point;
       const R = 80;
-      const lat = 90 - (Math.acos(p.y / R) * 180 / Math.PI);
-      const lon = ((270 + (Math.atan2(p.x, p.z) * 180 / Math.PI)) % 360) - 180;
+      // Correct inverse formula matching Three.js SphereGeometry UV mapping:
+      // phi = acos(y/R), lat = 90 - phi; theta = atan2(z, -x), lon = theta_deg - 180
+      const lat = 90 - (Math.acos(Math.max(-1, Math.min(1, p.y / R))) * 180 / Math.PI);
+      const lon_raw = Math.atan2(p.z, -p.x) * 180 / Math.PI;
+      const lon = ((lon_raw + 360) % 360) - 180;
       reverseGeocode(lat, lon);
     }
   }
@@ -1058,28 +1066,147 @@
   }
 
   // ============================================================
-  // 2D LEAFLET SATELLITE MAP
+  // 2D LEAFLET SATELLITE MAP (Google Hybrid — shows buildings, roads, labels)
   // ============================================================
   function init2DSatelliteMap() {
     if (leafletMapInstance) return;
-    leafletMapInstance = L.map('leaflet-map', { zoomControl: true }).setView([currentLocationContext.lat, currentLocationContext.lon], 7);
+    leafletMapInstance = L.map('leaflet-map', { zoomControl: true }).setView([currentLocationContext.lat, currentLocationContext.lon], 14);
 
-    // High-res Esri Satellite
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Esri World Imagery', maxZoom: 19
+    // Google Hybrid Layer: satellite imagery + building outlines, road names, labels — identical to Google Maps
+    L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      attribution: '© Google Maps — Satellite + Infrastructure View',
+      maxZoom: 21,
+      subdomains: ['0', '1', '2', '3']
     }).addTo(leafletMapInstance);
 
-    // Custom marker icon
-    const myIcon = L.divIcon({
-      html: '<div style="background:linear-gradient(135deg,#ff3366,#ff9900);width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(255,51,102,0.8);animation:pulse-dot 1.5s infinite;"></div>',
-      className: '', iconSize: [16, 16], iconAnchor: [8, 8]
-    });
-    leafletMarker = L.marker([currentLocationContext.lat, currentLocationContext.lon], { icon: myIcon }).addTo(leafletMapInstance);
-    leafletMarker.bindPopup(`<b>${currentLocationContext.name}</b>`).openPopup();
+    // Animated location marker with land-type icon
+    const initLocType = lastMLData ? lastMLData.location_type : 'agri';
+    const initNdvi   = lastCVData ? lastCVData.dominant_ndvi?.score : null;
+    leafletMarker = L.marker([currentLocationContext.lat, currentLocationContext.lon], {
+      icon: createLocMarker(initLocType)
+    }).addTo(leafletMapInstance);
+    leafletMarker.bindPopup(
+      buildMarkerPopup(currentLocationContext.name, lastMLData ? lastMLData.location_type : 'Prime Fertile Agricultural Zone', initNdvi)
+    ).openPopup();
 
     leafletMapInstance.on('click', function(e) {
       reverseGeocode(e.latlng.lat, e.latlng.lng);
     });
+
+    // Add NDVI land cover legend
+    addNdviLegendControl();
+
+    // If data already loaded, show NDVI overlay immediately
+    if (lastCVData) showNdviOverlayOn2DMap(currentLocationContext.lat, currentLocationContext.lon, lastCVData);
+
+    // Fetch nearby infrastructure (hospitals, schools, etc.)
+    fetchNearbyPlaces(currentLocationContext.lat, currentLocationContext.lon);
+  }
+
+  // ============================================================
+  // MARKER HELPERS — consistent land-type icons + popups
+  // ============================================================
+  function createLocMarker(locType) {
+    const lt = (locType || '').toLowerCase();
+    let color = '#32cd32', emoji = '🌾';
+    if      (lt.includes('ocean') || lt.includes('water') || lt.includes('marine') || lt.includes('sea') || lt.includes('river') || lt.includes('lake')) { color = '#1e90ff'; emoji = '🌊'; }
+    else if (lt.includes('polar') || lt.includes('arctic') || lt.includes('permafrost')) { color = '#b0d4ff'; emoji = '❄️'; }
+    else if (lt.includes('desert') || lt.includes('arid') || lt.includes('barren')) { color = '#c8a060'; emoji = '🏜️'; }
+    else if (lt.includes('industrial') || lt.includes('hazard') || lt.includes('factory')) { color = '#ff9900'; emoji = '🏭'; }
+    else if (lt.includes('forest')) { color = '#006400'; emoji = '🌲'; }
+    else { color = '#32cd32'; emoji = '🌾'; }
+    return L.divIcon({
+      html: `<div style="background:${color};width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 0 16px ${color};display:flex;align-items:center;justify-content:center;font-size:11px;animation:pulse-dot 2s ease-in-out infinite;">${emoji}</div>`,
+      className: '', iconSize: [24, 24], iconAnchor: [12, 12]
+    });
+  }
+
+  function buildMarkerPopup(name, locType, ndviScore) {
+    const shortName = (name || '').split(',')[0];
+    const lt = (locType || '').toLowerCase();
+    const color = lt.includes('ocean') || lt.includes('water') ? '#1e90ff' :
+                  lt.includes('desert') || lt.includes('arid') ? '#c8a060' :
+                  lt.includes('industrial') ? '#ff9900' : '#32cd32';
+    const isAgri = lt.includes('agri') || lt.includes('fertile');
+    return `<div style="font-family:Inter,sans-serif;min-width:190px;line-height:1.6;">
+      <div style="font-weight:800;color:#0070f3;font-size:13px;margin-bottom:3px;">📍 ${shortName}</div>
+      <div style="font-size:11px;margin-bottom:3px;"><b>Land Type:</b> <span style="color:${color};font-weight:700;">${locType || 'Analyzing…'}</span></div>
+      ${isAgri ? '<div style="font-size:10px;color:#32cd32;font-weight:700;">🌾 Agricultural Land (Real Location)</div>' : ''}
+      ${ndviScore !== null && ndviScore !== undefined ? `<div style="font-size:10px;color:#aaa;"><b>NDVI:</b> <span style="color:${color};font-weight:700;">${ndviScore}</span></div>` : ''}
+      <div style="font-size:9px;color:#888;margin-top:4px;">🗺️ Click anywhere on the map to analyze that point</div>
+    </div>`;
+  }
+
+  // ============================================================
+  // NDVI COLOR LEGEND ON 2D MAP
+  // ============================================================
+  let ndviLegendAdded = false;
+  function addNdviLegendControl() {
+    if (!leafletMapInstance || ndviLegendAdded) return;
+    ndviLegendAdded = true;
+    const legend = L.control({ position: 'bottomleft' });
+    legend.onAdd = function() {
+      const div = L.DomUtil.create('div', '');
+      div.style.cssText = 'background:rgba(5,10,21,0.92);border:1px solid rgba(0,240,255,0.35);border-radius:8px;padding:9px 11px;font-size:10px;color:#ccc;min-width:175px;line-height:1.6;';
+      div.innerHTML = `
+        <div style="font-weight:800;color:#00f0ff;margin-bottom:5px;font-size:11px;">🛰️ NDVI Land Cover (AI)</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="width:12px;height:12px;background:#50cd32;border-radius:2px;display:inline-block;flex-shrink:0;"></span>🌾 Agriculture (Light Green)</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="width:12px;height:12px;background:#006400;border-radius:2px;display:inline-block;flex-shrink:0;"></span>🌲 Forestry (Dark Green)</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="width:12px;height:12px;background:#c8a060;border-radius:2px;display:inline-block;flex-shrink:0;"></span>🏜️ Barren / Soil (Light Brown)</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="width:12px;height:12px;background:#1e90ff;border-radius:2px;display:inline-block;flex-shrink:0;"></span>🌊 Ocean / River / Lake (Blue)</div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#f0f0f0;border:1px solid #aaa;border-radius:2px;display:inline-block;flex-shrink:0;"></span>❄️ Ice / Snow (White)</div>`;
+      return div;
+    };
+    legend.addTo(leafletMapInstance);
+  }
+
+  // ============================================================
+  // NDVI OVERLAY ON 2D MAP (mirrors 3D land cover colors)
+  // ============================================================
+  function showNdviOverlayOn2DMap(lat, lon, cvData) {
+    if (!leafletMapInstance || !cvData || !cvData.land_cover_mask) return;
+    if (ndviOverlayLayer) { leafletMapInstance.removeLayer(ndviOverlayLayer); ndviOverlayLayer = null; }
+    // Approx extent of the cv_engine generated image: ~0.09° lat × 0.12° lon
+    const latSpan = 0.09, lonSpan = 0.12;
+    const bounds = L.latLngBounds([[lat - latSpan, lon - lonSpan], [lat + latSpan, lon + lonSpan]]);
+    ndviOverlayLayer = L.imageOverlay(cvData.land_cover_mask, bounds, {
+      opacity: 0.42,
+      interactive: false
+    }).addTo(leafletMapInstance);
+  }
+
+  // ============================================================
+  // NEARBY PLACES / INFRASTRUCTURE (OSM Overpass)
+  // ============================================================
+  function fetchNearbyPlaces(lat, lon) {
+    if (!leafletMapInstance) return;
+    const query = `[out:json][timeout:8];(
+      node["amenity"~"hospital|school|university|bank|market|station|pharmacy"](around:2500,${lat},${lon});
+      node["shop"~"supermarket|mall"](around:2000,${lat},${lon});
+    );out center 25;`;
+    fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query })
+      .then(r => r.json())
+      .then(data => {
+        if (nearbyMarkersGroup) leafletMapInstance.removeLayer(nearbyMarkersGroup);
+        nearbyMarkersGroup = L.layerGroup();
+        (data.elements || []).slice(0, 20).forEach(el => {
+          if (!el.lat || !el.lon) return;
+          const name  = el.tags?.name || el.tags?.amenity || el.tags?.shop || 'Place';
+          const type  = el.tags?.amenity || el.tags?.shop || '';
+          const color = type.includes('hospital') || type.includes('pharmacy') ? '#ff3366'
+                      : type.includes('school') || type.includes('university') ? '#7000ff'
+                      : type.includes('station') ? '#ff9900' : '#00f0ff';
+          const icon = L.divIcon({
+            html: `<div title="${name}" style="background:${color};width:9px;height:9px;border-radius:50%;border:1.5px solid white;box-shadow:0 0 6px ${color};"></div>`,
+            className: '', iconSize: [9, 9], iconAnchor: [4, 4]
+          });
+          L.marker([el.lat, el.lon], { icon })
+           .bindPopup(`<b style="font-size:12px;">${name}</b><br/><span style="font-size:10px;color:#666;text-transform:capitalize;">${type.replace(/_/g,' ')}</span>`)
+           .addTo(nearbyMarkersGroup);
+        });
+        nearbyMarkersGroup.addTo(leafletMapInstance);
+      })
+      .catch(() => {}); // Silently fail — Overpass may be unavailable
   }
 
   // ============================================================
@@ -1099,7 +1226,20 @@
       document.getElementById('leaflet-map').style.display = 'block';
       document.getElementById('scan-line').style.display = 'none';
       init2DSatelliteMap();
-      setTimeout(() => leafletMapInstance.invalidateSize(), 200);
+      setTimeout(() => {
+        leafletMapInstance.invalidateSize();
+        // Navigate to current location at city-level zoom so buildings/roads are visible
+        leafletMapInstance.setView([currentLocationContext.lat, currentLocationContext.lon], 14);
+        // Restore marker icon & popup with known land type
+        if (leafletMarker && lastMLData) {
+          leafletMarker.setIcon(createLocMarker(lastMLData.location_type));
+          leafletMarker.setPopupContent(buildMarkerPopup(currentLocationContext.name, lastMLData.location_type, lastCVData ? lastCVData.dominant_ndvi?.score : null));
+        }
+        // Restore NDVI overlay
+        if (lastCVData) showNdviOverlayOn2DMap(currentLocationContext.lat, currentLocationContext.lon, lastCVData);
+        // Fetch nearby places for current location
+        fetchNearbyPlaces(currentLocationContext.lat, currentLocationContext.lon);
+      }, 300);
     }
   }
 
@@ -1283,11 +1423,15 @@
     const ctx = {
       ...currentLocationContext,
       recommended_crop: lastMLData ? lastMLData.recommended_crop : 'Unknown',
+      location_type: lastMLData ? lastMLData.location_type : 'Unknown',
       soil_ph: document.getElementById('tel-ph').textContent,
       underground_water_depth: document.getElementById('tel-water').textContent,
+      soil_moisture: document.getElementById('tel-moist').textContent,
       ndvi_avg: document.getElementById('ndvi-score-display').textContent,
       dominant_ndvi: document.getElementById('ndvi-level-title').textContent,
-      factory_dist_km: lastMLData ? lastMLData.factory_info.distance_km : 10
+      factory_dist_km: lastMLData ? lastMLData.factory_info.distance_km : 10,
+      yield_accuracy: lastMLData ? lastMLData.yield_accuracy : 0,
+      arenas: lastMLData ? lastMLData.arenas : null
     };
 
     fetch(`${API_BASE}/hf-chat`, {
@@ -1324,12 +1468,16 @@
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.interimResults = false;
-    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-microphone" style="color:red;"></i> 2D Voice listening... speak place now';
+    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-microphone" style="color:red;"></i> 🎙️ 2D Voice listening… speak a place name now';
     recognition.onresult = function(e) {
       const spoken = e.results[0][0].transcript.trim();
       document.getElementById('cv-search-input').value = spoken;
       document.getElementById('location-input').value = spoken;
+      document.getElementById('voice-status').innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "${spoken}" — Locating on 2D map…`;
       searchLocationByName();
+    };
+    recognition.onerror = function() {
+      document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-times" style="color:red;"></i> Voice error. Please try again.';
     };
     recognition.start();
   }
@@ -1387,8 +1535,14 @@
 
     // Update 2D map
     if (leafletMapInstance) {
-      leafletMapInstance.setView([lat, lon], 8);
-      if (leafletMarker) leafletMarker.setLatLng([lat, lon]).openPopup();
+      leafletMapInstance.flyTo([lat, lon], 14, { duration: 1.2 });
+      if (leafletMarker) {
+        leafletMarker.setLatLng([lat, lon]);
+        leafletMarker.setPopupContent(buildMarkerPopup(name, 'Analyzing…', null));
+        leafletMarker.openPopup();
+      }
+      // Fetch nearby infrastructure whenever location changes
+      fetchNearbyPlaces(lat, lon);
     }
 
     speakCurrentLocation();
@@ -1423,6 +1577,22 @@
     const cv = data.computer_vision;
     const hist = data.historical_1_year_comparison;
     lastMLData = ml;
+    lastCVData = cv;  // store for 2D overlay restore
+
+    // ---- Update 2D Leaflet marker with actual land type & NDVI overlay ----
+    if (leafletMarker) {
+      leafletMarker.setIcon(createLocMarker(ml.location_type));
+      leafletMarker.setPopupContent(buildMarkerPopup(currentLocationContext.name, ml.location_type, ndvi.score));
+      if (activeMapMode === '2d') leafletMarker.openPopup();
+    }
+    // Show NDVI land cover overlay on 2D map (same color scheme as 3D cv_engine)
+    showNdviOverlayOn2DMap(currentLocationContext.lat, currentLocationContext.lon, cv);
+
+    // ---- Voice announcement of land type (the real location land type) ----
+    if (document.getElementById('voice-toggle').checked) {
+      const landMsg = _getLandTypeVoice(ml.location_type, currentLocationContext.name);
+      setTimeout(() => speakText(landMsg), 600);
+    }
 
     // ---- Location type badge ----
     const ltBadge = document.getElementById('loc-type-badge');
@@ -1586,6 +1756,23 @@
     if (document.getElementById('voice-toggle').checked && accNum < 50) {
       speakText(`Warning: Low crop yield accuracy of ${ml.yield_accuracy} percent for ${currentLocationContext.name.split(',')[0]}. ${ml.reason}`);
     }
+  }
+
+  // ============================================================
+  // LAND TYPE VOICE ANNOUNCEMENT (real location type)
+  // ============================================================
+  function _getLandTypeVoice(locType, locName) {
+    const shortName = (locName || '').split(',')[0];
+    const lt = (locType || '').toLowerCase();
+    if (lt.includes('ocean') || lt.includes('water') || lt.includes('marine') || lt.includes('sea') || lt.includes('river') || lt.includes('lake'))
+      return `${shortName} is a water body — ocean or coastal water region. No agricultural cultivation is possible here.`;
+    if (lt.includes('polar') || lt.includes('permafrost'))
+      return `${shortName} is a polar permafrost zone — freezing region. Only hydroponic greenhouse farming is possible.`;
+    if (lt.includes('desert') || lt.includes('arid') || lt.includes('barren'))
+      return `${shortName} is an arid barren land — dry desert region suitable only for drought-resistant crops.`;
+    if (lt.includes('industrial') || lt.includes('hazard') || lt.includes('factory'))
+      return `${shortName} is an industrial zone. Food crop cultivation is not recommended due to factory proximity.`;
+    return `${shortName} is agricultural land — a prime fertile agricultural zone suitable for crop cultivation.`;
   }
 
   // ============================================================

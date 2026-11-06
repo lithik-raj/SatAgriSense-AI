@@ -56,8 +56,9 @@ class HuggingFaceLLMService:
         
         loc_name = context.get("name", "the selected region")
         crop = str(context.get("recommended_crop", "Sunflower or Sorghum"))
+        location_type = str(context.get("location_type", "Prime Fertile Agricultural Zone"))
         try:
-            soil_ph = float(str(context.get("soil_ph", 6.5)).replace("°C", "").replace("%", "").strip())
+            soil_ph = float(str(context.get("soil_ph", 6.5)).replace("°C", "").replace("%", "").replace("pH","").strip())
         except (ValueError, TypeError):
             soil_ph = 6.5
         try:
@@ -68,6 +69,10 @@ class HuggingFaceLLMService:
             ndvi = float(str(context.get("ndvi_avg", 0.62)).strip())
         except (ValueError, TypeError):
             ndvi = 0.62
+        try:
+            soil_moisture = float(str(context.get("soil_moisture", "40%")).replace("%","").strip())
+        except (ValueError, TypeError):
+            soil_moisture = 40.0
         dominant_ndvi = str(context.get("dominant_ndvi", "HIGH"))
         
         factory_dist = 10.0
@@ -81,6 +86,103 @@ class HuggingFaceLLMService:
             
         is_factory_near = factory_dist < 3.0
         is_hazard = factory_dist < 0.8 or "no crop" in crop.lower()
+        lt = location_type.lower()
+
+        # ==============================================================
+        # BUILDING / CONSTRUCTION SUITABILITY QUERIES (highest priority)
+        # ==============================================================
+        building_keywords = ["building", "construct", "house", "build here", "suitable for build",
+                             "develop", "foundation", "structure", "real estate", "urban development",
+                             "infrastructure", "can i build", "is this suitable", "construction"]
+        is_building_query = any(kw in p_lower for kw in building_keywords)
+        
+        if is_building_query:
+            # Compute suitability score
+            score = 0
+            positives = []
+            issues_list = []
+            
+            # Water table
+            if water_depth > 18:
+                score += 30; positives.append(f"Deep water table ({water_depth}m) — excellent stability")
+            elif water_depth > 10:
+                score += 20; positives.append(f"Good water table depth ({water_depth}m)")
+            elif water_depth > 5:
+                score += 8; issues_list.append(f"Shallow water table ({water_depth}m) — pile foundations needed")
+            else:
+                issues_list.append(f"Very shallow water table ({water_depth}m) — high flood risk")
+            
+            # Soil pH
+            if 5.5 <= soil_ph <= 8.5:
+                score += 20; positives.append(f"Soil pH {soil_ph} is in construction-safe range")
+            else:
+                issues_list.append(f"Soil pH {soil_ph} outside ideal range (5.5–8.5)")
+            
+            # Soil moisture
+            if soil_moisture < 35:
+                score += 20; positives.append("Low soil moisture — good for compaction")
+            elif soil_moisture < 55:
+                score += 10; positives.append("Moderate soil moisture — standard drainage needed")
+            else:
+                issues_list.append(f"High soil moisture ({soil_moisture}%) — extensive waterproofing required")
+            
+            # Location type
+            if any(kw in lt for kw in ["ocean","sea","water","marine","river","lake"]):
+                score = 0; issues_list.append("Water body — construction impossible")
+            elif any(kw in lt for kw in ["polar","permafrost"]):
+                score = 5; issues_list.append("Permafrost — extremely difficult and costly to build")
+            elif any(kw in lt for kw in ["agri","fertile"]):
+                score += 20; positives.append("Stable agricultural land — good structural base")
+                issues_list.append("⚠️ Prime agricultural land — urban development may require legal clearance (land use change)")
+            elif any(kw in lt for kw in ["industrial","hazard"]):
+                score += 5; issues_list.append("Industrial contamination check mandatory before construction")
+            elif any(kw in lt for kw in ["desert","arid"]):
+                score += 12; issues_list.append("Sandy soil — deep anchored foundations required")
+            
+            score = max(0, min(100, score))
+            
+            if score >= 70:
+                rating = "✅ HIGHLY SUITABLE"
+                rec = "Proceed with standard geotechnical survey and EIA."
+            elif score >= 50:
+                rating = "⚠️ MODERATELY SUITABLE"
+                rec = "Construction feasible with proper engineering — obtain geotechnical survey."
+            elif score >= 25:
+                rating = "⚠️ LOW SUITABILITY"
+                rec = "Major interventions required. Consult structural engineer."
+            else:
+                rating = "❌ NOT SUITABLE"
+                rec = "Construction not recommended without site remediation."
+            
+            foundation_type = (
+                "Shallow raft/strip foundation (<1.5m)" if water_depth > 18 and soil_moisture < 40
+                else "Medium depth foundation (2–3m)" if water_depth > 10
+                else "Deep pile foundation (>4m)"
+            )
+            
+            positive_str = "\n".join(f"  ✅ {p}" for p in positives) if positives else "  None"
+            issues_str = "\n".join(f"  ⚠️ {i}" for i in issues_list) if issues_list else "  None"
+            
+            reply = (
+                f"🏗️ **Building & Construction Suitability — {loc_name}**:\n\n"
+                f"**Overall Rating**: {rating} (Score: {score}/100)\n\n"
+                f"**Key Parameters:**\n"
+                f"• Soil pH: **{soil_ph}** {'✅' if 5.5 <= soil_ph <= 8.5 else '⚠️'}\n"
+                f"• Water Table Depth: **{water_depth}m** {'✅ Safe' if water_depth > 10 else '⚠️ Shallow'}\n"
+                f"• Soil Moisture: **{soil_moisture}%** {'✅' if soil_moisture < 50 else '⚠️ High'}\n"
+                f"• Land Type: **{location_type}**\n"
+                f"• NDVI Vegetation: **{dominant_ndvi}** (Score: {ndvi})\n\n"
+                f"**Positive Factors:**\n{positive_str}\n\n"
+                f"**Issues / Concerns:**\n{issues_str}\n\n"
+                f"**Foundation Recommendation:** {foundation_type}\n\n"
+                f"💡 **Recommendation:** {rec}\n"
+                f"**Mandatory Steps:** Soil Bearing Capacity (CBR) Test → Geological Survey → EIA → Building Permit"
+            )
+            return {
+                "source": "Sentinel-AI Geo-Structural Assessment Engine",
+                "model": "Building Suitability AI (Geo-Engineering Module)",
+                "response": reply
+            }
         
         # 1. TAMIL Language Support (தமிழ்)
         if lang == "ta" or "tamil" in p_lower or any('\u0b80' <= c <= '\u0bff' for c in prompt):
