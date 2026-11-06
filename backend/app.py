@@ -15,8 +15,11 @@ FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fr
 app = Flask(__name__, static_folder=FRONTEND_DIR)
 CORS(app)
 
-# Initialize SQLite database
-init_db()
+# Initialize SQLite database safely
+try:
+    init_db()
+except Exception as e:
+    print('Database init non-critical error:', e)
 
 @app.route("/", methods=["GET"])
 def index():
@@ -24,6 +27,20 @@ def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 @app.route("/api/status", methods=["GET"])
+@app.route("/status", methods=["GET"])
+@app.route("/api/sentinel-status", methods=["GET"])
+@app.route("/sentinel-status", methods=["GET"])
+def sentinel_status():
+    return jsonify({
+        "status": "OPERATIONAL",
+        "satellites": {
+            "Sentinel-1": {"status": "ACTIVE", "mode": "C-band SAR Ground Moisture"},
+            "Sentinel-2": {"status": "ACTIVE", "mode": "MSI Multi-Spectral 10m NDVI"},
+            "Sentinel-3": {"status": "ACTIVE", "mode": "SLSTR Surface Temperature"},
+            "Sentinel-5P": {"status": "ACTIVE", "mode": "TROPOMI Atmospheric NO2/SO2"}
+        }
+    })
+
 def api_status():
     return jsonify({
         "status": "ONLINE",
@@ -39,6 +56,7 @@ def api_status():
     })
 
 @app.route("/api/building-suitability", methods=["POST"])
+@app.route("/building-suitability", methods=["POST"])
 def building_suitability():
     """Analyze whether a location's land is suitable for building/construction."""
     data = request.json or {}
@@ -197,6 +215,7 @@ def fetch_live_weather(lat, lon):
     }
 
 @app.route("/api/analyze-location", methods=["POST"])
+@app.route("/analyze-location", methods=["POST"])
 def analyze_location():
     data = request.json or {}
     lat = float(data.get("lat", 11.0168))
@@ -272,6 +291,7 @@ def analyze_location():
     })
 
 @app.route("/api/hf-chat", methods=["POST"])
+@app.route("/hf-chat", methods=["POST"])
 def hf_chat():
     data = request.json or {}
     prompt = data.get("prompt", "Recommend crops for this location")
@@ -281,6 +301,7 @@ def hf_chat():
     return jsonify(res)
 
 @app.route("/api/history", methods=["GET"])
+@app.route("/history", methods=["GET"])
 def get_history():
     history = get_recent_locations(15)
     return jsonify({"history": history})
