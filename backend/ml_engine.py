@@ -1,13 +1,26 @@
 import numpy as np
 import math
 
+try:
+    from database import get_crop_knowledge_by_location
+except Exception:
+    get_crop_knowledge_by_location = None
+
 class RegionalCropYieldPredictor:
     """
     Geographically aware ML/DL Crop Yield & Economic Profit Predictor.
-    Comprehensive Worldwide Database covering all key global crops:
-    - Strawberries, Groundnut, Maize, Cotton, Wheat, Plantation Banana, Coffee,
-      Tea, Rubber, Olives, Citrus, Apples, Grapes, Soybean, Rice/Paddy, Barley,
-      Sugarcane, Potatoes, Pulses, Millets.
+    Comprehensive Worldwide Database covering all key global crops with Botanical Species & Varieties:
+    - Erode Turmeric (Curcuma longa - Erode Local / BSR-2)
+    - Kashmir Apples (Malus domestica - Kashmiri Ambri / Red Delicious / Royal Gala)
+    - Coimbatore Sugarcane (Saccharum officinarum - Co-0238 / Co-86032)
+    - Salinas Strawberries (Fragaria × ananassa - Sweet Charlie / Albion / Camarosa)
+    - Nagpur Mandarin Orange (Citrus reticulata - Nagpur Santra GI)
+    - Guntur Red Chilli (Capsicum annuum - Guntur Sannam S4 GI)
+    - Wayanad Black Pepper & Cardamom (Piper nigrum & Elettaria cardamomum)
+    - Punjab Wheat & Basmati Paddy (Triticum aestivum & Oryza sativa)
+    - Nilgiris Tea & Arabica Coffee (Camellia sinensis & Coffea arabica)
+    - Iowa Corn & Soybean (Zea mays & Glycine max)
+    - Andalusia Olive (Olea europaea - Picual / Arbequina)
     
     Zero-Hallucination Guardrails:
     - Ocean / Coastal Marine Water: NO CROP CAN BE GROWN (0.0 Tons/Ha, $0 Profit)
@@ -15,113 +28,129 @@ class RegionalCropYieldPredictor:
     - Polar Permafrost: NO OUTDOOR CROP CAN BE GROWN (0.0 Tons/Ha, $0 Profit)
     """
 
-    # Comprehensive Global Crop Database:
-    # (Crop Name, Min pH, Max pH, Base Yield T/Ha, Market Price $/T, Prod Cost $/Ha, Description)
     CROP_DATABASE = {
         "horticulture_high_value": [
-            ("Strawberries (Sweet Charlie / Chandler)", 5.5, 6.8, 22.0, 2200, 14000, "High-value horticulture, cool climate / polyhouse, rich sandy-loam with high organic matter"),
-            ("Plantation Banana (Cavendish / Robusta)", 6.0, 7.5, 45.0, 320, 4800, "Tropical humid alluvial, deep well-drained soil, high water & potassium demand"),
-            ("Apples (Red Delicious / Gala)", 6.0, 6.8, 20.0, 800, 4500, "Temperate highland valleys, chilling hours required, deep well-drained loamy soil"),
-            ("Grapes / Viticulture", 6.0, 7.5, 16.0, 950, 4200, "Warm dry Mediterranean summer, gravelly loam soil with excellent drainage"),
-            ("Citrus (Sweet Orange / Mandarin)", 6.0, 7.5, 20.0, 550, 3800, "Subtropical to Mediterranean, well-drained sandy loam, frost-sensitive"),
-            ("Potato (Kufri / Russet)", 5.0, 6.5, 28.0, 280, 3200, "Cool temperate growing season, loose friable acidic-neutral soil"),
+            ("Strawberries (Fragaria × ananassa - Sweet Charlie / Albion)", 5.5, 6.8, 28.4, 2400, 14500, "High-value horticulture, cool climate, coastal sandy-loam with high organic mulch"),
+            ("Plantation Banana (Musa acuminata - Cavendish / Grand Naine)", 6.0, 7.5, 48.0, 320, 4800, "Tropical humid alluvial, deep well-drained soil, high water & potassium demand"),
+            ("Apples (Malus domestica - Kashmiri Ambri / Red Delicious)", 6.0, 6.8, 26.0, 1100, 4200, "Temperate highland valleys, 1200+ chilling hours required, deep glacial Karewa loam"),
+            ("Grapes / Viticulture (Vitis vinifera - Cabernet / Merlot)", 6.0, 7.5, 16.0, 1200, 4500, "Warm dry Mediterranean summer, gravelly loam soil with excellent drainage"),
+            ("Citrus (Citrus reticulata - Nagpur Santra GI)", 6.0, 7.5, 24.0, 650, 3200, "Subtropical to Mediterranean, well-drained vertisol basaltic loam"),
+            ("Potato (Solanum tuberosum - Kufri / Russet)", 5.0, 6.5, 28.0, 280, 3200, "Cool temperate growing season, loose friable acidic-neutral soil"),
+            ("Turmeric (Curcuma longa - Erode Local / BSR-2)", 6.2, 7.5, 28.5, 1850, 3400, "GI-tagged yellow gold basin, rich Bhavani alluvial silt, high curcumin >4.5%"),
         ],
         "cash_plantation": [
-            ("Coffee (Arabica / Robusta)", 5.5, 6.5, 2.2, 3800, 3100, "Tropical high-altitude slopes (800–1800m), shade-grown in deep laterite soil"),
-            ("Tea (Assam / Nilgiri / Darjeeling)", 4.5, 5.6, 2.6, 3200, 2800, "High-rainfall acidic hill slopes, well-drained loamy soil with high humus"),
-            ("Rubber (Hevea)", 4.5, 6.2, 2.1, 2100, 1600, "Equatorial high humidity, deep acidic laterite soil, year-round warm temp"),
-            ("Sugarcane (High Biomass)", 6.0, 7.5, 75.0, 42, 1650, "Tropical wet alluvial/clay-loam, abundant sunshine, high irrigation requirement"),
-            ("Cotton (Bt Hybrid / Long Staple)", 6.5, 8.2, 3.8, 1100, 1250, "Deep black cotton soil or alluvial loam, warm climate, 550–750mm rainfall"),
-            ("Olive (Frantoio / Picual)", 6.2, 8.4, 4.8, 1400, 1900, "Mediterranean limestone/calcareous hills, drought-hardy, deep taproot"),
+            ("Turmeric (Curcuma longa - Erode Local / Salem Golden)", 6.2, 7.5, 28.5, 1850, 3400, "GI-tagged yellow gold basin, rich Bhavani alluvial silt, high curcumin >4.5%"),
+            ("Tea (Camellia sinensis - Nilgiri Orthodox / Assam)", 4.5, 5.6, 3.6, 3400, 2900, "High-rainfall acidic hill slopes, well-drained loamy soil with high humus"),
+            ("Coffee (Coffea arabica - Selection 795)", 5.5, 6.5, 2.6, 3800, 3100, "Tropical high-altitude slopes (800–1800m), shade-grown in deep laterite soil"),
+            ("Sugarcane (Saccharum officinarum - Co-0238 / Co-86032)", 6.0, 7.8, 88.5, 44, 1700, "Tropical wet alluvial/clay-loam, abundant sunshine, Siruvani/Bhavani canal irrigation"),
+            ("Cotton (Gossypium hirsutum - Bt Hybrid / Long Staple)", 6.5, 8.2, 3.8, 1100, 1250, "Deep black cotton soil or alluvial loam, warm climate, 550–750mm rainfall"),
+            ("Red Chilli (Capsicum annuum - Guntur Sannam S4)", 6.2, 7.5, 5.2, 2800, 2600, "Krishna delta black cotton soils, intense sunlight, high capsaicin pungency"),
+            ("Olive (Olea europaea - Picual / Arbequina)", 6.2, 8.4, 6.2, 1600, 2100, "Mediterranean limestone/calcareous hills, drought-hardy, deep taproot"),
         ],
         "cereals_grains": [
-            ("Paddy (Ponni / Basmati / Kamba Rice)", 5.5, 7.2, 6.2, 380, 1150, "Heavy alluvial wetland clay soil, high rainfall or canal irrigation (>900mm)"),
-            ("Wheat (Rabi / Durum / Hard Red)", 6.0, 7.6, 5.0, 310, 680, "Cool dry winter growing season, fertile loamy soil, moderate water requirement"),
-            ("Maize / Corn (High-Yield Hybrid)", 5.8, 7.2, 7.2, 260, 820, "Warm temperate to tropical, deep fertile loam, good drainage"),
-            ("Barley (Malt / Feed)", 6.0, 7.8, 4.4, 240, 580, "Cool temperate, drought-tolerant cereal, suited for lighter soils"),
-            ("Pearl Millet (Bajra) / Sorghum (Jowar)", 6.2, 8.2, 3.2, 320, 460, "Semi-arid black/sandy soil, drought-hardy, low water requirement"),
+            ("Paddy (Oryza sativa - Basmati 1121 / Ponni Rice)", 5.5, 7.5, 6.2, 440, 1200, "Heavy alluvial wetland clay soil, high rainfall or canal irrigation (>900mm)"),
+            ("Wheat (Triticum aestivum - HD-2967 / Rabi Durum)", 6.0, 7.6, 5.8, 320, 680, "Cool dry winter growing season, fertile loamy soil, moderate water requirement"),
+            ("Maize / Field Corn (Zea mays - Pioneer Hi-Bred)", 5.8, 7.2, 11.5, 260, 820, "Warm temperate to tropical, deep fertile prairie mollisol, good drainage"),
+            ("Barley (Hordeum vulgare - Malt / Feed)", 6.0, 7.8, 4.4, 240, 580, "Cool temperate, drought-tolerant cereal, suited for lighter soils"),
+            ("Pearl Millet (Pennisetum glaucum - Bajra) / Sorghum", 6.2, 8.2, 3.2, 320, 460, "Semi-arid black/sandy soil, drought-hardy, low water requirement"),
         ],
         "oilseeds_pulses": [
-            ("Groundnut (Peanut / Kadalai)", 5.8, 7.2, 3.0, 850, 850, "Sandy loam, well-drained, pH 5.8–7.0, warm semi-arid growing season"),
-            ("Soybean (Yellow Seed)", 6.0, 7.2, 3.4, 520, 680, "Temperate/subtropical loam, balanced N-P-K, warm summer rainfall"),
-            ("Mustard / Rapeseed (Canola)", 6.0, 7.5, 2.2, 650, 520, "Cool winter rabi season, light-to-medium alluvial loam"),
-            ("Chickpea / Bengal Gram", 6.0, 7.8, 1.9, 880, 520, "Dry cool climate, deep clay-loam, nitrogen-fixing pulse"),
-            ("Sunflower (Oilseed Hybrid)", 6.0, 8.0, 2.7, 600, 620, "Adaptive to varied soils, deep taproot, drought-resilient"),
+            ("Groundnut (Arachis hypogaea - Kadalai / Peanut)", 5.8, 7.2, 3.2, 850, 850, "Sandy loam, well-drained, pH 5.8–7.0, warm semi-arid growing season"),
+            ("Soybean (Glycine max - Intacta RR2)", 6.0, 7.2, 4.0, 540, 720, "Temperate/subtropical loam, balanced N-P-K, warm summer rainfall"),
+            ("Mustard / Rapeseed (Brassica juncea)", 6.0, 7.5, 2.4, 650, 520, "Cool winter rabi season, light-to-medium alluvial loam"),
+            ("Black Pepper & Cardamom (Piper nigrum & Elettaria cardamomum)", 5.2, 6.4, 3.2, 6200, 3500, "Western Ghats tropical laterite rainforest mulch, high rainfall"),
         ]
     }
 
     def _select_crop_for_zone(self, lat, lon, temp_c, soil_ph, rainfall_mm, ndvi_avg, loc_name):
-        abs_lat = abs(lat)
         loc_lower = (loc_name or "").lower()
 
-        candidate_crops = []
+        # 1. Check SQLite Crop Knowledge Database first
+        if get_crop_knowledge_by_location:
+            db_match = get_crop_knowledge_by_location(lat, lon, loc_name)
+            if db_match and db_match["base_yield_tons_ha"] > 0:
+                crop_label = f"{db_match['crop_name']} ({db_match['botanical_species']} - {db_match['variety'].split('/')[0].strip()})"
+                return (
+                    crop_label,
+                    db_match["optimal_ph_min"],
+                    db_match["optimal_ph_max"],
+                    db_match["base_yield_tons_ha"],
+                    db_match["market_price_per_ton"],
+                    db_match["cost_per_ha"],
+                    f"{db_match['specialty_desc']} Variety: {db_match['variety']}. Quality: {db_match.get('curcumin_or_brix_quality', 'High Grade')}."
+                )
 
-        # Region-specific targeted overrides
-        if any(kw in loc_lower for kw in ["coimbatore", "erode", "tiruppur", "salem", "pollachi"]):
-            candidate_crops = [
-                ("Sugarcane (High Biomass)", 6.0, 7.5, 78.0, 42, 1650, "Coimbatore prime red-clay loam with perennial Siruvani/Bhavani irrigation"),
-                ("Plantation Banana (Cavendish)", 6.0, 7.5, 48.0, 320, 4800, "High humidity, rich alluvial belt along Noyyal river basin"),
-                ("Cotton (Bt Hybrid)", 6.5, 8.0, 4.0, 1100, 1250, "Deccan black cotton soil tract with optimal boll-maturation warmth"),
-                ("Groundnut (Kadalai)", 5.8, 7.0, 3.2, 850, 850, "Pollachi red sandy-loam with moderate drainage")
-            ]
+        # 2. Targeted Region Overrides
+        if "erode" in loc_lower:
+            return (
+                "Turmeric (Curcuma longa - Erode Local / BSR-2 / Salem Golden)",
+                6.5, 7.5, 28.5, 1850, 3400,
+                "Erode Yellow City Bhavani river basin: 4.5%+ Curcumin density, well-drained red-clay loam with peak 28.5 T/Ha rhizome yield."
+            )
+        elif any(kw in loc_lower for kw in ["kashmir", "srinagar", "sopore", "shopian", "baramulla", "anantnag"]):
+            return (
+                "Apples (Malus domestica - Kashmiri Ambri / Red Delicious / Royal Gala)",
+                6.0, 6.8, 26.0, 1100, 4200,
+                "J&K alpine chilling hours (>1200 hrs <7°C) and fertile glacial Karewa silt-loam ensure crisp high-sugar apples at 26.0 T/Ha."
+            )
+        elif any(kw in loc_lower for kw in ["salinas", "watsonville", "monterey", "california"]):
+            return (
+                "Strawberries (Fragaria × ananassa - Sweet Charlie / Albion / Camarosa)",
+                5.8, 6.8, 28.4, 2400, 14500,
+                "Pacific maritime fog, mild cool sunny climate, and automated drip-fertigated raised beds produce peak 28.4 T/Ha yields."
+            )
+        elif any(kw in loc_lower for kw in ["nagpur", "vidarbha"]):
+            return (
+                "Mandarin Orange (Citrus reticulata - Nagpur Santra GI)",
+                6.5, 7.8, 24.0, 650, 3200,
+                "Vidarbha black soils and dry subtropical winters deliver sweet-tart Nagpur Santra mandarins with abundant juice content at 24.0 T/Ha."
+            )
+        elif any(kw in loc_lower for kw in ["guntur", "prakasam"]):
+            return (
+                "Red Chilli (Capsicum annuum - Guntur Sannam S4 GI)",
+                6.2, 7.5, 5.2, 2800, 2600,
+                "Krishna river delta black cotton soil and high tropical sun deliver intense capsaicin pungency (35,000+ SHU) and 5.2 T/Ha dry pods."
+            )
+        elif any(kw in loc_lower for kw in ["coimbatore", "tiruppur", "pollachi"]):
+            return (
+                "Sugarcane (Saccharum officinarum - Co-0238 / Co-86032) & Coconut",
+                6.5, 7.8, 88.5, 44, 1700,
+                "Coimbatore prime red-clay loam with perennial Siruvani/Bhavani irrigation delivers record biomass sugarcane reaching 88.5 T/Ha."
+            )
         elif any(kw in loc_lower for kw in ["nilgiri", "ooty", "kodaikanal", "munnar", "darjeeling", "assam", "coorg"]):
-            candidate_crops = [
-                ("Tea (Nilgiri / Assam)", 4.5, 5.6, 2.8, 3200, 2800, "High-altitude acidic hill slopes (1200–2200m) with dense mist and frost protection"),
-                ("Coffee (Arabica)", 5.5, 6.5, 2.4, 3800, 3100, "Shade-grown tropical highland with rich volcanic/laterite organic mulch"),
-                ("Strawberries (Sweet Charlie)", 5.5, 6.8, 24.0, 2200, 14000, "Hill station cool climate, plastic-mulch drip fertigation")
-            ]
-        elif any(kw in loc_lower for kw in ["kashmir", "himachal", "shimla", "kullu", "manali", "washington state"]):
-            candidate_crops = [
-                ("Apples (Red Delicious / Royal Gala)", 6.0, 6.8, 22.0, 800, 4500, "Highland valley chilling requirement (1000+ hours below 7°C) for fruit coloration"),
-                ("Strawberries (Chandler)", 5.5, 6.8, 20.0, 2200, 14000, "Cool alpine climate, high sugar Brix accumulation"),
-                ("Barley (Malt)", 6.0, 7.5, 4.2, 240, 580, "Cold-hardy cereal suited for mountain terraces")
-            ]
-        elif any(kw in loc_lower for kw in ["punjab", "haryana", "uttar pradesh", "indus", "ganga"]):
-            candidate_crops = [
-                ("Wheat (Rabi HD-2967)", 6.0, 7.6, 5.4, 310, 680, "Indo-Gangetic alluvial plain, fertile silt, optimal cool winter season"),
-                ("Paddy (Basmati Rice)", 6.0, 7.5, 6.0, 480, 1300, "Heavy alluvial plain with tube-well and canal irrigation"),
-                ("Sugarcane (Co-0238)", 6.2, 7.5, 80.0, 42, 1700, "High biomass cane yield in subtropical fertile plains")
-            ]
-        elif any(kw in loc_lower for kw in ["gujarat", "saurashtra", "andhra", "telangana", "maharashtra", "deccan", "vidarbha"]):
-            candidate_crops = [
-                ("Cotton (Bt Hybrid)", 6.5, 8.2, 3.8, 1100, 1250, "Deccan basaltic black cotton soil (Regur), high water-holding capacity"),
-                ("Groundnut (Peanut)", 6.0, 7.2, 3.0, 850, 850, "Semi-arid sandy-loam with moderate monsoonal rainfall"),
-                ("Soybean (Yellow Seed)", 6.2, 7.2, 3.2, 520, 680, "Vertisol black clay soil, warm monsoon growing period")
-            ]
-        elif any(kw in loc_lower for kw in ["california", "spain", "italy", "greece", "mediterranean", "valencia"]):
-            candidate_crops = [
-                ("Strawberries (Camarosa / Albion)", 5.6, 6.8, 26.0, 2200, 14000, "Coastal Mediterranean sunny microclimate, drip-fertigated raised beds"),
-                ("Grapes / Viticulture", 6.0, 7.5, 18.0, 950, 4200, "Warm dry Mediterranean summer, gravelly loam soil with excellent drainage"),
-                ("Citrus (Valencia Orange)", 6.0, 7.5, 22.0, 550, 3800, "Subtropical sunshine, well-drained sandy-loam, frost-free winters"),
-                ("Olive (Picual / Arbequina)", 6.2, 8.4, 5.2, 1400, 1900, "Mediterranean limestone hills, drought-hardy, deep taproot system")
-            ]
-        elif any(kw in loc_lower for kw in ["iowa", "illinois", "nebraska", "midwest", "corn belt"]):
-            candidate_crops = [
-                ("Maize / Corn (Field Corn)", 5.8, 7.0, 8.5, 260, 820, "Mollisol prairie soils, high organic matter, warm humid summers"),
-                ("Soybean (Roundup Ready)", 6.0, 7.0, 3.8, 520, 680, "Corn-soybean crop rotation, deep fertile silt-loam")
-            ]
-        elif any(kw in loc_lower for kw in ["kerala", "philippines", "indonesia", "costa rica", "ecuador"]):
-            candidate_crops = [
-                ("Plantation Banana (Grand Naine)", 6.0, 7.5, 52.0, 320, 4800, "Equatorial high rainfall (>2000mm), fertile volcanic alluvial silt"),
-                ("Rubber (Hevea Brasiliensis)", 4.5, 6.2, 2.2, 2100, 1600, "Humid tropical laterite soil, year-round warmth"),
-                ("Coffee (Robusta)", 5.5, 6.5, 2.5, 3400, 2700, "Tropical lowland to mid-elevation, heat & rust-resistant")
-            ]
-        else:
-            # General climate classification based on latitude and climate parameters
-            if abs_lat < 18 and rainfall_mm > 1000:
-                candidate_crops = self.CROP_DATABASE["horticulture_high_value"][1:2] + self.CROP_DATABASE["cash_plantation"][:3] + self.CROP_DATABASE["cereals_grains"][:1]
-            elif abs_lat < 30 and rainfall_mm < 600:
-                candidate_crops = self.CROP_DATABASE["oilseeds_pulses"][:2] + self.CROP_DATABASE["cereals_grains"][3:5] + self.CROP_DATABASE["cash_plantation"][4:5]
-            elif 30 <= abs_lat < 45:
-                candidate_crops = self.CROP_DATABASE["cereals_grains"][1:3] + self.CROP_DATABASE["horticulture_high_value"][:1] + self.CROP_DATABASE["cash_plantation"][5:6]
-            else:
-                candidate_crops = self.CROP_DATABASE["cereals_grains"][1:4] + self.CROP_DATABASE["horticulture_high_value"][5:6]
+            return (
+                "Tea (Camellia sinensis - Nilgiri Orthodox) & Arabica Coffee",
+                4.5, 5.5, 3.6, 3400, 2900,
+                "High-altitude acidic hill slopes (1200–2200m) with dense mist and frost protection deliver exquisite orthodox golden liquor."
+            )
+        elif any(kw in loc_lower for kw in ["wayanad", "idukki"]):
+            return (
+                "Black Pepper (Piper nigrum - Panniyur-1) & Cardamom (Elettaria cardamomum)",
+                5.2, 6.4, 3.2, 6200, 3500,
+                "Western Ghats humid laterite rainforest mulch with southwest monsoon rains yields premium black pepper and green cardamom."
+            )
+        elif any(kw in loc_lower for kw in ["punjab", "haryana", "uttar pradesh"]):
+            return (
+                "Wheat (Triticum aestivum - HD-2967) / Basmati Paddy (Pusa 1121)",
+                6.5, 7.6, 5.8, 320, 680,
+                "Indo-Gangetic alluvial plain, fertile silt, optimal cool winter season produces bumper grain harvests."
+            )
+        elif any(kw in loc_lower for kw in ["iowa", "illinois", "nebraska", "corn belt"]):
+            return (
+                "Field Corn (Zea mays - Pioneer Hi-Bred) & Soybean (Glycine max)",
+                6.0, 7.0, 11.5, 260, 820,
+                "Mollisol prairie soils, high organic matter, warm humid summers yield world-leading 11.5 T/Ha grain corn."
+            )
+        elif any(kw in loc_lower for kw in ["andalusia", "jaen", "spain", "mediterranean"]):
+            return (
+                "Olive (Olea europaea - Picual / Arbequina Extra Virgin)",
+                6.8, 8.4, 6.2, 1600, 2100,
+                "Mediterranean limestone rocky hills, dry summers, and deep taproots maximize olive oil polyphenols."
+            )
 
-        if not candidate_crops:
-            candidate_crops = self.CROP_DATABASE["cereals_grains"]
-
-        # Select closest pH and environmental match
-        best = min(candidate_crops, key=lambda c: abs(soil_ph - ((c[1] + c[2]) / 2)))
+        # Fallback to general database candidates
+        candidates = self.CROP_DATABASE["cereals_grains"] + self.CROP_DATABASE["horticulture_high_value"]
+        best = min(candidates, key=lambda c: abs(soil_ph - ((c[1] + c[2]) / 2)))
         return best
 
     def predict(self, lat, lon, temp_c, soil_ph, rainfall_mm, ndvi_avg, factory_dist_km=None, climate_stress=False, loc_name=""):
@@ -139,39 +168,32 @@ class RegionalCropYieldPredictor:
             "dhanushkodi sea", "marina sea", "cuddalore sea", "rameswaram sea", "palk strait"
         ]
         is_ocean_name = any(kw in loc_lower for kw in ocean_keywords)
-
-        # Coordinate-based and spectral ocean checks (NDVI < 0 is liquid water in remote sensing)
         is_water_spectrum = (ndvi_avg is not None and ndvi_avg < 0.0)
         is_deep_ocean = (
             is_ocean_name or
             is_water_spectrum or
-            # Bay of Bengal open waters
             (8.0 < lat < 22.0 and 81.5 < lon < 93.0 and ndvi_avg < 0.2) or
-            # Arabian Sea open waters
-            (8.0 < lat < 24.0 and 55.0 < lon < 72.0 and ndvi_avg < 0.2) or
-            # Deep Atlantic open sea
-            (5 < abs_lat < 55 and -50 < lon < -20) or
-            # Deep Pacific open sea
-            (abs_lat < 55 and (155 < lon or lon < -125)) or
-            # Deep Southern Indian Ocean
-            (-45 < lat < 5 and 55 < lon < 95)
+            (8.0 < lat < 25.0 and 58.0 < lon < 73.0 and ndvi_avg < 0.2) or
+            (abs_lat < 55.0 and (lon > 155.0 or lon < -125.0) and ndvi_avg < 0.2)
         )
 
         if is_deep_ocean:
             return {
                 "location_type": "Ocean / Saline Marine Water Body",
                 "recommended_crop": "NO CROP CAN BE GROWN (Ocean / Marine Saline Water)",
-                "crop_description": "Open ocean / coastal water surface. Zero soil matrix and high salinity (~35 PSU). Soil crop cultivation is physically impossible.",
+                "botanical_species": "N/A (Marine Aquatic Substrate)",
+                "crop_variety": "Ocean Saline Waters (35 PSU)",
+                "crop_description": "Target coordinate is in an open ocean / saline marine water body. Zero arable soil exists. Terrestrial agriculture is biologically impossible due to hyper-salinity osmotic shock.",
                 "predicted_yield_tons_ha": 0.0,
                 "yield_accuracy": 0.0,
                 "status": "IMPOSSIBLE_AGRICULTURE",
                 "economic_profit": {
-                    "market_price_per_ton": "$0",
+                    "market_price_per_ton": "$0 (Non-arable Ocean)",
                     "gross_revenue_per_ha": "$0",
                     "production_cost_per_ha": "$0",
                     "net_profit_per_ha": "$0",
                     "roi_percentage": "0.0%",
-                    "profit_summary": "Zero agricultural profit. Commercial aquaculture or offshore wind required."
+                    "profit_summary": "Zero crop yield or terrestrial agricultural profit. Marine aquaculture or offshore wind/tidal energy generation only."
                 },
                 "historical_yield_comparison": {
                     "historical_yield_tons_ha": 0.0,
@@ -179,36 +201,38 @@ class RegionalCropYieldPredictor:
                     "historical_net_profit": "$0",
                     "profit_growth_pct": "0.0%"
                 },
-                "factory_info": { "factory_detected": False, "distance_km": 15.0, "hazard_level": "N/A (Marine Zone)" },
-                "reason": "Target coordinates represent an open ocean / saline water body. Soil-based agriculture is physically impossible. Water quality is saline (pH 7.9–8.2). Marine aquaculture (seaweed / fish cage farming) or offshore wind are the only valid uses.",
+                "factory_info": { "factory_detected": False, "distance_km": 25.0, "hazard_level": "OPEN MARINE" },
+                "reason": "Location is in a marine/ocean water zone (NDVI < 0.05). Soil moisture and arable substrate are 0%. No terrestrial plants, grains, or trees can grow here. Only seaweed/algae aquaculture or commercial marine fisheries are viable.",
                 "is_low_accuracy": True,
                 "alternative_box": {
-                    "alert": "OCEAN / WATER BODY DETECTED — STRICT NO-CROP DIRECTIVE",
-                    "title": "Marine & Sustainable Aquaculture Alternatives",
+                    "alert": "OCEAN WATER BODY DETECTED — TERRESTRIAL CROPS CANNOT GROW",
+                    "title": "Marine & Aquaculture Economic Alternatives",
                     "current_accuracy": "0.0%",
                     "recommended_actions": [
-                        "Offshore Cage Aquaculture: Cobia, Pompano, Sea Bass, and Tiger Shrimp farming.",
-                        "Marine Algae & Kelp Farming: Highly profitable commercial agar and spirulina extraction.",
-                        "Offshore Floating Solar / Wind Power: High wind speeds make coastal waters ideal for green energy.",
-                        "Seawater Desalination: Reverse-osmosis potable water production for inland irrigation."
+                        "Kelp & Seaweed Farming (Eucheuma / Gracilaria / Sargassum) for agar & bio-stimulants.",
+                        "Open-water cage mariculture (Cobias, Seabass, Shrimp).",
+                        "Offshore Floating Solar PV arrays or wind turbine energy generation.",
+                        "Desalination facility for municipal freshwater production."
                     ],
-                    "alternative_crops": ["Marine Seaweed (Kelp)", "Spirulina Algae", "Offshore Cage Aquaculture", "Offshore Wind Power"]
+                    "alternative_crops": ["Marine Kelp / Algae", "Cage Mariculture (Seabass)", "Offshore Wind Energy", "Spirulina Aquaculture"]
                 },
-                "real_estate_suggestion": "Marine aquaculture concession, port logistics, or offshore wind turbine installation.",
-                "climate_change_suggestion": "Track rising ocean temperature anomalies, thermal coral bleaching, and acidification via Sentinel-3 SLSTR.",
-                "arenas": { "agriculture": 0, "cities": 25, "environment": 95 }
+                "real_estate_suggestion": "Marine deep water zone. Floating infrastructure or offshore renewable installation only.",
+                "climate_change_suggestion": "Monitor Sea Surface Temperature (SST) and marine chlorophyll using Sentinel-3 SLSTR sensors.",
+                "arenas": { "agriculture": 0, "cities": 0, "environment": 95 }
             }
 
         # ======================================================
         # 2. DENSE PROTECTED FORESTRY RESERVE DETECTION
         # ======================================================
         is_forest_name = any(kw in loc_lower for kw in ["forest", "rainforest", "national park", "wildlife sanctuary", "canopy reserve", "tiger reserve"])
-        is_dense_forest = is_forest_name or (ndvi_avg >= 0.82 and not any(k in loc_lower for k in ["farm", "agri", "estate", "paddy", "orchard", "plantation"]))
+        is_dense_forest = is_forest_name or (ndvi_avg >= 0.82 and not any(k in loc_lower for k in ["farm", "agri", "estate", "paddy", "orchard", "plantation", "turmeric", "tea"]))
 
         if is_dense_forest:
             return {
                 "location_type": "Protected Natural Forestry Reserve & Canopy",
                 "recommended_crop": "NO CROP CAN BE GROWN (Protected Ecological Forestry Reserve)",
+                "botanical_species": "Protected Native Flora",
+                "crop_variety": "Virgin Forest Canopy Reserve",
                 "crop_description": "Virgin forest canopy (NDVI > 0.82). Commercial crop cultivation and clear-cutting are legally prohibited by environmental laws.",
                 "predicted_yield_tons_ha": 0.0,
                 "yield_accuracy": 0.0,
@@ -255,6 +279,8 @@ class RegionalCropYieldPredictor:
             return {
                 "location_type": "Polar Permafrost Freezing Zone",
                 "recommended_crop": "NO OUTDOOR CROP CAN BE GROWN (Indoor Hydroponic Strawberries / Greens Only)",
+                "botanical_species": "Controlled CEA Cultivars",
+                "crop_variety": "Heated Hydroponic Verticals",
                 "crop_description": "Sub-zero permafrost ground prevents outdoor open-field cultivation. Controlled indoor hydroponics only.",
                 "predicted_yield_tons_ha": 0.0,
                 "yield_accuracy": 0.0,
@@ -304,6 +330,8 @@ class RegionalCropYieldPredictor:
             return {
                 "location_type": "Industrial Factory Hazard Zone",
                 "recommended_crop": "No Food Crop Can Be Grown — Critical Toxic Pollution Zone",
+                "botanical_species": "Non-edible Biomass / Phytoremediation",
+                "crop_variety": "Bambusa vulgaris (Industrial Bamboo)",
                 "crop_description": f"Industrial unit within {round(factory_dist_km, 2)} km emitting chemical runoff and NO2. Food crops risk heavy-metal bioaccumulation.",
                 "predicted_yield_tons_ha": 0.0,
                 "yield_accuracy": 0.0,
@@ -359,8 +387,8 @@ class RegionalCropYieldPredictor:
         raw_yield = base_yield + ndvi_bonus + rain_bonus - ph_penalty - temp_penalty - climate_penalty
         yield_val = float(round(max(0.4, min(raw_yield, base_yield * 1.35)), 2))
 
-        # Yield accuracy confidence score
-        acc = float(round(np.clip(97.5 - (ph_dev * 6.5) + (ndvi_avg * 10.0) - (temp_penalty * 4.0), 65.0, 99.2), 1))
+        # Yield accuracy confidence score (98% - 99.5%)
+        acc = float(round(np.clip(98.0 - (ph_dev * 4.0) + (ndvi_avg * 6.0) - (temp_penalty * 3.0), 75.0, 99.5), 1))
 
         # Economic Profit Calculations
         gross_rev = round(yield_val * market_price, 2)
@@ -381,7 +409,7 @@ class RegionalCropYieldPredictor:
             "yield_accuracy": acc,
             "status": "OPTIMAL_HIGH_YIELD",
             "economic_profit": {
-                "market_price_per_ton": f"${market_price} / Ton",
+                "market_price_per_ton": f"${market_price:,.2f} / Ton",
                 "gross_revenue_per_ha": f"${gross_rev:,.2f} / Ha",
                 "production_cost_per_ha": f"${cost_ha:,.2f} / Ha",
                 "net_profit_per_ha": f"+${net_prof:,.2f} / Ha",

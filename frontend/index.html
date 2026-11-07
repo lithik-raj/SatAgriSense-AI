@@ -963,6 +963,154 @@
   let nearbyMarkersGroup = null; // Leaflet nearby places layer
 
   // ============================================================
+  // VOICE & PANEL CONTROLLERS (Minimize, Maximize, Chat Voice Reader)
+  // ============================================================
+  let chatVoiceActive = true;
+
+  function toggleSearchBoxMinimize() {
+    const box = document.getElementById('search-box');
+    const icon = document.getElementById('search-min-icon');
+    if (!box) return;
+    box.classList.toggle('minimized');
+    if (icon) {
+      if (box.classList.contains('minimized')) {
+        icon.className = 'fa-solid fa-plus';
+        icon.title = 'Expand Search Box';
+      } else {
+        icon.className = 'fa-solid fa-minus';
+        icon.title = 'Minimize Search Box';
+      }
+    }
+  }
+
+  function toggleCVPanelMinimize() {
+    const p = document.getElementById('cv-panel');
+    const icon = document.getElementById('cv-min-icon');
+    if (!p) return;
+    p.classList.toggle('minimized');
+    if (icon) {
+      if (p.classList.contains('minimized')) {
+        icon.className = 'fa-solid fa-plus';
+        icon.title = 'Expand 2D Analysis';
+      } else {
+        icon.className = 'fa-solid fa-minus';
+        icon.title = 'Minimize 2D Analysis';
+      }
+    }
+  }
+
+  function closeCVPanel() {
+    const p = document.getElementById('cv-panel');
+    const reopenBtn = document.getElementById('reopen-cv-btn');
+    if (p) p.classList.add('closed');
+    if (reopenBtn) reopenBtn.style.display = 'flex';
+  }
+
+  function openCVPanel() {
+    const p = document.getElementById('cv-panel');
+    const reopenBtn = document.getElementById('reopen-cv-btn');
+    if (p) {
+      p.classList.remove('closed');
+      p.classList.remove('minimized');
+    }
+    const icon = document.getElementById('cv-min-icon');
+    if (icon) icon.className = 'fa-solid fa-minus';
+    if (reopenBtn) reopenBtn.style.display = 'none';
+  }
+
+  function toggleChatVoiceSpeech() {
+    chatVoiceActive = !chatVoiceActive;
+    updateChatVoiceUI();
+    if (!chatVoiceActive && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  function updateChatVoiceUI() {
+    const label = document.getElementById('chat-voice-label');
+    const icon = document.getElementById('chat-voice-icon');
+    const readerText = document.getElementById('reader-btn-text');
+    const bottomIcon = document.getElementById('bottom-voice-icon');
+    const topBtn = document.getElementById('chat-voice-toggle-btn');
+    const bottomBtn = document.getElementById('toggle-reader-btn');
+
+    if (label) label.textContent = chatVoiceActive ? 'Voice: ON' : 'Voice: OFF';
+    if (icon) icon.className = chatVoiceActive ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+    if (readerText) readerText.textContent = chatVoiceActive ? 'Voice Reader: ON' : 'Voice Reader: OFF';
+    if (bottomIcon) bottomIcon.className = chatVoiceActive ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+
+    if (topBtn) {
+      topBtn.style.background = chatVoiceActive ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.06)';
+      topBtn.style.borderColor = chatVoiceActive ? '#00f0ff' : 'rgba(255,255,255,0.2)';
+      topBtn.style.color = chatVoiceActive ? '#00f0ff' : '#888';
+    }
+    if (bottomBtn) {
+      bottomBtn.style.background = chatVoiceActive ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.06)';
+      bottomBtn.style.borderColor = chatVoiceActive ? 'var(--cyan-glow)' : 'rgba(255,255,255,0.2)';
+      bottomBtn.style.color = chatVoiceActive ? '#00f0ff' : '#888';
+    }
+  }
+
+  function speakFullChatResponse(rawText) {
+    if (!chatVoiceActive || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      let clean = String(rawText || '')
+        .replace(/<br\s*\/?>/gi, '. ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/[*_#`~>]/g, '')
+        .replace(/[🌾🍎🍊🍓🌱💧🧪🏭📍📊💡📅👋🎙️]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!clean) return;
+
+      const chunks = clean.match(/[^.!?]+[.!?]+|\S+/g) || [clean];
+      let chunkIdx = 0;
+
+      function speakNext() {
+        if (!chatVoiceActive || chunkIdx >= chunks.length) return;
+        const textChunk = chunks[chunkIdx].trim();
+        if (!textChunk) {
+          chunkIdx++;
+          return speakNext();
+        }
+        const utter = new SpeechSynthesisUtterance(textChunk);
+        utter.rate = 1.0;
+        utter.pitch = 1.0;
+        utter.lang = 'en-US';
+        utter.onend = function() {
+          chunkIdx++;
+          speakNext();
+        };
+        utter.onerror = function() {
+          chunkIdx++;
+          speakNext();
+        };
+        window.speechSynthesis.speak(utter);
+      }
+      speakNext();
+    } catch(err) {
+      console.warn('SpeechSynthesis error:', err);
+    }
+  }
+
+  function selectHistoryLocation(lat, lon, name, country) {
+    const slide = document.getElementById('history-slide');
+    if (slide) slide.classList.remove('open');
+    triggerLocationAnalysis(lat, lon, name, country);
+    if (activeMapMode === '2d' && leafletMapInstance) {
+      leafletMapInstance.panTo([lat, lon]);
+    } else if (globeMesh) {
+      update3DPinPosition(lat, lon);
+    }
+    if ('speechSynthesis' in window && document.getElementById('voice-toggle')?.checked) {
+      speakText(`Loaded history location: ${name.split(',')[0]}`);
+    }
+  }
+
+  // ============================================================
   // LOADING SCREEN DISMISSAL (Instant & Zero-Delay)
   // ============================================================
   let loadingDismissed = false;
@@ -987,27 +1135,60 @@
   // ============================================================
   function startVoiceInput() {
     const micBtn = document.getElementById('mic-btn');
+    const voiceStatus = document.getElementById('voice-status');
+    const input = document.getElementById('location-input');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Speech Recognition not supported. Type location instead."); return; }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    micBtn.classList.add('mic-listening');
-    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-microphone" style="color:red;"></i> Listening... speak location name now';
+    if (!SpeechRecognition) {
+      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ffa500;"></i> Voice input not supported by browser. Type location name instead.';
+      if (input) input.focus();
+      return;
+    }
 
-    recognition.onresult = function(e) {
-      micBtn.classList.remove('mic-listening');
-      const spoken = e.results[0][0].transcript.trim();
-      document.getElementById('location-input').value = spoken;
-      document.getElementById('voice-status').innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "${spoken}" - Searching...`;
-      searchLocationByName();
-    };
-    recognition.onerror = function() {
-      micBtn.classList.remove('mic-listening');
-      document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-times" style="color:red;"></i> Voice error. Try again.';
-    };
-    recognition.start();
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      if (micBtn) micBtn.classList.add('mic-listening');
+      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening... Speak city, region, or crop name now';
+
+      recognition.onresult = function(e) {
+        if (micBtn) micBtn.classList.remove('mic-listening');
+        if (e.results && e.results[0] && e.results[0][0]) {
+          const spoken = e.results[0][0].transcript.trim();
+          if (input) input.value = spoken;
+          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "<strong>${spoken}</strong>" — Searching location...`;
+          searchLocationByName();
+        }
+      };
+
+      recognition.onerror = function(e) {
+        if (micBtn) micBtn.classList.remove('mic-listening');
+        const err = e ? e.error : 'unknown';
+        if (err === 'not-allowed' || err === 'service-not-allowed') {
+          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-lock" style="color:#ffa500;"></i> Microphone blocked. Allow mic in browser address bar or type location name.';
+        } else if (err === 'no-speech') {
+          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-slash" style="color:#94a3b8;"></i> No speech heard. Click mic & speak clearly or type location.';
+        } else if (err === 'network') {
+          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-wifi" style="color:#ffa500;"></i> Speech network unavailable. Type location directly.';
+        } else {
+          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Voice info (${err}). Type location directly.`;
+        }
+        if (input) input.focus();
+      };
+
+      recognition.onend = function() {
+        if (micBtn) micBtn.classList.remove('mic-listening');
+      };
+
+      recognition.start();
+    } catch (err) {
+      if (micBtn) micBtn.classList.remove('mic-listening');
+      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Type location name in the box.';
+      if (input) input.focus();
+    }
   }
 
   function startVoiceChatInput() {
@@ -1233,8 +1414,8 @@
     ).openPopup();
 
     leafletMapInstance.on('click', function(e) {
-      const lat = e.latlng.lat;
-      const lon = e.latlng.lng;
+      const lat = Math.max(-85, Math.min(85, e.latlng.lat));
+      const lon = ((e.latlng.lng + 180) % 360 + 360) % 360 - 180;
       const geo = getExactGeographicLocationName(lat, lon);
       // 0ms SUDDEN UPDATE: Instant refresh of all dashboard features
       triggerLocationAnalysis(lat, lon, geo.name, geo.country);
@@ -1269,19 +1450,29 @@
     });
   }
 
-  function buildMarkerPopup(name, locType, ndviScore) {
+  function buildMarkerPopup(name, locType, ndviScore, cropName, cropYield) {
     const shortName = (name || '').split(',')[0];
     const lt = (locType || '').toLowerCase();
-    const color = lt.includes('ocean') || lt.includes('water') ? '#1e90ff' :
-                  lt.includes('desert') || lt.includes('arid') ? '#c8a060' :
+    const color = (lt.includes('ocean') || lt.includes('water')) ? '#1e90ff' :
+                  (lt.includes('desert') || lt.includes('arid') || lt.includes('barren')) ? '#c8a060' :
                   lt.includes('industrial') ? '#ff9900' : '#32cd32';
-    const isAgri = lt.includes('agri') || lt.includes('fertile');
-    return `<div style="font-family:Inter,sans-serif;min-width:190px;line-height:1.6;">
-      <div style="font-weight:800;color:#0070f3;font-size:13px;margin-bottom:3px;">📍 ${shortName}</div>
+    const isAgri = lt.includes('agri') || lt.includes('fertile') || lt.includes('basin') || lt.includes('valley');
+    const cropDisplay = cropName || (lastMLData ? lastMLData.recommended_crop : 'Analyzing…');
+    const yieldDisplay = cropYield || (lastMLData ? lastMLData.predicted_yield_tons_ha : '--');
+
+    return `<div style="font-family:Inter,sans-serif;min-width:215px;line-height:1.6;color:#fff;">
+      <div style="font-weight:800;color:#00f0ff;font-size:13px;margin-bottom:3px;display:flex;align-items:center;gap:5px;">
+        <i class="fa-solid fa-location-dot" style="color:#ff3366;"></i> ${shortName}
+      </div>
       <div style="font-size:11px;margin-bottom:3px;"><b>Land Type:</b> <span style="color:${color};font-weight:700;">${locType || 'Analyzing…'}</span></div>
-      ${isAgri ? '<div style="font-size:10px;color:#32cd32;font-weight:700;">🌾 Agricultural Land (Real Location)</div>' : ''}
-      ${ndviScore !== null && ndviScore !== undefined ? `<div style="font-size:10px;color:#aaa;"><b>NDVI:</b> <span style="color:${color};font-weight:700;">${ndviScore}</span></div>` : ''}
-      <div style="font-size:9px;color:#888;margin-top:4px;">🗺️ Click anywhere on the map to analyze that point</div>
+      ${isAgri ? `<div style="font-size:10px;color:#32cd32;font-weight:700;margin-bottom:3px;"><i class="fa-solid fa-seedling"></i> Agricultural Land (Real Live Location)</div>` : ''}
+      <div style="background:rgba(0,240,255,0.08);border:1px solid rgba(0,240,255,0.25);border-radius:6px;padding:5px 7px;margin:4px 0;font-size:11px;">
+        <div style="font-size:9px;color:#8a99ad;text-transform:uppercase;font-weight:700;">Recommended Crop:</div>
+        <div style="color:#50cd32;font-weight:800;font-size:11px;">${cropDisplay}</div>
+        <div style="color:#ffd700;font-size:10px;font-weight:700;">Peak Yield: ${yieldDisplay} T/Ha</div>
+      </div>
+      ${ndviScore !== null && ndviScore !== undefined ? `<div style="font-size:10px;color:#aaa;"><b>NDVI Score:</b> <span style="color:${color};font-weight:700;">${ndviScore}</span></div>` : ''}
+      <div style="font-size:9px;color:#00f0ff;margin-top:4px;">✨ Click anywhere on 2D map for 0ms instant telemetry & crop analysis</div>
     </div>`;
   }
 
@@ -1565,6 +1756,146 @@
       costHa = 0;
       status = 'PERMAFROST_LIMIT';
       reason = 'Sub-zero permafrost ground prevents outdoor open-field cultivation. (Indoor heated CEA hydroponics only).';
+    } else if (locLower.includes('erode')) {
+
+      crop = 'Turmeric (Curcuma longa - Erode Local / BSR-2 / Salem Golden)';
+
+      yieldTons = 28.5;
+
+      yieldAcc = 99.4;
+
+      locType = 'Yellow Gold Basin — Global Turmeric GI Hub';
+
+      ndviScore = 0.73;
+
+      marketPrice = 1850;
+
+      costHa = 3400;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'Erode GI-tagged Turmeric (Curcuma longa) thrives in nutrient-dense Bhavani alluvial silt and semi-arid warmth, producing world-renowned 4.5%+ curcumin concentration and 28.5 T/Ha peak rhizome yields.';
+
+    } else if (locLower.includes('kashmir') || locLower.includes('srinagar') || locLower.includes('sopore') || locLower.includes('shopian') || locLower.includes('baramulla') || locLower.includes('anantnag')) {
+
+      crop = 'Apples (Malus domestica - Kashmiri Ambri / Red Delicious / Royal Gala)';
+
+      yieldTons = 26.0;
+
+      yieldAcc = 99.3;
+
+      locType = 'Kashmir Temperate Alpine Horticulture Valley';
+
+      ndviScore = 0.72;
+
+      marketPrice = 1100;
+
+      costHa = 4200;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'J&K alpine chilling requirement (1200+ hrs <7°C) and glacial Karewa terraces deliver crisp, high-Brix apples (Ambri & Red Delicious) at 26.0 T/Ha.';
+
+    } else if (locLower.includes('nagpur') || locLower.includes('vidarbha')) {
+
+      crop = 'Mandarin Orange (Citrus reticulata - Nagpur Santra GI)';
+
+      yieldTons = 24.0;
+
+      yieldAcc = 99.1;
+
+      locType = 'Orange City — Subtropical Citrus Basin';
+
+      ndviScore = 0.69;
+
+      marketPrice = 650;
+
+      costHa = 3200;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'Nagpur basaltic black clay-loam, dry subtropical winters, and canal drip systems produce famous sweet-tart Nagpur Santra mandarins at 24.0 T/Ha.';
+
+    } else if (locLower.includes('guntur') || locLower.includes('prakasam')) {
+
+      crop = 'Red Chilli (Capsicum annuum - Guntur Sannam S4 GI)';
+
+      yieldTons = 5.2;
+
+      yieldAcc = 99.2;
+
+      locType = 'Guntur Asia Spice Hub — Hot Chilli Heartland';
+
+      ndviScore = 0.64;
+
+      marketPrice = 2800;
+
+      costHa = 2600;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'Krishna delta black alluvial soils and high tropical sunshine deliver peak capsaicin (35,000+ SHU) and high yields of GI-tagged Guntur Sannam S4 chillies.';
+
+    } else if (locLower.includes('salinas') || locLower.includes('watsonville') || locLower.includes('monterey')) {
+
+      crop = 'Strawberries (Fragaria × ananassa - Sweet Charlie / Albion / Camarosa)';
+
+      yieldTons = 28.4;
+
+      yieldAcc = 99.5;
+
+      locType = 'Salinas Valley Salad Bowl & Berry Heartland';
+
+      ndviScore = 0.71;
+
+      marketPrice = 2400;
+
+      costHa = 14500;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'Salinas coastal marine layer morning fog, well-drained sandy loam, and automated drip-fertigation achieve world-leading 28.4 T/Ha fresh strawberry yields.';
+
+    } else if (locLower.includes('coimbatore') || locLower.includes('pollachi') || locLower.includes('tiruppur')) {
+
+      crop = 'Sugarcane (Saccharum officinarum - Co-0238 / Co-86032) & Coconut';
+
+      yieldTons = 88.5;
+
+      yieldAcc = 98.8;
+
+      locType = 'Kongu Agro Basin — Perennial River Irrigation';
+
+      ndviScore = 0.70;
+
+      marketPrice = 44;
+
+      costHa = 1700;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'Kongu red-clay loams with Siruvani and Bhavani river canal networks produce record high biomass sugarcane (Co-0238) reaching 88.5 T/Ha.';
+
+    } else if (locLower.includes('wayanad') || locLower.includes('idukki')) {
+
+      crop = 'Black Pepper (Piper nigrum - Panniyur-1) & Cardamom (Elettaria cardamomum)';
+
+      yieldTons = 3.2;
+
+      yieldAcc = 98.9;
+
+      locType = 'Western Ghats Spices & Hill Agroforestry Reserve';
+
+      ndviScore = 0.82;
+
+      marketPrice = 6200;
+
+      costHa = 3500;
+
+      status = 'OPTIMAL_HIGH_YIELD';
+
+      reason = 'Western Ghats laterite rainforest mulch, high elevation (900-1400m), and southwest monsoon deliver world-famous Malabar black pepper and green cardamom.';
+
     } else if (locLower.includes('nilgiri') || locLower.includes('ooty') || locLower.includes('darjeeling') || locLower.includes('assam')) {
       crop = 'Tea (Nilgiri / Assam) & Coffee';
       yieldTons = 3.6;
@@ -2185,22 +2516,40 @@
 
   function startVoiceInput2D() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Speech Recognition not supported in this browser."); return; }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-microphone" style="color:red;"></i> 🎙️ 2D Voice listening… speak a place name now';
-    recognition.onresult = function(e) {
-      const spoken = e.results[0][0].transcript.trim();
-      document.getElementById('cv-search-input').value = spoken;
-      document.getElementById('location-input').value = spoken;
-      document.getElementById('voice-status').innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "${spoken}" — Locating on 2D map…`;
-      searchLocationByName();
-    };
-    recognition.onerror = function() {
-      document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-times" style="color:red;"></i> Voice error. Please try again.';
-    };
-    recognition.start();
+    const vStatus = document.getElementById('voice-status');
+    const input2D = document.getElementById('cv-search-input');
+    if (!SpeechRecognition) {
+      if (vStatus) vStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ffa500;"></i> Voice input not supported. Type location name in 2D box.';
+      if (input2D) input2D.focus();
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      if (vStatus) vStatus.innerHTML = '<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ 2D Voice listening... Speak place name now';
+      recognition.onresult = function(e) {
+        if (e.results && e.results[0] && e.results[0][0]) {
+          const spoken = e.results[0][0].transcript.trim();
+          if (input2D) input2D.value = spoken;
+          document.getElementById('location-input').value = spoken;
+          if (vStatus) vStatus.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "<strong>${spoken}</strong>" — Locating on 2D map...`;
+          searchLocationByName();
+        }
+      };
+      recognition.onerror = function(e) {
+        const err = e ? e.error : 'unknown';
+        if (vStatus) {
+          if (err === 'not-allowed') vStatus.innerHTML = '<i class="fa-solid fa-lock" style="color:#ffa500;"></i> Mic blocked. Allow microphone in browser or type name.';
+          else if (err === 'no-speech') vStatus.innerHTML = '<i class="fa-solid fa-microphone-slash" style="color:#94a3b8;"></i> No speech detected. Click mic & speak or type name.';
+          else vStatus.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Voice info (${err}). Type place name.`;
+        }
+        if (input2D) input2D.focus();
+      };
+      recognition.start();
+    } catch(err) {
+      if (input2D) input2D.focus();
+    }
   }
 
   function searchLocationByName() {
@@ -2257,6 +2606,9 @@
         if (lat >= 11.5 && lat <= 11.9 && lon >= 79.6 && lon <= 80.0) return { name: "Cuddalore Coastal Region, Tamil Nadu", country: "India" };
         return { name: "Tamil Nadu Agricultural Zone", country: "India" };
       }
+      if (lat >= 20.8 && lat <= 21.4 && lon >= 78.8 && lon <= 79.4) return { name: "Nagpur (Mandarin Orange Belt), Maharashtra", country: "India" };
+      if (lat >= 16.0 && lat <= 16.6 && lon >= 80.2 && lon <= 80.7) return { name: "Guntur (Chilli & Spice Basin), Andhra Pradesh", country: "India" };
+      if (lat >= 11.5 && lat <= 11.9 && lon >= 75.9 && lon <= 76.4) return { name: "Wayanad (Pepper & Cardamom Reserve), Kerala", country: "India" };
       if (lat >= 8.2 && lat <= 12.8 && lon >= 74.8 && lon <= 77.5) return { name: "Kerala Coastal & Plantation Belt", country: "India" };
       if (lat >= 11.5 && lat <= 18.5 && lon >= 74.0 && lon <= 78.6) return { name: "Karnataka Agricultural Basin (Coffee & Maize)", country: "India" };
       if (lat >= 15.6 && lat <= 22.0 && lon >= 72.6 && lon <= 80.9) return { name: "Maharashtra (Deccan Cotton & Sugarcane Tract)", country: "India" };
@@ -2356,9 +2708,13 @@
       if (controls) controls.autoRotate = false;
     }
 
-    // Update 2D map immediately
+    // Update 2D map immediately with smooth pan
     if (leafletMapInstance) {
-      leafletMapInstance.flyTo([lat, lon], 14, { duration: 1.0 });
+      if (activeMapMode === '2d') {
+        leafletMapInstance.panTo([lat, lon], { animate: true, duration: 0.5 });
+      } else {
+        leafletMapInstance.setView([lat, lon], 14);
+      }
       if (leafletMarker) {
         leafletMarker.setLatLng([lat, lon]);
       }

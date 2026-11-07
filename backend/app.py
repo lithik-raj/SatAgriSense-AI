@@ -4,7 +4,7 @@ import math
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_cors import CORS
 
-from database import init_db, save_location_record, get_recent_locations
+from database import init_db, save_location_record, get_recent_locations, get_all_crop_knowledge
 from cv_engine import generate_satellite_imagery
 from ml_engine import regional_ml_predictor
 from sentinel_service import sentinel_service
@@ -305,6 +305,12 @@ def hf_chat():
 def get_history():
     history = get_recent_locations(15)
     return jsonify({"history": history})
+
+@app.route("/api/crop-knowledge", methods=["GET"])
+@app.route("/crop-knowledge", methods=["GET"])
+def get_crop_knowledge():
+    knowledge = get_all_crop_knowledge()
+    return jsonify({"knowledge": knowledge})
 
 @app.route("/<path:path>", methods=["GET"])
 def static_proxy(path):
