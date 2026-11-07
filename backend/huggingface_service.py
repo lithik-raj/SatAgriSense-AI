@@ -11,9 +11,26 @@ class HuggingFaceLLMService:
     def chat_query(self, prompt, location_context=None, user_api_key=None, lang="en"):
         api_key = user_api_key or self.api_key
         
-        # Determine language code
+        # Determine language code & Auto-Detect script from user prompt
         target_lang = lang or (location_context.get("lang") if isinstance(location_context, dict) else None) or "en"
         target_lang = str(target_lang).lower()
+
+        if re.search(r"[\u0B80-\u0BFF]", prompt):
+            target_lang = "ta"
+        elif re.search(r"[\u0900-\u097F]", prompt):
+            target_lang = "hi"
+        elif re.search(r"[\u0D00-\u0D7F]", prompt):
+            target_lang = "ml"
+        elif re.search(r"[\u0C00-\u0C7F]", prompt):
+            target_lang = "te"
+        elif re.search(r"[\u0C80-\u0CFF]", prompt):
+            target_lang = "kn"
+        elif re.search(r"[\u0A00-\u0A7F]", prompt):
+            target_lang = "pa"
+        elif re.search(r"[\u0980-\u09FF]", prompt):
+            target_lang = "bn"
+        elif re.search(r"[\u0600-\u06FF]", prompt):
+            target_lang = "ur" 
 
         system_instruction = (
             "You are an expert Geo-Agricultural AI Advisor, Civil Geotechnical Engineer, and Environmental Hydrologist. "
@@ -380,7 +397,8 @@ class HuggingFaceLLMService:
         # ==============================================================
         crop_keywords = ["crop", "crops", "which crop", "grows more", "yield", "more yield", "highest yield",
                          "best crop", "recommend crop", "farming", "cultivate", "harvest", "agriculture", "profit",
-                         "grow", "plant", "wheat", "rice", "paddy", "turmeric", "apple", "can we grow"]
+                         "grow", "plant", "wheat", "rice", "paddy", "turmeric", "apple", "groundnut", "peanut", 
+                         "kadalai", "maize", "cotton", "banana", "coffee", "strawberries", "can we grow"]
         if any(kw in p_lower for kw in crop_keywords):
             if is_water:
                 return {

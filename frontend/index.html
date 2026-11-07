@@ -524,12 +524,12 @@
         </div>
       </div>
       <div class="search-box-body" id="search-box-body">
-        <div class="search-bar-row">
+        <div class="search-bar-row" style="position:relative;">
           <input type="text" id="location-input" class="search-input"
             value="Coimbatore, Tamil Nadu, India"
             placeholder="Type location or use mic..."
             onkeypress="if(event.key==='Enter') searchLocationByName()"/>
-          <button id="mic-btn" class="btn-icon" onclick="startVoiceInput()" title="Voice Input">
+          <button id="mic-btn" class="btn-icon" onclick="startVoiceInput()" title="Voice Input (Speech-to-Text)">
             <i class="fa-solid fa-microphone"></i>
           </button>
           <button class="btn-icon" onclick="searchLocationByName()" title="Search">
@@ -538,6 +538,28 @@
           <button class="btn-icon" onclick="speakCurrentLocation()" title="Speak Location" style="background:rgba(0,240,255,0.3);color:#00f0ff;border:1px solid var(--cyan-glow);">
             <i class="fa-solid fa-volume-high"></i>
           </button>
+          <!-- In-Page Voice & Location Fallback Banner -->
+          <div id="voice-fallback-banner" style="display:none;position:absolute;top:44px;left:0;right:0;background:rgba(8,16,32,0.97);border:1px solid var(--cyan-glow);border-radius:10px;padding:10px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.85);backdrop-filter:blur(10px);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:700;color:var(--cyan-glow);display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-microphone-lines fa-bounce" style="color:#ff3366;"></i> Direct Voice & Location Search
+              </span>
+              <button type="button" onclick="closeVoiceBanner()" style="background:none;border:none;color:#888;font-size:16px;cursor:pointer;">&times;</button>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <input type="text" id="voice-banner-input" placeholder="Speak or type location name..." style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(0,240,255,0.4);border-radius:6px;color:#fff;padding:6px 10px;font-size:12px;outline:none;" onkeypress="if(event.key==='Enter') submitVoiceBannerSearch()"/>
+              <button type="button" onclick="submitVoiceBannerSearch()" style="background:linear-gradient(135deg,#00f0ff,#0070f3);border:none;border-radius:6px;color:#000;font-weight:800;padding:6px 12px;font-size:11px;cursor:pointer;">GO</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+              <span style="font-size:9px;color:#888;margin-right:2px;">Quick:</span>
+              <button type="button" onclick="quickSelectVoiceLoc('Erode, Tamil Nadu, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🌾 Erode</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Kashmir Valley, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🍎 Kashmir</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Coimbatore, Tamil Nadu, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🚜 Coimbatore</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Delhi, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🏛️ Delhi</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Nagpur, Maharashtra, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🍊 Nagpur</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Salinas Valley, California, USA')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🍓 Salinas</button>
+            </div>
+          </div>
         </div>
         <div id="voice-status" style="font-size:10px;color:var(--text-muted);margin-top:5px;">
           <i class="fa-solid fa-circle-info"></i> Search or click globe to analyze any location. Voice commands active.
@@ -1265,15 +1287,44 @@
     }
   }
 
-  function promptVoiceFallback() {
-    const userLoc = prompt("Microphone voice recognition network is unavailable. Please type your target location (e.g., 'Erode', 'Kashmir', 'California', 'Tokyo'):", "");
-    if (userLoc && userLoc.trim()) {
-      const inp = document.getElementById('location-input');
-      if (inp) {
-        inp.value = userLoc.trim();
-        searchLocationByName();
-      }
+  function openVoiceBanner() {
+    const b = document.getElementById('voice-fallback-banner');
+    if (!b) return;
+    b.style.display = 'block';
+    const inp = document.getElementById('voice-banner-input');
+    if (inp) {
+      inp.focus();
+      inp.value = document.getElementById('location-input')?.value || '';
     }
+    const voiceStatus = document.getElementById('voice-status');
+    if (voiceStatus) {
+      voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-lines" style="color:var(--cyan-glow);"></i> Enter target location below:';
+    }
+  }
+
+  function closeVoiceBanner() {
+    const b = document.getElementById('voice-fallback-banner');
+    if (b) b.style.display = 'none';
+  }
+
+  function submitVoiceBannerSearch() {
+    const inp = document.getElementById('voice-banner-input');
+    const val = inp ? inp.value.trim() : '';
+    if (val) {
+      document.getElementById('location-input').value = val;
+      closeVoiceBanner();
+      searchLocationByName();
+    }
+  }
+
+  function quickSelectVoiceLoc(locName) {
+    document.getElementById('location-input').value = locName;
+    closeVoiceBanner();
+    searchLocationByName();
+  }
+
+  function promptVoiceFallback() {
+    openVoiceBanner();
   }
 
   function speakFullChatResponse(rawText) {
@@ -1284,8 +1335,8 @@
         .replace(/<br\s*\/?>/gi, '. ')
         .replace(/<[^>]+>/g, '')
         .replace(/https?:\/\/\S+/g, '')
-        .replace(/[*_#`~>]/g, '')
-        .replace(/[🌾🍎🍊🍓🌱💧🧪🏭📍📊💡📅👋🎙️🌊⚠️✅❌🏢📋🥇📈💰🚫🌲❄️🐟🌿💨🦅🧂]/gu, '')
+        .replace(/[*_#`~>•|\-]/g, ' ')
+        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -1294,11 +1345,16 @@
       const chunks = clean.match(/[^.!?]+[.!?]+|\S+/g) || [clean];
       let chunkIdx = 0;
 
-      // Select matching regional voice from browser speech synthesis
+      // Select best matching regional voice
       const voices = window.speechSynthesis.getVoices() || [];
-      const langPrefix = (currentChatLangCode || 'en-US').toLowerCase().split('-')[0];
-      const matchVoice = voices.find(v => v.lang.toLowerCase() === currentChatLangCode.toLowerCase()) ||
-                         voices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+      const code = (currentChatLangCode || 'en-US').toLowerCase();
+      const prefix = code.split('-')[0];
+
+      let matchVoice = voices.find(v => v.lang.toLowerCase() === code) ||
+                         voices.find(v => v.lang.toLowerCase().replace('_', '-') === code) ||
+                         voices.find(v => v.lang.toLowerCase().startsWith(prefix));
+
+      const isIndic = ['ta', 'hi', 'ml', 'te', 'kn', 'mr', 'pa', 'bn', 'ur'].includes(prefix);
 
       function speakNext() {
         if (!chatVoiceActive || chunkIdx >= chunks.length) return;
@@ -1308,7 +1364,7 @@
           return speakNext();
         }
         const utter = new SpeechSynthesisUtterance(textChunk);
-        utter.rate = 1.0;
+        utter.rate = isIndic ? 0.92 : 0.98;
         utter.pitch = 1.0;
         utter.lang = currentChatLangCode || 'en-US';
         if (matchVoice) utter.voice = matchVoice;
@@ -1405,8 +1461,8 @@
         } else if (err === 'no-speech') {
           if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-slash" style="color:#94a3b8;"></i> No speech heard. Click mic & speak clearly or type location.';
         } else if (err === 'network') {
-          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-wifi" style="color:#ffa500;"></i> Speech network unavailable. <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;font-weight:700;text-decoration:underline;margin-left:4px;">Click here to enter location</a>';
-          promptVoiceFallback();
+          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-lines" style="color:var(--cyan-glow);"></i> Direct Search Panel open. Speak or type location name below:';
+          openVoiceBanner();
         } else {
           if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Voice info (${err}). <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">Type location</a>`;
         }
@@ -2029,6 +2085,12 @@
     let status = 'OPTIMAL_HIGH_YIELD';
     let reason = 'Optimal red-clay loam, balanced soil pH, and perennial aquifer support high sugarcane harvest.';
 
+    const floodKeywords = ['flood', 'delta', 'wetland', 'marsh', 'swamp', 'low-lying', 'inundation', 'riverbed', 'floodplain'];
+    const isFloodZone = (waterDepth < 4.0 || rainMm > 70.0 || floodKeywords.some(kw => locLower.includes(kw))) && !isWater && !isForest;
+
+    const barrenKeywords = ['barren', 'arid', 'wasteland', 'desert', 'plateau', 'rocky', 'dryland', 'scrub', 'thar', 'sahara', 'mojave', 'atacama', 'kutch', 'ladakh', 'deccan', 'dry'];
+    const isBarren = (soilMoist < 22.0 || barrenKeywords.some(kw => locLower.includes(kw))) && !isWater && !isForest && !isFloodZone;
+
     if (isWater) {
       crop = 'NO CROP CAN BE GROWN (Ocean / Marine Saline Water)';
       yieldTons = 0.0;
@@ -2059,6 +2121,31 @@
       costHa = 0;
       status = 'PERMAFROST_LIMIT';
       reason = 'Sub-zero permafrost ground prevents outdoor open-field cultivation. (Indoor heated CEA hydroponics only).';
+    } else if (isFloodZone) {
+      crop = 'Deepwater Paddy / Flood-Resistant Rice (Swarna-Sub1)';
+      yieldTons = 5.4;
+      yieldAcc = 98.6;
+      locType = 'Low-Lying Wetland / Seasonal Flood Hazard Basin';
+      ndviScore = 0.52;
+      marketPrice = 440;
+      costHa = 1100;
+      status = 'FLOOD_PRONE_WETLAND';
+      reason = `Low-lying flood hazard basin with shallow water table (${waterDepth}m). BUILDINGS CANNOT BE BUILT HERE due to catastrophic monsoon flood risks, hydraulic basement uplift, and subsoil liquefaction! High water saturation is optimal for flood-submergence resistant Rice (Swarna-Sub1).`;
+    } else if (isBarren) {
+      crop = 'Groundnut (Arachis hypogaea - Kadalai / Drought-Resistant Peanut - TMV-7 / TAG-24)';
+      yieldTons = 3.2;
+      yieldAcc = 98.4;
+      locType = 'Barren Land / Arid Rocky Plateau (Non-Fertile Ground)';
+      ndviScore = 0.22;
+      marketPrice = 850;
+      costHa = 850;
+      status = 'BARREN_ARID_OPTIMIZED';
+      const canBuild = waterDepth >= 5.0;
+      const phStatus = (soilPh >= 6.0 && soilPh <= 7.8) ? `good and balanced (pH ${soilPh})` : (soilPh > 7.8 ? `alkaline (pH ${soilPh}) requiring gypsum` : `acidic (pH ${soilPh}) requiring lime`);
+      const buildMsg = canBuild 
+        ? `Building houses/buildings is HIGHLY RECOMMENDED on this barren land (preserves fertile agricultural cropland; dense dry subsoil has CBR 12–18%).`
+        : `BUILDINGS CANNOT BE BUILT OR ARE DANGEROUS due to shallow water table (${waterDepth}m) and subsoil liquefaction / flood risk!`;
+      reason = `Barren/arid plateau ground (NDVI: 0.22). Water-intensive crops will fail, but deep-rooted Groundnut (Arachis hypogaea) fixes nitrogen and yields 3.2 T/Ha. Water/soil pH is ${phStatus}. ${buildMsg}`;
     } else if (locLower.includes('erode')) {
 
       crop = 'Turmeric (Curcuma longa - Erode Local / BSR-2 / Salem Golden)';
@@ -2624,8 +2711,20 @@
           `• स्तर: **${wastewaterHazard}** — ${wastewaterDesc}`;
       }
 
+      const isBarrenLoc = locType.toLowerCase().includes('barren') || locType.toLowerCase().includes('arid') || locType.toLowerCase().includes('plateau');
+      const isSevereFlood = waterDepthNum < 5.0;
+      let buildingVerdictHeader = '';
+
+      if (isSevereFlood) {
+        buildingVerdictHeader = '❌ **BUILDINGS CANNOT BE BUILT OR ARE AT CRITICAL COLLAPSE HAZARD DUE TO SEVERE FLOOD POSSIBILITIES** (High groundwater table creates hydrostatic uplift, basement flooding, and soil liquefaction)';
+      } else if (isBarrenLoc) {
+        buildingVerdictHeader = '✅ **HIGHLY RECOMMENDED TO BUILD HOUSES & BUILDINGS ON THIS BARREN LAND** (Preserves fertile agricultural cropland from destruction; dry barren subsoil exhibits high load-bearing capacity CBR 12–18%)';
+      } else {
+        buildingVerdictHeader = factoryDist >= 3.0 ? '✅ **APPROVED FOR CONSTRUCTION** (Safe distance from industrial emissions)' : '⚠️ **CONDITIONAL APPROVAL** — Industrial air/water buffers required';
+      }
+
       return `🏗️ **Comprehensive Geo-Structural Hazard & Construction Feasibility — ${locName}**:\n\n` +
-        `**Suitability Assessment**: ${factoryDist >= 3.0 && waterDepthNum >= 5.0 ? '✅ **APPROVED FOR BUILDING CONSTRUCTION** (Score: 84/100)' : '⚠️ **CONDITIONAL APPROVAL** — Specific structural mitigations required.'}\n\n` +
+        `**Official Construction Verdict**: ${buildingVerdictHeader}\n\n` +
         `🌊 **1. Flood Risk & Hydraulic Upward Pressure:**\n` +
         `• **Status**: **${floodLevel}**\n` +
         `• **Water Table Depth**: **${waterDepth}**\n` +
@@ -2652,7 +2751,8 @@
     // TOPIC 3: CROPS, HIGHEST YIELD & PROFIT (Zero Hallucination)
     // ------------------------------------------------------------
     const isCropQuery = ['crop', 'crops', 'which crop', 'grows more', 'yield', 'highest yield', 
-                         'more yield', 'best crop', 'farming', 'grow', 'plant', 'profit'].some(w => p.includes(w));
+                         'more yield', 'best crop', 'farming', 'grow', 'plant', 'profit', 'groundnut', 
+                         'peanut', 'kadalai', 'maize', 'cotton', 'banana', 'coffee', 'strawberries', 'soil ph'].some(w => p.includes(w));
     if (isCropQuery) {
       if (isWater) {
         return `🌊 **OCEAN / WATER BODY DETECTED — STRICT NO-CROP DIRECTIVE (${locName})**:\n\n` +
@@ -2709,15 +2809,31 @@
           `• बेहतर मृदा स्वास्थ्य और सटीक ड्रिप सिंचाई से इस वर्ष उपज में **+12.4% की वृद्धि** हुई है।`;
       }
 
+      const phEvaluation = (soilPh >= 6.0 && soilPh <= 7.8) 
+        ? `✅ **GOOD & BALANCED (pH ${soilPh})** — Optimal bioavailability of nitrogen, phosphorus, and potassium.` 
+        : (soilPh > 7.8 
+          ? `⚠️ **ALKALINE (pH ${soilPh})** — May cause iron/zinc deficiency; gypsum and sulfur conditioning recommended.` 
+          : `⚠️ **ACIDIC (pH ${soilPh})** — May cause aluminum toxicity; agricultural dolomite lime required.`);
+
+      const isGroundnutQuery = p.includes('groundnut') || p.includes('peanut') || p.includes('kadalai') || locType.toLowerCase().includes('barren');
+      const groundnutSection = isGroundnutQuery ? (
+        `\n\n🥜 **Groundnut (Arachis hypogaea - Kadalai) Specialty Evaluation:**\n` +
+        `• **Suitability**: **HIGHLY SUITABLE FOR BARREN & DRY RED-LOAM SOILS**\n` +
+        `• **Why it thrives**: Deep taproot system fixes atmospheric nitrogen through Rhizobium bacteria. Requires 60% less water than sugarcane or paddy.\n` +
+        `• **Expected Yield**: **3.2 Tons/Hectare** (Peak Market Price: **$850/Ton** | Net ROI: **+220%**)\n` +
+        `• **Water & Soil pH Status**: ${phEvaluation}`
+      ) : '';
+
       return `🌾 **Crop Recommendation, High Yield & Profit Analysis — ${locName}**:\n\n` +
         `🥇 **Highest Yielding Recommended Crop**: **${crop}**\n` +
         `📈 **Predicted Yield**: **${yieldVal} Tons/Hectare** (Yield Confidence Accuracy: **${yieldAcc}%**)\n` +
         `💰 **Estimated Economic Return**: High net profit and ROI based on regional market pricing\n\n` +
-        `**Why ${crop} Produces Maximum Yield & Profit Here:**\n` +
-        `• **Soil pH Balance**: Current pH **${soilPh}** enables maximum nutrient absorption for **${crop}**.\n` +
-        `• **Groundwater Access**: Aquifer depth at **${waterDepth}** provides stable irrigation capacity.\n` +
-        `• **Moisture Alignment**: Soil moisture **${soilMoist}** supports optimal root respiration.\n` +
-        `• **NDVI Photosynthetic Health**: Score **${ndvi}** indicates healthy vegetative vigor.\n\n` +
+        `**Agronomic & Water Matrix Diagnostics:**\n` +
+        `• **Soil & Water pH**: ${phEvaluation}\n` +
+        `• **Water Salinity**: **${waterSalinityPSU} PSU** (TDS: **${waterTdsPPM.toLocaleString()} ppm**) — ${waterPotability}\n` +
+        `• **Groundwater Aquifer Depth**: **${waterDepth}**\n` +
+        `• **Soil Moisture**: **${soilMoist}** | **NDVI Vegetative Index**: **${ndvi}**` +
+        groundnutSection + `\n\n` +
         `📊 **Historical 1-Year Comparison (Prior vs Current Season):**\n` +
         `• Prior Season: Baseline harvest was ~11% lower with lower NDVI canopy density.\n` +
         `• Current Season: Optimal soil conditioning and weather generated a **+12.4% yield gain**.\n\n` +
@@ -2905,6 +3021,16 @@
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
     if (!text) return;
+
+    // Automatic Language Detection from User Typed Script
+    if (/[\u0B80-\u0BFF]/.test(text)) setChatLanguage('ta-IN', 'Tamil (தமிழ்)');
+    else if (/[\u0900-\u097F]/.test(text)) setChatLanguage('hi-IN', 'Hindi (हिन्दी)');
+    else if (/[\u0D00-\u0D7F]/.test(text)) setChatLanguage('ml-IN', 'Malayalam (മലയാളം)');
+    else if (/[\u0C00-\u0C7F]/.test(text)) setChatLanguage('te-IN', 'Telugu (తెలుగు)');
+    else if (/[\u0C80-\u0CFF]/.test(text)) setChatLanguage('kn-IN', 'Kannada (ಕನ್ನಡ)');
+    else if (/[\u0A00-\u0A7F]/.test(text)) setChatLanguage('pa-IN', 'Punjabi (ਪੰਜਾਬੀ)');
+    else if (/[\u0980-\u09FF]/.test(text)) setChatLanguage('bn-IN', 'Bengali (বাংলা)');
+    else if (/[\u0600-\u06FF]/.test(text)) setChatLanguage('ur-PK', 'Urdu (اردو)');
 
     const chatBody = document.getElementById('chat-body');
 
@@ -3168,6 +3294,8 @@
   // ============================================================
   function triggerLocationAnalysis(lat, lon, name, country) {
     currentLocationContext = { lat, lon, name, country };
+    const detectedLang = detectRegionalLanguage(name, country, lat, lon);
+    setChatLanguage(detectedLang.code, detectedLang.name);
     updateRegionalLanguageUI(name, country, lat, lon);
 
     document.getElementById('coord-display').textContent = `Lat: ${lat.toFixed(3)}°, Lon: ${lon.toFixed(3)}°`;

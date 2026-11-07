@@ -299,7 +299,8 @@ def analyze_location():
         rainfall_mm=rain_mm, ndvi_avg=dominant_ndvi["score"],
         factory_dist_km=factory_dist_km,
         climate_stress=climate_stress_flag,
-        loc_name=loc_name
+        loc_name=loc_name,
+        water_depth=underground_water_depth
     )
 
     # 6. Save to SQLite DB
