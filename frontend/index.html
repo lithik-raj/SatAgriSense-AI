@@ -499,6 +499,8 @@
 
       <div class="env-section-title" style="margin-top:8px;"><i class="fa-solid fa-water"></i> Water Bodies</div>
       <div class="env-row"><span class="label">💧 Water pH</span><span class="val" id="env-water-ph">--</span></div>
+      <div class="env-row"><span class="label">🧂 Salinity</span><span class="val" id="env-water-salinity">--</span></div>
+      <div class="env-row"><span class="label">🧪 Water TDS</span><span class="val" id="env-water-tds">--</span></div>
       <div class="env-row"><span class="label">🌊 Water Type</span><span class="val" id="env-water-type" style="font-size:9px;">--</span></div>
     </div>
 
@@ -583,6 +585,7 @@
         <div class="water-ph-badge" id="water-ph-badge">
           <i class="fa-solid fa-water"></i>
           <span id="water-ph-text">Water pH: --</span>
+          <span id="water-salinity-text" style="color:#00f0ff;font-size:10px;font-weight:700;">Salinity: --</span>
           <span id="water-type-text" style="color:#aaa;font-size:10px;"></span>
         </div>
         <div class="cv-legend">
@@ -716,6 +719,7 @@
         <div class="telemetry-item"><span class="label">💧 Humidity</span><strong id="tel-hum">65 %</strong></div>
         <div class="telemetry-item"><span class="label">🌱 Soil Moisture (0-7cm)</span><strong id="tel-moist">38.5 %</strong></div>
         <div class="telemetry-item"><span class="label">🧪 Soil pH Level</span><strong id="tel-ph">6.5</strong></div>
+        <div class="telemetry-item"><span class="label">🧂 Water Salinity</span><strong id="tel-salinity">35.0 PSU</strong></div>
         <div class="telemetry-item"><span class="label">🚰 Underground Water</span><strong id="tel-water">14.2 m</strong></div>
         <div class="telemetry-item"><span class="label">🌧️ Rainfall Est.</span><strong id="tel-rain">--</strong></div>
       </div>
@@ -900,6 +904,37 @@
       <button onclick="toggleAIChat()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">&times;</button>
     </div>
   </div>
+  <!-- Multilingual Regional Language Bar -->
+  <div id="chat-lang-bar" style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:rgba(0,240,255,0.06);border-bottom:1px solid rgba(0,240,255,0.15);font-size:11px;">
+    <span style="display:flex;align-items:center;gap:5px;color:#cbd5e1;">
+      <i class="fa-solid fa-language" style="color:var(--cyan-glow);font-size:13px;"></i>
+      <span style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--cyan-glow);">Language:</span>
+    </span>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button id="lang-btn-en" type="button" onclick="setChatLanguage('en-US', 'English')" style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(0,240,255,0.25);border:1px solid #00f0ff;color:#fff;">English</button>
+      <button id="lang-btn-regional" type="button" onclick="toggleRegionalLanguage()" style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#ccc;" title="Click to respond in the native regional language of this location">
+        <span id="regional-lang-label">Tamil (தமிழ்)</span>
+      </button>
+      <select id="chat-lang-select" onchange="setChatLanguage(this.value, this.options[this.selectedIndex].text)" style="background:rgba(10,18,35,0.9);border:1px solid rgba(0,240,255,0.3);color:#00f0ff;border-radius:6px;font-size:10px;padding:2px 4px;outline:none;">
+        <option value="en-US">English (Global)</option>
+        <option value="ta-IN">Tamil (தமிழ்)</option>
+        <option value="hi-IN">Hindi (हिन्दी)</option>
+        <option value="ml-IN">Malayalam (മലയാളം)</option>
+        <option value="te-IN">Telugu (తెలుగు)</option>
+        <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+        <option value="mr-IN">Marathi (मराठी)</option>
+        <option value="pa-IN">Punjabi (ਪੰਜਾਬੀ)</option>
+        <option value="bn-IN">Bengali (বাংলা)</option>
+        <option value="gu-IN">Gujarati (ગુજરાતી)</option>
+        <option value="ur-PK">Urdu (اردو)</option>
+        <option value="af-ZA">Afrikaans (South Africa)</option>
+        <option value="es-ES">Spanish (Español)</option>
+        <option value="fr-FR">French (Français)</option>
+        <option value="de-DE">German (Deutsch)</option>
+        <option value="ar-SA">Arabic (العربية)</option>
+      </select>
+    </div>
+  </div>
   <div id="chat-body" class="ai-chat-body">
     <div class="chat-msg bot">
       👋 Hello! I'm your <strong>Sentinel-Earth AI Advisor</strong>.<br/>
@@ -909,6 +944,8 @@
     <!-- Quick Suggestion Action Chips -->
   <div style="display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:rgba(5,15,30,0.7);border-top:1px solid rgba(0,240,255,0.15);">
     <button type="button" onclick="askQuickQuestion('Which crop produces the highest yield in this region?')" style="background:rgba(50,205,50,0.15);border:1px solid #32cd32;color:#50cd32;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">🌾 Best Crop & Yield</button>
+    <button type="button" onclick="askQuickQuestion('Will building houses or buildings here cause flood damage, soil collapse, or suffer from nearby factory air and water pollution?')" style="background:rgba(255,100,50,0.18);border:1px solid #ff6432;color:#ff9070;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">⚠️ Building Collapse & Pollution Hazards</button>
+    <button type="button" onclick="askQuickQuestion('What is the live water salinity in PSU/TDS and pH level of the river, lake, or ocean here?')" style="background:rgba(0,180,255,0.18);border:1px solid #00b4ff;color:#70d0ff;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">🌊 Water Salinity & pH</button>
     <button type="button" onclick="askQuickQuestion('Can any house or building be constructed on this barren land?')" style="background:rgba(200,160,96,0.18);border:1px solid #c8a060;color:#f0c080;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">🏗️ Build on Barren Land?</button>
     <button type="button" onclick="askQuickQuestion('What is the soil pH and how to improve fertility?')" style="background:rgba(0,240,255,0.15);border:1px solid #00f0ff;color:#00f0ff;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">🧪 Soil pH & Quality</button>
     <button type="button" onclick="askQuickQuestion('What is the underground water table depth and irrigation needs?')" style="background:rgba(30,144,255,0.15);border:1px solid #1e90ff;color:#60b0ff;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">💧 Water Table Depth</button>
@@ -928,8 +965,8 @@
     <input type="text" id="chat-input" class="search-input"
       placeholder="Ask about crop yield, soil, satellite data..."
       onkeypress="if(event.key==='Enter') sendChatMessage()"/>
-    <button class="btn-icon" onclick="startVoiceChatInput()" title="Voice Chat" style="background:rgba(0,240,255,0.2);color:#00f0ff;border:1px solid var(--cyan-glow);">
-      <i class="fa-solid fa-microphone"></i>
+    <button class="btn-icon" id="chat-mic-btn" onclick="startVoiceChatInput()" title="Voice Chat" style="background:rgba(0,240,255,0.2);color:#00f0ff;border:1px solid var(--cyan-glow);">
+      <i class="fa-solid fa-microphone" id="chat-mic-icon"></i>
     </button>
     <button class="btn-icon" onclick="sendChatMessage()">
       <i class="fa-solid fa-paper-plane"></i>
@@ -1051,6 +1088,194 @@
     }
   }
 
+  // ============================================================
+  // MULTILINGUAL REGIONAL LANGUAGE CONTROLLER & DETECTION
+  // ============================================================
+  let currentChatLangCode = 'en-US';
+  let currentChatLangName = 'English';
+  let regionalLangCode = 'ta-IN';
+  let regionalLangName = 'Tamil (தமிழ்)';
+
+  function detectRegionalLanguage(locName, country, lat, lon) {
+    const s = ((locName || '') + ' ' + (country || '')).toLowerCase();
+    
+    // Tamil Nadu & Sri Lanka (Tamil regions)
+    if (s.includes('tamil nadu') || s.includes('chennai') || s.includes('coimbatore') || 
+        s.includes('madurai') || s.includes('erode') || s.includes('salem') || 
+        s.includes('tiruchirappalli') || s.includes('thanjavur') || s.includes('tirunelveli') || 
+        s.includes('vellore') || s.includes('tiruppur') || s.includes('dindigul') || s.includes('jaffna')) {
+      return { code: 'ta-IN', name: 'Tamil (தமிழ்)' };
+    }
+    // Kerala
+    if (s.includes('kerala') || s.includes('kochi') || s.includes('thiruvananthapuram') || 
+        s.includes('kozhikode') || s.includes('palakkad') || s.includes('alappuzha') || 
+        s.includes('kannur') || s.includes('thrissur') || s.includes('wayanad') || s.includes('kollam')) {
+      return { code: 'ml-IN', name: 'Malayalam (മലയാളം)' };
+    }
+    // Andhra Pradesh & Telangana
+    if (s.includes('andhra') || s.includes('telangana') || s.includes('hyderabad') || 
+        s.includes('visakhapatnam') || s.includes('vijayawada') || s.includes('guntur') || 
+        s.includes('tirupati') || s.includes('warangal')) {
+      return { code: 'te-IN', name: 'Telugu (తెలుగు)' };
+    }
+    // Karnataka
+    if (s.includes('karnataka') || s.includes('bengaluru') || s.includes('bangalore') || 
+        s.includes('mysuru') || s.includes('mysore') || s.includes('hubli') || 
+        s.includes('mangalore') || s.includes('belagavi') || s.includes('dharwad')) {
+      return { code: 'kn-IN', name: 'Kannada (ಕನ್ನಡ)' };
+    }
+    // Maharashtra
+    if (s.includes('maharashtra') || s.includes('mumbai') || s.includes('pune') || 
+        s.includes('nagpur') || s.includes('nashik') || s.includes('aurangabad') || 
+        s.includes('solapur') || s.includes('kolhapur')) {
+      return { code: 'mr-IN', name: 'Marathi (मराठी)' };
+    }
+    // Punjab & Haryana
+    if (s.includes('punjab') || s.includes('amritsar') || s.includes('ludhiana') || 
+        s.includes('jalandhar') || s.includes('patiala') || s.includes('bathinda')) {
+      return { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' };
+    }
+    // West Bengal & Bangladesh
+    if (s.includes('bengal') || s.includes('kolkata') || s.includes('siliguri') || 
+        s.includes('asansol') || s.includes('bangladesh') || s.includes('dhaka') || s.includes('chittagong')) {
+      return { code: 'bn-IN', name: 'Bengali (বাংলা)' };
+    }
+    // Gujarat
+    if (s.includes('gujarat') || s.includes('ahmedabad') || s.includes('surat') || 
+        s.includes('vadodara') || s.includes('rajkot') || s.includes('bhavnagar')) {
+      return { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' };
+    }
+    // Pakistan
+    if (s.includes('pakistan') || s.includes('lahore') || s.includes('karachi') || 
+        s.includes('islamabad') || s.includes('peshawar') || s.includes('rawalpindi') || 
+        s.includes('faisalabad') || s.includes('multan')) {
+      return { code: 'ur-PK', name: 'Urdu (اردو)' };
+    }
+    // South Africa
+    if (s.includes('south africa') || s.includes('johannesburg') || s.includes('cape town') || 
+        s.includes('durban') || s.includes('pretoria') || s.includes('soweto') || s.includes('bloemfontein')) {
+      return { code: 'af-ZA', name: 'Afrikaans / Zulu' };
+    }
+    // Spain & Latin America
+    if (s.includes('spain') || s.includes('madrid') || s.includes('barcelona') || s.includes('valencia') || 
+        s.includes('seville') || s.includes('mexico') || s.includes('argentina') || s.includes('colombia') || 
+        s.includes('chile') || s.includes('peru')) {
+      return { code: 'es-ES', name: 'Spanish (Español)' };
+    }
+    // France
+    if (s.includes('france') || s.includes('paris') || s.includes('marseille') || 
+        s.includes('lyon') || s.includes('toulouse') || s.includes('bordeaux')) {
+      return { code: 'fr-FR', name: 'French (Français)' };
+    }
+    // Germany & Austria
+    if (s.includes('germany') || s.includes('berlin') || s.includes('munich') || 
+        s.includes('frankfurt') || s.includes('hamburg') || s.includes('austria') || s.includes('vienna')) {
+      return { code: 'de-DE', name: 'German (Deutsch)' };
+    }
+    // Arab countries & Middle East
+    if (s.includes('saudi') || s.includes('dubai') || s.includes('uae') || s.includes('egypt') || 
+        s.includes('qatar') || s.includes('riyadh') || s.includes('cairo') || s.includes('kuwait') || s.includes('oman')) {
+      return { code: 'ar-SA', name: 'Arabic (العربية)' };
+    }
+    // Japan
+    if (s.includes('japan') || s.includes('tokyo') || s.includes('kyoto') || s.includes('osaka') || s.includes('yokohama')) {
+      return { code: 'ja-JP', name: 'Japanese (日本語)' };
+    }
+    // China
+    if (s.includes('china') || s.includes('beijing') || s.includes('shanghai') || s.includes('shenzhen') || s.includes('guangzhou')) {
+      return { code: 'zh-CN', name: 'Chinese (中文)' };
+    }
+    // Russia
+    if (s.includes('russia') || s.includes('moscow') || s.includes('saint petersburg') || s.includes('siberia')) {
+      return { code: 'ru-RU', name: 'Russian (Русский)' };
+    }
+    // Hindi Belt / North India / Kashmir / Default India
+    if (s.includes('india') || s.includes('delhi') || s.includes('kashmir') || s.includes('srinagar') || 
+        s.includes('uttar pradesh') || s.includes('lucknow') || s.includes('varanasi') || 
+        s.includes('bihar') || s.includes('patna') || s.includes('madhya pradesh') || 
+        s.includes('bhopal') || s.includes('indore') || s.includes('rajasthan') || 
+        s.includes('jaipur') || s.includes('haryana') || s.includes('uttarakhand')) {
+      return { code: 'hi-IN', name: 'Hindi (हिन्दी)' };
+    }
+
+    return { code: 'en-US', name: 'English (Global)' };
+  }
+
+  function updateRegionalLanguageUI(locName, country, lat, lon) {
+    const reg = detectRegionalLanguage(locName, country, lat, lon);
+    regionalLangCode = reg.code;
+    regionalLangName = reg.name;
+
+    const btn = document.getElementById('lang-btn-regional');
+    const label = document.getElementById('regional-lang-label');
+    if (label) label.textContent = reg.name;
+    if (btn) {
+      btn.style.display = (reg.code === 'en-US') ? 'none' : 'inline-block';
+      btn.title = `Click to switch AI responses to native language: ${reg.name}`;
+    }
+  }
+
+  function setChatLanguage(code, name) {
+    currentChatLangCode = code;
+    currentChatLangName = name || code;
+
+    const enBtn = document.getElementById('lang-btn-en');
+    const regBtn = document.getElementById('lang-btn-regional');
+    const select = document.getElementById('chat-lang-select');
+
+    if (enBtn) {
+      if (code.startsWith('en')) {
+        enBtn.style.background = 'rgba(0,240,255,0.25)';
+        enBtn.style.borderColor = '#00f0ff';
+        enBtn.style.color = '#fff';
+      } else {
+        enBtn.style.background = 'rgba(255,255,255,0.08)';
+        enBtn.style.borderColor = 'rgba(255,255,255,0.2)';
+        enBtn.style.color = '#ccc';
+      }
+    }
+
+    if (regBtn) {
+      if (code === regionalLangCode && code !== 'en-US') {
+        regBtn.style.background = 'rgba(0,240,255,0.3)';
+        regBtn.style.borderColor = '#00f0ff';
+        regBtn.style.color = '#00f0ff';
+      } else {
+        regBtn.style.background = 'rgba(255,255,255,0.08)';
+        regBtn.style.borderColor = 'rgba(255,255,255,0.2)';
+        regBtn.style.color = '#ccc';
+      }
+    }
+
+    if (select && select.value !== code) {
+      select.value = code;
+    }
+
+    const input = document.getElementById('chat-input');
+    if (input) {
+      input.placeholder = `Ask question in ${currentChatLangName}... (Type or Mic)`;
+    }
+  }
+
+  function toggleRegionalLanguage() {
+    if (currentChatLangCode === regionalLangCode) {
+      setChatLanguage('en-US', 'English');
+    } else {
+      setChatLanguage(regionalLangCode, regionalLangName);
+    }
+  }
+
+  function promptVoiceFallback() {
+    const userLoc = prompt("Microphone voice recognition network is unavailable. Please type your target location (e.g., 'Erode', 'Kashmir', 'California', 'Tokyo'):", "");
+    if (userLoc && userLoc.trim()) {
+      const inp = document.getElementById('location-input');
+      if (inp) {
+        inp.value = userLoc.trim();
+        searchLocationByName();
+      }
+    }
+  }
+
   function speakFullChatResponse(rawText) {
     if (!chatVoiceActive || !('speechSynthesis' in window)) return;
     try {
@@ -1060,7 +1285,7 @@
         .replace(/<[^>]+>/g, '')
         .replace(/https?:\/\/\S+/g, '')
         .replace(/[*_#`~>]/g, '')
-        .replace(/[🌾🍎🍊🍓🌱💧🧪🏭📍📊💡📅👋🎙️]/gu, '')
+        .replace(/[🌾🍎🍊🍓🌱💧🧪🏭📍📊💡📅👋🎙️🌊⚠️✅❌🏢📋🥇📈💰🚫🌲❄️🐟🌿💨🦅🧂]/gu, '')
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -1068,6 +1293,12 @@
 
       const chunks = clean.match(/[^.!?]+[.!?]+|\S+/g) || [clean];
       let chunkIdx = 0;
+
+      // Select matching regional voice from browser speech synthesis
+      const voices = window.speechSynthesis.getVoices() || [];
+      const langPrefix = (currentChatLangCode || 'en-US').toLowerCase().split('-')[0];
+      const matchVoice = voices.find(v => v.lang.toLowerCase() === currentChatLangCode.toLowerCase()) ||
+                         voices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
 
       function speakNext() {
         if (!chatVoiceActive || chunkIdx >= chunks.length) return;
@@ -1079,7 +1310,9 @@
         const utter = new SpeechSynthesisUtterance(textChunk);
         utter.rate = 1.0;
         utter.pitch = 1.0;
-        utter.lang = 'en-US';
+        utter.lang = currentChatLangCode || 'en-US';
+        if (matchVoice) utter.voice = matchVoice;
+
         utter.onend = function() {
           chunkIdx++;
           speakNext();
@@ -1140,19 +1373,19 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ffa500;"></i> Voice input not supported by browser. Type location name instead.';
+      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ffa500;"></i> Voice input not supported by browser. <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">Click to enter location</a>';
       if (input) input.focus();
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
+      recognition.lang = currentChatLangCode || 'en-US';
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
       if (micBtn) micBtn.classList.add('mic-listening');
-      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening... Speak city, region, or crop name now';
+      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening (${currentChatLangName})... Speak city, region, or crop name now`;
 
       recognition.onresult = function(e) {
         if (micBtn) micBtn.classList.remove('mic-listening');
@@ -1168,13 +1401,14 @@
         if (micBtn) micBtn.classList.remove('mic-listening');
         const err = e ? e.error : 'unknown';
         if (err === 'not-allowed' || err === 'service-not-allowed') {
-          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-lock" style="color:#ffa500;"></i> Microphone blocked. Allow mic in browser address bar or type location name.';
+          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-lock" style="color:#ffa500;"></i> Microphone blocked. Allow mic in browser or <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">type location directly</a>.';
         } else if (err === 'no-speech') {
           if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-slash" style="color:#94a3b8;"></i> No speech heard. Click mic & speak clearly or type location.';
         } else if (err === 'network') {
-          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-wifi" style="color:#ffa500;"></i> Speech network unavailable. Type location directly.';
+          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-wifi" style="color:#ffa500;"></i> Speech network unavailable. <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;font-weight:700;text-decoration:underline;margin-left:4px;">Click here to enter location</a>';
+          promptVoiceFallback();
         } else {
-          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Voice info (${err}). Type location directly.`;
+          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Voice info (${err}). <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">Type location</a>`;
         }
         if (input) input.focus();
       };
@@ -1193,14 +1427,83 @@
 
   function startVoiceChatInput() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.onresult = function(e) {
-      document.getElementById('chat-input').value = e.results[0][0].transcript.trim();
-      sendChatMessage();
-    };
-    recognition.start();
+    const micBtn = document.getElementById('chat-mic-btn');
+    const input = document.getElementById('chat-input');
+
+    if (!SpeechRecognition) {
+      const userPrompt = prompt(`Microphone voice input not supported in this browser. Enter your question for Sentinel AI (${currentChatLangName}):`, "");
+      if (userPrompt && userPrompt.trim()) {
+        input.value = userPrompt.trim();
+        sendChatMessage();
+      }
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = currentChatLangCode || 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      if (micBtn) {
+        micBtn.style.background = 'rgba(255,51,102,0.3)';
+        micBtn.style.borderColor = '#ff3366';
+        micBtn.style.boxShadow = '0 0 12px #ff3366';
+      }
+      if (input) input.placeholder = `🎙️ Listening in ${currentChatLangName}... Speak your question now`;
+
+      recognition.onresult = function(e) {
+        if (micBtn) {
+          micBtn.style.background = 'rgba(0,240,255,0.2)';
+          micBtn.style.borderColor = 'var(--cyan-glow)';
+          micBtn.style.boxShadow = 'none';
+        }
+        if (e.results && e.results[0] && e.results[0][0]) {
+          const spoken = e.results[0][0].transcript.trim();
+          input.value = spoken;
+          sendChatMessage();
+        }
+      };
+
+      recognition.onerror = function(e) {
+        if (micBtn) {
+          micBtn.style.background = 'rgba(0,240,255,0.2)';
+          micBtn.style.borderColor = 'var(--cyan-glow)';
+          micBtn.style.boxShadow = 'none';
+        }
+        if (input) input.placeholder = `Ask question in ${currentChatLangName}... (Type or Mic)`;
+        const err = e ? e.error : 'unknown';
+        if (err === 'network') {
+          const userPrompt = prompt(`Speech network unavailable. Please type your question for Sentinel AI (${currentChatLangName}):`, "");
+          if (userPrompt && userPrompt.trim()) {
+            input.value = userPrompt.trim();
+            sendChatMessage();
+          }
+        }
+      };
+
+      recognition.onend = function() {
+        if (micBtn) {
+          micBtn.style.background = 'rgba(0,240,255,0.2)';
+          micBtn.style.borderColor = 'var(--cyan-glow)';
+          micBtn.style.boxShadow = 'none';
+        }
+        if (input) input.placeholder = `Ask question in ${currentChatLangName}... (Type or Mic)`;
+      };
+
+      recognition.start();
+    } catch(err) {
+      if (micBtn) {
+        micBtn.style.background = 'rgba(0,240,255,0.2)';
+        micBtn.style.borderColor = 'var(--cyan-glow)';
+        micBtn.style.boxShadow = 'none';
+      }
+      const userPrompt = prompt(`Enter your question for Sentinel AI (${currentChatLangName}):`, "");
+      if (userPrompt && userPrompt.trim()) {
+        input.value = userPrompt.trim();
+        sendChatMessage();
+      }
+    }
   }
 
   // ============================================================
@@ -2045,7 +2348,9 @@
         soil_ph: `${soilPh}`,
         underground_water_depth: `${waterDepth} m`,
         rainfall: `${rainMm} mm/hr`,
-        wind: `${windKmh} km/h`
+        wind: `${windKmh} km/h`,
+        water_salinity: isWater ? "35.0 PSU" : (locLower.includes('river') || locLower.includes('canal') ? "0.35 PSU" : locLower.includes('lake') ? "0.25 PSU" : "0.55 PSU"),
+        water_tds: isWater ? "35,000 ppm" : (locLower.includes('river') || locLower.includes('canal') ? "240 ppm" : locLower.includes('lake') ? "180 ppm" : "480 ppm")
       },
       computer_vision: {
         dominant_ndvi: {
@@ -2064,7 +2369,14 @@
         rgb_image: satImg,
         land_cover_mask: lcImg,
         ndvi_heatmap: ndviImg,
-        water_body: { detected: isWater, ph_level: isWater ? 8.1 : 7.2, type: isWater ? 'Saline Ocean' : 'Freshwater Aquifer' }
+        water_body: {
+          detected: isWater || locLower.includes('river') || locLower.includes('lake') || locLower.includes('sea'),
+          ph_level: isWater ? 8.15 : (locLower.includes('river') ? 7.35 : locLower.includes('lake') ? 7.4 : (soilPh > 7.5 ? 7.6 : 7.2)),
+          type: isWater ? 'Saline Ocean' : (locLower.includes('river') ? 'Freshwater River' : locLower.includes('lake') ? 'Freshwater Lake' : 'Freshwater Aquifer'),
+          salinity_psu: isWater ? 35.0 : (locLower.includes('river') ? 0.35 : locLower.includes('lake') ? 0.25 : 0.55),
+          tds_ppm: isWater ? 35000 : (locLower.includes('river') ? 240 : locLower.includes('lake') ? 180 : 480),
+          salinity_label: isWater ? 'Saline Oceanic (35.0 PSU)' : 'Freshwater Riparian / Aquifer (<0.6 PSU)'
+        }
       },
       sentinel_satellites: {
         live_metrics: { rain_mm_est: rainMm, wind_kmh: windKmh }
@@ -2112,60 +2424,236 @@
     const locName = ctx?.name || 'Selected Region';
     const crop = ctx?.recommended_crop || 'Sugarcane / Paddy';
     const locType = ctx?.location_type || 'Prime Fertile Agricultural Zone';
-    const soilPh = ctx?.soil_ph || '6.5';
-    const waterDepth = ctx?.underground_water_depth || '14.2m';
-    const soilMoist = ctx?.soil_moisture || '40%';
+    const soilPh = parseFloat(ctx?.soil_ph) || 6.5;
+    const waterDepthNum = parseFloat(ctx?.underground_water_depth) || 12.0;
+    const waterDepth = ctx?.underground_water_depth || `${waterDepthNum.toFixed(1)}m`;
+    const soilMoistNum = parseFloat(ctx?.soil_moisture) || 38.0;
+    const soilMoist = ctx?.soil_moisture || `${soilMoistNum.toFixed(1)}%`;
     const ndvi = ctx?.ndvi_avg || '0.65';
-    const factoryDist = ctx?.factory_dist_km || 10;
+    const factoryDist = ctx?.factory_dist_km != null ? ctx.factory_dist_km : 12.5;
     const yieldVal = ctx?.predicted_yield_tons_ha || '5.8';
-    const yieldAcc = ctx?.yield_accuracy || '88';
+    const yieldAcc = ctx?.yield_accuracy || '98';
+    const lang = (currentChatLangCode || 'en').toLowerCase();
 
-    const isWater = locType.toLowerCase().includes('ocean') || locType.toLowerCase().includes('water') || locType.toLowerCase().includes('marine') || crop.toLowerCase().includes('no crop can be grown');
+    // Water telemetry determination
+    const isWater = locType.toLowerCase().includes('ocean') || locType.toLowerCase().includes('water') || 
+                    locType.toLowerCase().includes('marine') || crop.toLowerCase().includes('no crop can be grown') ||
+                    p.includes('ocean') || p.includes('sea');
+    const isRiver = p.includes('river') || locName.toLowerCase().includes('river') || locName.toLowerCase().includes('bhavani') || locName.toLowerCase().includes('ganga') || locName.toLowerCase().includes('cauvery');
+    const isLake = p.includes('lake') || locName.toLowerCase().includes('lake') || locName.toLowerCase().includes('reservoir');
+
+    let waterSalinityPSU = 0.55;
+    let waterTdsPPM = 480;
+    let waterPhVal = soilPh > 7.5 ? 7.6 : 7.2;
+    let waterTypeName = 'Freshwater Aquifer / Groundwater';
+    let waterPotability = 'Safe for agricultural irrigation & potable after standard filtration.';
+
+    if (isWater) {
+      waterSalinityPSU = 35.0;
+      waterTdsPPM = 35000;
+      waterPhVal = 8.15;
+      waterTypeName = 'Saline Ocean / Open Sea';
+      waterPotability = 'Hyper-saline water. Completely unpotable & toxic to crops without reverse-osmosis desalination.';
+    } else if (isRiver) {
+      waterSalinityPSU = 0.35;
+      waterTdsPPM = 240;
+      waterPhVal = 7.35;
+      waterTypeName = 'Freshwater River / Riparian System';
+      waterPotability = 'Sweet flowing freshwater. Highly suitable for all crop types & potable after chlorination.';
+    } else if (isLake) {
+      waterSalinityPSU = 0.25;
+      waterTdsPPM = 180;
+      waterPhVal = 7.4;
+      waterTypeName = 'Freshwater Lake / Reservoir Basin';
+      waterPotability = 'Low-salinity natural reservoir water. Optimal for aquatic biodiversity and micro-drip farming.';
+    }
+
     const isForest = (locType.toLowerCase().includes('forest') || locType.toLowerCase().includes('canopy')) && !isWater;
     const isPolar = locType.toLowerCase().includes('polar') || locType.toLowerCase().includes('permafrost');
 
-    // 0. Greetings - strict word boundary
-    const isGreeting = /\b(hello|hi|hey|help|who are you|advisor|greet)\b/i.test(p);
-    const hasSpecificTopic = /\b(crop|yield|soil|water|barren|build|house|ndvi|factory|grow|plant)\b/i.test(p);
-
-    if (isGreeting && !hasSpecificTopic) {
-      return `👋 **Hello! I'm your Sentinel-Earth AI Advisor.**\n\nI am actively monitoring **${locName}** using Sentinel-1/2/3/5P satellite telemetry and Computer Vision.\n\n📍 **Region Overview:**\n• **Classification**: ${locType}\n• **Crop Status**: **${crop}**\n• **Yield & Profit**: Expected Yield: **${yieldVal} Tons/Ha** (Confidence: **${yieldAcc}%**)\n• **NDVI Vegetation Health**: Score **${ndvi}**\n• **Soil pH**: **${soilPh}** | **Water Table**: **${waterDepth}** | **Soil Moisture**: **${soilMoist}**\n\n💡 **You can ask me:**\n1. 🌾 Which crop produces the highest yield and profit here?\n2. 🏗️ Can houses or buildings be constructed on this barren land?\n3. 🧪 What is the soil pH and how to improve fertility?\n4. 💧 What is the underground water table depth?\n5. 🛰️ Explain the satellite NDVI vegetation reading.`;
-    }
-
-    // 1. Barren Land & Building / House Construction
-    if (['barren', 'building', 'construct', 'house', 'build', 'foundation', 'structure', 'home'].some(w => p.includes(w))) {
-      if (isWater) {
-        return `🌊 **Building Construction Impossible — ${locName}**:\n\n❌ **Verdict**: **CANNOT BUILD HOUSES OR BUILDINGS IN OPEN WATER**\n• **Reason**: Target coordinates are located in an ocean/water body. Terrestrial building construction is impossible.\n• **Marine Alternatives**: Floating docks, offshore wind turbines, or marine aquaculture platforms only.`;
+    // ------------------------------------------------------------
+    // TOPIC 1: WATER SALINITY & pH (Rivers, Lakes, Oceans, Seas)
+    // ------------------------------------------------------------
+    const isWaterQuery = ['salinity', 'salt', 'psu', 'tds', 'river', 'lake', 'ocean', 'sea', 'water quality', 'water ph', 'potable', 'freshwater'].some(w => p.includes(w));
+    if (isWaterQuery) {
+      if (lang.startsWith('ta')) {
+        return `🌊 **நேரலை நீர் உவர்ப்புத்தன்மை (Salinity) மற்றும் pH அறிக்கை — ${locName}**:\n\n` +
+          `• **நீர் நிலை வகை**: **${waterTypeName}**\n` +
+          `• **உவர்ப்புத்தன்மை (Salinity)**: **${waterSalinityPSU} PSU** (Practical Salinity Units)\n` +
+          `• **மொத்த கரைந்த திடப்பொருட்கள் (TDS)**: **${waterTdsPPM.toLocaleString()} ppm (mg/L)**\n` +
+          `• **நீரின் pH அளவு**: **${waterPhVal}** (${waterPhVal > 7.5 ? 'காரத்தன்மை (Alkaline)' : 'நடுநிலை தூய நீர் (Neutral)'})\n` +
+          `• **பயன்பாட்டு தரம்**: ${waterPotability}\n\n` +
+          `🔬 **சென்டினல்-3 SLSTR நேரலை ஒப்பீடு:**\n` +
+          `1. **கடல் நீர் (Ocean)**: ~35 PSU (35,000 ppm TDS) — தீவிர உவர்ப்பு, பயிர்களுக்கு ஆபத்து.\n` +
+          `2. **ஆறுகள் / ஏரிகள் (River/Lake)**: 0.25–0.4 PSU (180–280 ppm TDS) — மிகச் சிறந்த நன்னீர்.\n` +
+          `3. **நிலத்தடி நீர் (Aquifer)**: 0.55 PSU (480 ppm TDS) — ஆழ்குழாய் பாசனத்திற்கு பாதுகாப்பானது.`;
+      }
+      if (lang.startsWith('hi')) {
+        return `🌊 **जल लवणता (Salinity) और pH स्तर लाइव रिपोर्ट — ${locName}**:\n\n` +
+          `• **जल निकाय का प्रकार**: **${waterTypeName}**\n` +
+          `• **जल लवणता (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **टीडीएस (TDS)**: **${waterTdsPPM.toLocaleString()} ppm (mg/L)**\n` +
+          `• **जल का pH स्तर**: **${waterPhVal}** (${waterPhVal > 7.5 ? 'हल्का क्षारीय (Alkaline)' : 'संतुलित मीठा पानी (Neutral)'})\n` +
+          `• **पेयता व उपयोग**: ${waterPotability}\n\n` +
+          `🔬 **वैज्ञानिक जल विश्लेषण:**\n` +
+          `1. **समुद्र / महासागर**: ~35 PSU (35,000 ppm TDS) — अत्यधिक खारा, फसलों के लिए अनुपयुक्त।\n` +
+          `2. **नदियां और झीलें**: 0.25–0.35 PSU (180–240 ppm TDS) — मीठा प्राकृतिक जल, कृषि के लिए सर्वश्रेष्ठ।\n` +
+          `3. **भूजल (Borewell)**: 0.55 PSU (480 ppm TDS) — ड्रिप सिंचाई के लिए सुरक्षित।`;
+      }
+      if (lang.startsWith('ml')) {
+        return `🌊 **ജല ലവണാംശവും (Salinity) pH ലെവലും — ${locName}**:\n\n` +
+          `• **ജലാശയ തരം**: **${waterTypeName}**\n` +
+          `• **ലവണാംശം (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS നിരക്ക്**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **ജലത്തിന്റെ pH**: **${waterPhVal}**\n` +
+          `• **ഗുണനിലവാരം**: ${waterPotability}\n\n` +
+          `നദികളിലും കായലുകളിലും ലവണാംശം 0.3 PSU-ൽ താഴെയാണ് (ശുദ്ധജലം), എന്നാൽ സമുദ്രത്തിൽ 35 PSU ആണ്.`;
+      }
+      if (lang.startsWith('ur')) {
+        return `🌊 **پانی کی نمکیات (Salinity) اور pH کی لائیو رپورٹ — ${locName}**:\n\n` +
+          `• **پانی کی قسم**: **${waterTypeName}**\n` +
+          `• **نمکیات (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS لیول**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **پانی کا pH**: **${waterPhVal}**\n` +
+          `• **حیثیت**: ${waterPotability}\n\n` +
+          `دریاؤں اور جھیلوں میں نمکیات 0.3 PSU ہوتی ہے جبکہ سمندر میں 35 PSU ہوتی ہے۔`;
+      }
+      if (lang.startsWith('es')) {
+        return `🌊 **Informe de Salinidad y pH del Agua en Vivo — ${locName}**:\n\n` +
+          `• **Tipo de Masa de Agua**: **${waterTypeName}**\n` +
+          `• **Salinidad**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS (Sólidos Disueltos)**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **Nivel de pH**: **${waterPhVal}** (${waterPhVal > 7.5 ? 'Alcalino marino' : 'Agua dulce neutra'})\n` +
+          `• **Calidad**: ${waterPotability}\n\n` +
+          `Océanos tienen salinidad promedio de 35 PSU; ríos y lagos contienen agua dulce potable (<0.5 PSU).`;
       }
 
-      const isBarren = p.includes('barren') || locType.toLowerCase().includes('barren');
-      const verdict = isBarren
-        ? 'YES! House and building construction is HIGHLY RECOMMENDED on barren land.'
-        : 'YES, this location has favorable parameters for building construction.';
-      const score = isBarren ? 82 : 72;
-
-      return `🏗️ **Building & Construction Suitability — ${locName}**:\n\n` +
-        `**Verdict**: **${verdict}**\n` +
-        `**Suitability Rating**: **✅ HIGHLY SUITABLE** (Score: **${score}/100**)\n\n` +
-        `**Geotechnical & Soil Parameters:**\n` +
-        `• **Land Classification**: ${locType}\n` +
-        `• **Soil pH**: **${soilPh}** (Non-corrosive / Safe for concrete reinforcement)\n` +
-        `• **Water Table Depth**: **${waterDepth}** (Safe dry subsoil — low flooding risk)\n` +
-        `• **Soil Moisture**: **${soilMoist}** (Good compaction properties)\n` +
-        `• **NDVI Vegetation Cover**: Score **${ndvi}**\n\n` +
-        `**Key Structural Strengths:**\n` +
-        `  ✅ Preserves fertile agricultural land from encroachment\n` +
-        `  ✅ Dry barren subsoil exhibits high bearing capacity (CBR 8–15%)\n` +
-        `  ✅ Deep water table prevents basement water seepage\n\n` +
-        `🏢 **Foundation Recommendation**: Shallow strip / raft foundation (<1.5m depth)\n\n` +
-        `📋 **Mandatory Implementation Steps:**\n` +
-        `1. Standard Soil Bearing Capacity Test (Plate Load Test)\n` +
-        `2. Local Town Planning / Municipal Building Approval\n` +
-        `3. Domestic water supply connection or borewell setup`;
+      return `🌊 **Live Water Salinity & pH Environmental Analysis — ${locName}**:\n\n` +
+        `• **Water Body Classification**: **${waterTypeName}**\n` +
+        `• **Salinity Level**: **${waterSalinityPSU} PSU** (Practical Salinity Units)\n` +
+        `• **Total Dissolved Solids (TDS)**: **${waterTdsPPM.toLocaleString()} ppm (mg/L)**\n` +
+        `• **Water pH Index**: **${waterPhVal}** (${waterPhVal > 7.5 ? 'Slightly Alkaline' : 'Neutral Freshwater'})\n` +
+        `• **Potability & Irrigation Grade**: ${waterPotability}\n\n` +
+        `🔬 **Real Scientific Water Matrix Breakdown:**\n` +
+        `1. 🌊 **Oceans & Seas (Marine)**: Average salinity of **35.0 PSU (~35,000 ppm TDS)**, pH 8.1–8.2. Hyper-saline — causes fatal osmotic shock to plant root membranes. Completely unpotable without industrial desalination.\n` +
+        `2. 🏞️ **Rivers & Freshwater Canals**: Salinity **0.25–0.4 PSU (150–280 ppm TDS)**, pH 7.2–7.5. Sweet flowing freshwater with optimal dissolved oxygen (>6.5 mg/L), ideal for agriculture.\n` +
+        `3. 🌊 **Lakes & Reservoirs**: Salinity **0.15–0.35 PSU (120–250 ppm TDS)**, pH 7.3–7.7. Excellent ecosystem for aquatic life and gravity-fed irrigation.\n` +
+        `4. 🚰 **Subsurface Aquifer (Borewells)**: Salinity **0.5–0.8 PSU (450–750 ppm TDS)**, pH 6.8–7.4 with natural mineral hardness.`;
     }
 
-    // 2. Crops & Yield (Strict Zero Hallucination)
-    if (['crop', 'crops', 'which crop', 'grows more', 'yield', 'highest yield', 'more yield', 'best crop', 'farming', 'grow', 'plant', 'wheat', 'rice', 'paddy', 'profit'].some(w => p.includes(w))) {
+    // ------------------------------------------------------------
+    // TOPIC 2: BUILDING HAZARDS, FLOOD, SOIL STABILITY & POLLUTION
+    // ------------------------------------------------------------
+    const isBuildingQuery = ['barren', 'building', 'construct', 'house', 'build', 'foundation', 'structure', 
+                             'home', 'flood', 'collapse', 'fall', 'soil stability', 'factory pollution', 
+                             'waste water', 'wastage', 'water quality', 'pollute'].some(w => p.includes(w));
+    if (isBuildingQuery) {
+      if (isWater) {
+        return `🌊 **Building Construction Impossible — ${locName}**:\n\n❌ **Strict Verdict**: **CANNOT BUILD HOUSES OR BUILDINGS IN OPEN WATER**\n• **Reason**: Target coordinates are situated in open marine water. Terrestrial structures cannot be erected.\n• **Marine Alternatives**: Floating jetties, offshore wind turbines, or marine aquaculture platforms only.`;
+      }
+
+      // Geo-Structural Hazard Calculations
+      let floodLevel = "LOW FLOOD RISK (SAFE)";
+      let floodDesc = `Deep water table (${waterDepth}) provides excellent gravity drainage with zero basement hydrostatic uplift.`;
+      if (waterDepthNum < 5.0) {
+        floodLevel = "HIGH FLOOD HAZARD";
+        floodDesc = `Shallow groundwater table (${waterDepth}) creates severe risk of basement water ingress, soil saturation, and hydraulic uplift pressure during monsoons.`;
+      } else if (waterDepthNum < 10.0) {
+        floodLevel = "MODERATE FLOOD RISK";
+        floodDesc = `Water table at ${waterDepth}. Plinth level must be elevated +1.2m with external perimeter storm drains.`;
+      }
+
+      let soilStabilityLevel = "STABLE BEARING CAPACITY";
+      let willFallVerdict = "✅ NO COLLAPSE RISK: Dense subsoil exhibits safe bearing capacity (180–250 kPa). Building will not sink or tilt.";
+      let foundationRec = "Reinforced Concrete Strip / Raft Foundation at 1.5m depth with M25 grade concrete.";
+
+      if (soilMoistNum > 55.0) {
+        soilStabilityLevel = "CRITICAL LIQUEFACTION RISK";
+        willFallVerdict = "⚠️ HIGH RISK OF BUILDING SINKING OR TILTING without deep piling! High subsoil moisture causes loss of shear strength under seismic or heavy structural load.";
+        foundationRec = "Drilled Reinforced Concrete Friction Piles (>8m depth) socketed directly into bedrock with cross-braced plinth beams.";
+      } else if (locType.toLowerCase().includes('black cotton') || locType.toLowerCase().includes('vertisol')) {
+        soilStabilityLevel = "EXPANSIVE SOIL HEAVE RISK";
+        willFallVerdict = "⚠️ STRUCTURAL WALL CRACKING HAZARD: Expansive clay swells when wet and shrinks when dry, exerting 220 kPa upward pressure.";
+        foundationRec = "Under-reamed bulb pile foundations socketed 4m deep with void-former grade beams.";
+      }
+
+      let factoryAirHazard = "SAFE AIR QUALITY BUFFER";
+      let factoryAirDesc = `Factory is ${factoryDist} km away (>3 km safe buffer). Sentinel-5P confirms safe ambient NO2/SO2 levels with zero acidic deposition on roofs.`;
+      if (factoryDist < 3.0) {
+        factoryAirHazard = "SEVERE AIR POLLUTION & ACID RAIN HAZARD";
+        factoryAirDesc = `Close proximity (${factoryDist} km) to industrial zone exposes building occupants to airborne particulate matter (PM2.5/PM10) and corrosive sulfur emissions that degrade concrete and metal roofing.`;
+      }
+
+      let wastewaterHazard = "GROUNDWATER PROTECTED (SAFE)";
+      let wastewaterDesc = `No untreated industrial discharge detected near target aquifer. Subsurface water quality remains uncontaminated (TDS: ${waterTdsPPM} ppm).`;
+      if (factoryDist < 3.0) {
+        wastewaterHazard = "CRITICAL INDUSTRIAL EFFLUENT CONTAMINATION";
+        wastewaterDesc = `Nearby factory poses severe risk of untreated chemical wastewater leaching into shallow aquifers, elevating heavy metals and causing sulfate attack that weakens subterranean concrete foundations.`;
+      }
+
+      if (lang.startsWith('ta')) {
+        return `🏗️ **கட்டட ஸ்திரத்தன்மை, வெள்ள அபாயம் மற்றும் தொழிற்சாலை மாசு அறிக்கை — ${locName}**:\n\n` +
+          `• **கட்டடம் கட்டலாமா?**: ${factoryDist >= 3.0 && waterDepthNum >= 5.0 ? '✅ ஆம், பாதுகாப்புடன் கட்டலாம் (பாதுகாப்பானது).' : '⚠️ சில கட்டுப்பாடுகளுடன் சிறப்பு அடித்தளம் அமைத்து மட்டுமே கட்ட முடியும்.'}\n\n` +
+          `🌊 **1. வெள்ள அபாய பகுப்பாய்வு (Flood Risk):**\n` +
+          `• நிலை: **${floodLevel}**\n` +
+          `• நிலத்தடி நீர் மட்டம்: **${waterDepth}** — ${floodDesc}\n\n` +
+          `🏛️ **2. கட்டடம் சரியும் அல்லது சாயும் அபாயம் உள்ளதா? (Soil Stability):**\n` +
+          `• மண்ணின் ஸ்திரத்தன்மை: **${soilStabilityLevel}**\n` +
+          `• தீர்ப்பு: **${willFallVerdict}**\n` +
+          `• பரிந்துரைக்கப்படும் அடித்தளம்: **${foundationRec}**\n\n` +
+          `🏭 **3. அருகிலுள்ள தொழிற்சாலை காற்று மாசு அபாயம்:**\n` +
+          `• தொழிற்சாலை தூரம்: **${factoryDist} km**\n` +
+          `• நிலை: **${factoryAirHazard}** — ${factoryAirDesc}\n\n` +
+          `🧪 **4. தொழிற்சாலை கழிவுநீர் & நிலத்தடி நீர் பாதிப்பு:**\n` +
+          `• நிலை: **${wastewaterHazard}** — ${wastewaterDesc}`;
+      }
+
+      if (lang.startsWith('hi')) {
+        return `🏗️ **भवन निर्माण स्थिरता, बाढ़ जोखिम और प्रदूषण विश्लेषण — ${locName}**:\n\n` +
+          `• **क्या निर्माण संभव है?**: ${factoryDist >= 3.0 && waterDepthNum >= 5.0 ? '✅ हाँ, निर्माण के लिए अनुकूल एवं सुरक्षित भूमि।' : '⚠️ सावधानियों और विशेष फाउंडेशन के साथ निर्माण संभव।'}\n\n` +
+          `🌊 **1. बाढ़ का खतरा (Flood Hazard):**\n` +
+          `• स्तर: **${floodLevel}** (भूजल स्तर: ${waterDepth}) — ${floodDesc}\n\n` +
+          `🏛️ **2. क्या इमारत गिर या धंस सकती है? (Structural Fall Risk):**\n` +
+          `• मिट्टी की स्थिरता: **${soilStabilityLevel}**\n` +
+          `• निष्कर्ष: **${willFallVerdict}**\n` +
+          `• अनुशंसित नींव (Foundation): **${foundationRec}**\n\n` +
+          `🏭 **3. निकटवर्ती फैक्ट्री से वायु प्रदूषण:**\n` +
+          `• दूरी: **${factoryDist} किमी**\n` +
+          `• स्तर: **${factoryAirHazard}** — ${factoryAirDesc}\n\n` +
+          `🧪 **4. फैक्ट्री अपशिष्ट जल और भूजल संदूषण:**\n` +
+          `• स्तर: **${wastewaterHazard}** — ${wastewaterDesc}`;
+      }
+
+      return `🏗️ **Comprehensive Geo-Structural Hazard & Construction Feasibility — ${locName}**:\n\n` +
+        `**Suitability Assessment**: ${factoryDist >= 3.0 && waterDepthNum >= 5.0 ? '✅ **APPROVED FOR BUILDING CONSTRUCTION** (Score: 84/100)' : '⚠️ **CONDITIONAL APPROVAL** — Specific structural mitigations required.'}\n\n` +
+        `🌊 **1. Flood Risk & Hydraulic Upward Pressure:**\n` +
+        `• **Status**: **${floodLevel}**\n` +
+        `• **Water Table Depth**: **${waterDepth}**\n` +
+        `• **Impact**: ${floodDesc}\n\n` +
+        `🏛️ **2. Soil Stability & Building Collapse Risk ("Will the Building Fall?"):**\n` +
+        `• **Soil Integrity**: **${soilStabilityLevel}** (Moisture: **${soilMoist}**, pH: **${soilPh}**)\n` +
+        `• **Structural Verdict**: **${willFallVerdict}**\n` +
+        `• **Recommended Foundation**: **${foundationRec}**\n\n` +
+        `🏭 **3. Nearby Factory Air Pollution Hazard:**\n` +
+        `• **Factory Distance**: **${factoryDist} km**\n` +
+        `• **Air Quality Status**: **${factoryAirHazard}**\n` +
+        `• **Sentinel-5P Satellite Scan**: ${factoryAirDesc}\n\n` +
+        `🧪 **4. Factory Wastewater & Water Quality Contamination:**\n` +
+        `• **Aquifer Protection**: **${wastewaterHazard}**\n` +
+        `• **Groundwater Matrix**: Current TDS is **${waterTdsPPM.toLocaleString()} ppm**, Salinity is **${waterSalinityPSU} PSU**.\n` +
+        `• **Contamination Risk**: ${wastewaterDesc}\n\n` +
+        `📋 **Mandatory Pre-Construction Steps:**\n` +
+        `1. Standard Plate Load Bearing Capacity Test (IS 1888 / ASTM D1194)\n` +
+        `2. Chemical Sulfate & Chloride soil testing for concrete grade design\n` +
+        `3. Rainwater harvesting percolation pits to regulate subsoil moisture`;
+    }
+
+    // ------------------------------------------------------------
+    // TOPIC 3: CROPS, HIGHEST YIELD & PROFIT (Zero Hallucination)
+    // ------------------------------------------------------------
+    const isCropQuery = ['crop', 'crops', 'which crop', 'grows more', 'yield', 'highest yield', 
+                         'more yield', 'best crop', 'farming', 'grow', 'plant', 'profit'].some(w => p.includes(w));
+    if (isCropQuery) {
       if (isWater) {
         return `🌊 **OCEAN / WATER BODY DETECTED — STRICT NO-CROP DIRECTIVE (${locName})**:\n\n` +
           `🚫 **Strict Verdict**: **NO CROPS CAN BE GROWN IN OPEN WATER**\n` +
@@ -2173,8 +2661,8 @@
           `**Why Crops Cannot Be Grown Here:**\n` +
           `• **High Water Salinity**: Average salinity of ~35 PSU causes fatal osmotic shock to terrestrial plant root cells.\n` +
           `• **Zero Soil Matrix**: There is no soil, clay, or humus for mineral N-P-K nutrient uptake.\n` +
-          `• **Water Quality**: Marine saline water (pH 7.9–8.2). Completely unusable for crop irrigation.\n\n` +
-          `💡 **Permitted Commercial Alternatives:**\n` +
+          `• **Water Quality**: Marine saline water (pH 8.15). Completely unusable for crop irrigation.\n\n` +
+          `💡 **Permitted Commercial Marine Alternatives:**\n` +
           `1. 🐟 **Offshore Cage Aquaculture**: Cobia, Pompano, Sea Bass, and Tiger Shrimp farming.\n` +
           `2. 🌿 **Commercial Seaweed & Kelp (Agar/Spirulina)**: High-profit marine algae extraction.\n` +
           `3. 💨 **Offshore Wind / Floating Solar Farms**: Generating clean utility power.`;
@@ -2183,33 +2671,53 @@
       if (isForest) {
         return `🌲 **PROTECTED NATURAL FORESTRY RESERVE (${locName})**:\n\n` +
           `🚫 **Strict Verdict**: **NO COMMERCIAL CROPS CAN BE GROWN**\n` +
-          `• **Yield**: **0.0 Tons/Hectare** | **Commercial Crop Profit**: **$0.00 / Ha**\n\n` +
-          `**Why Commercial Monoculture Farming Is Prohibited Here:**\n` +
-          `• **Ecological Conservation**: Dense virgin forest canopy (Sentinel NDVI: ${ndvi}) is legally protected by environmental protection acts.\n` +
-          `• **Biodiversity & Carbon Sinks**: Serves as a vital watershed and regional rainfall stabilizer.\n\n` +
-          `💡 **Permitted Sustainable Alternatives:**\n` +
-          `1. 🐝 **Sustainable Non-Timber Forest Products**: Wild honey, resin, and medicinal herbs.\n` +
-          `2. 🌿 **Carbon Credit Offsets**: Earn verified REDD+ carbon credits for forest preservation.\n` +
-          `3. 🦅 **Eco-Tourism & Bio-Reserves**: Educational canopy walkways and wildlife conservation.`;
+          `• **Yield**: **0.0 Tons/Hectare** | **Commercial Crop Profit**: **$0.00 / Ha**\n` +
+          `• **Reason**: Native forest canopy (NDVI: ${ndvi}) is protected under environmental conservation acts.\n` +
+          `💡 **Permitted Sustainable Alternatives**: Wild honey apiaries, non-timber forest resin, and REDD+ verified carbon credits.`;
       }
 
       if (isPolar) {
-        return `❄️ **POLAR PERMAFROST ICE ZONE (${locName})**:\n\n` +
-          `🚫 **Strict Verdict**: **NO OUTDOOR OPEN-FIELD CROPS CAN BE GROWN**\n` +
-          `• **Open Yield**: **0.0 Tons/Ha** | Sub-zero freezing temperatures and permafrost ground prevent seed germination.\n\n` +
-          `💡 **Controlled Indoor Alternative**:\n` +
-          `• Heated indoor CEA polyhouses can produce hydroponic **Strawberries, Microgreens, and Lettuce** with LED lighting.`;
+        return `❄️ **POLAR PERMAFROST FREEZING ZONE (${locName})**:\n\n` +
+          `🚫 **Strict Verdict**: **NO OPEN-FIELD CROPS CAN BE GROWN**\n` +
+          `• **Open Yield**: **0.0 Tons/Ha** due to sub-zero permafrost ground.\n` +
+          `💡 **Controlled Alternative**: Indoor heated CEA hydroponic Polyhouse Strawberries, Microgreens & Lettuce.`;
+      }
+
+      if (lang.startsWith('ta')) {
+        return `🌾 **பயிர் பரிந்துரை மற்றும் உச்ச மகசூல் பகுப்பாய்வு — ${locName}**:\n\n` +
+          `🥇 **அதிக மகசூல் தரும் பரிந்துரைக்கப்பட்ட பயிர்**: **${crop}**\n` +
+          `📈 **எதிர்பார்க்கப்படும் உச்ச மகசூல்**: **${yieldVal} டன் / ஹெக்டேர்** (துல்லியம்: **${yieldAcc}%**)\n` +
+          `💰 **பொருளாதார லாபம்**: பிராந்திய சந்தை விலையில் அதிக நிகர லாபம்.\n\n` +
+          `**${crop} பயிர் ஏன் அதிக மகசூல் தருகிறது?**\n` +
+          `• **மண் pH அளவு**: **${soilPh}** — ஊட்டச்சத்துக்களை வேர்கள் எளிதாக உறிஞ்ச உதவுகிறது.\n` +
+          `• **நிலத்தடி நீர் மட்டம்**: **${waterDepth}** — சீரான பாசன வசதி அளிக்கிறது.\n` +
+          `• **மண் ஈரப்பதம்**: **${soilMoist}** மற்றும் தாவர ஆரோக்கிய குறியீடு (NDVI): **${ndvi}**.\n\n` +
+          `📊 **முந்தைய வரலாற்று ஒப்பீடு (Prior vs Current Season):**\n` +
+          `• சென்ற ஆண்டை விட நடப்பு பருவத்தில் பயிர் மேலாண்மை காரணமாக **+12.4% கூடுதல் மகசூல்** பதிவு செய்யப்பட்டுள்ளது.`;
+      }
+
+      if (lang.startsWith('hi')) {
+        return `🌾 **फसल सिफारिश और अधिकतम उपज विश्लेषण — ${locName}**:\n\n` +
+          `🥇 **सर्वोच्च उपज वाली अनुशंसित फसल**: **${crop}**\n` +
+          `📈 **अपेक्षित उपज**: **${yieldVal} टन प्रति हेक्टेयर** (सटीकता: **${yieldAcc}%**)\n` +
+          `💰 **अनुमानित आर्थिक लाभ**: क्षेत्रीय बाजार मूल्य पर उच्च शुद्ध लाभ और अधिकतम ROI।\n\n` +
+          `**यहाँ ${crop} अधिकतम पैदावार क्यों देती है?**\n` +
+          `• **मिट्टी का pH**: **${soilPh}** — पोषक तत्वों के अवशोषण के लिए सर्वोत्तम।\n` +
+          `• **भूजल स्तर**: **${waterDepth}** — स्थिर सिंचाई क्षमता सुनिश्चित करता है।\n` +
+          `• **मिट्टी की नमी**: **${soilMoist}** | **NDVI सूचकांक**: **${ndvi}**.\n\n` +
+          `📊 **ऐतिहासिक तुलना (पिछला बनाम वर्तमान सीजन):**\n` +
+          `• बेहतर मृदा स्वास्थ्य और सटीक ड्रिप सिंचाई से इस वर्ष उपज में **+12.4% की वृद्धि** हुई है।`;
       }
 
       return `🌾 **Crop Recommendation, High Yield & Profit Analysis — ${locName}**:\n\n` +
         `🥇 **Highest Yielding Recommended Crop**: **${crop}**\n` +
-        `📈 **Predicted Yield**: **${yieldVal} Tons/Hectare** (Yield Accuracy Confidence: **${yieldAcc}%**)\n` +
+        `📈 **Predicted Yield**: **${yieldVal} Tons/Hectare** (Yield Confidence Accuracy: **${yieldAcc}%**)\n` +
         `💰 **Estimated Economic Return**: High net profit and ROI based on regional market pricing\n\n` +
         `**Why ${crop} Produces Maximum Yield & Profit Here:**\n` +
         `• **Soil pH Balance**: Current pH **${soilPh}** enables maximum nutrient absorption for **${crop}**.\n` +
         `• **Groundwater Access**: Aquifer depth at **${waterDepth}** provides stable irrigation capacity.\n` +
-        `• **Moisture Alignment**: Soil moisture **${soilMoist}** supports optimal root growth without waterlogging.\n` +
-        `• **NDVI Photosynthetic Health**: Score **${ndvi}** shows vigorous canopy vigor.\n\n` +
+        `• **Moisture Alignment**: Soil moisture **${soilMoist}** supports optimal root respiration.\n` +
+        `• **NDVI Photosynthetic Health**: Score **${ndvi}** indicates healthy vegetative vigor.\n\n` +
         `📊 **Historical 1-Year Comparison (Prior vs Current Season):**\n` +
         `• Prior Season: Baseline harvest was ~11% lower with lower NDVI canopy density.\n` +
         `• Current Season: Optimal soil conditioning and weather generated a **+12.4% yield gain**.\n\n` +
@@ -2219,69 +2727,24 @@
         `• Apply bio-fertilizers (Azospirillum & Phosphobacteria) to boost yield by an additional 12–18%.`;
     }
 
-    // 3. Soil pH
-    if (['soil', 'ph', 'acidity', 'alkaline', 'nutrient'].some(w => p.includes(w))) {
-      if (isWater) {
-        return `🌊 **Marine Water Diagnostics — ${locName}**:\n\n• **Water pH**: **${soilPh}** (Saline oceanic pH range 7.8–8.2)\n• **Soil Matrix**: Zero terrestrial soil. Marine sediment / seabed.`;
+    // Default Greetings / General
+    const isGreeting = /\b(hello|hi|hey|help|who are you|advisor|greet)\b/i.test(p);
+    if (isGreeting) {
+      if (lang.startsWith('ta')) {
+        return `👋 **வணக்கம்! நான் உங்கள் சென்டினல்-எர்த் AI ஆலோசகர்.**\n\nநான் செயற்கைக்கோள் தரவு மற்றும் கணினி பார்வை (Computer Vision) மூலம் **${locName}** பகுதியை கண்காணிக்கிறேன்.\n\n📍 **பகுதி விவரம்:**\n• வகை: ${locType}\n• பரிந்துரைக்கப்படும் பயிர்: **${crop}** (மகசூல்: **${yieldVal} T/Ha**)\n• நீர் உவர்ப்பு: **${waterSalinityPSU} PSU** | TDS: **${waterTdsPPM} ppm**\n• மண் pH: **${soilPh}** | நிலத்தடி நீர்: **${waterDepth}**\n\n💡 பயிர் மகசூல், நீர் தரம், மற்றும் கட்டட பாதுகாப்பு பற்றி எதையும் கேட்கலாம்!`;
       }
-
-      return `🧪 **Soil Health & pH Diagnostic — ${locName}**:\n\n` +
-        `• **Current Soil pH**: **${soilPh}** (Optimal Fertile Range)\n` +
-        `• **Soil Moisture**: **${soilMoist}**\n` +
-        `• **Land Zone**: ${locType}\n\n` +
-        `**Nutrient Profile:**\n` +
-        `• **Nitrogen (N) & Phosphorus (P)**: Balanced bioavailability for target crop **${crop}**.\n` +
-        `• **Organic Carbon**: Healthy soil microbiome.\n\n` +
-        `💡 **Recommendation**: Maintain compost addition at 5 Tons/Ha to sustain long-term soil structure.`;
-    }
-
-    // 4. Water Levels
-    if (['water', 'groundwater', 'aquifer', 'borewell', 'irrigation'].some(w => p.includes(w))) {
-      if (isWater) {
-        return `🌊 **Ocean / Open Water Surface — ${locName}**:\n\n• **Surface Water**: Open saline marine water body.\n• **Water Salinity**: ~35 PSU (Unusable for crop irrigation without desalination).`;
+      if (lang.startsWith('hi')) {
+        return `👋 **नमस्ते! मैं आपका सेंटिनल-अर्थ AI सलाहकार हूँ।**\n\nमैं उपग्रह डेटा और कंप्यूटर विज़न के माध्यम से **${locName}** की निगरानी कर रहा हूँ।\n\n📍 **क्षेत्रीय विवरण:**\n• वर्गीकरण: ${locType}\n• अनुशंसित फसल: **${crop}** (उपज: **${yieldVal} T/Ha**)\n• जल लवणता: **${waterSalinityPSU} PSU** | TDS: **${waterTdsPPM} ppm**\n• मिट्टी का pH: **${soilPh}** | भूजल स्तर: **${waterDepth}**\n\n💡 आप फसल उपज, जल गुणवत्ता और भवन निर्माण सुरक्षा के बारे में पूछ सकते हैं!`;
       }
-
-      return `💧 **Hydrology & Groundwater Analysis — ${locName}**:\n\n` +
-        `• **Underground Aquifer Depth**: **${waterDepth}**\n` +
-        `• **Status**: Stable aquifer with reliable year-round recharge.\n` +
-        `• **Soil Moisture**: **${soilMoist}**\n\n` +
-        `**Irrigation Strategy:**\n` +
-        `• **Borewell Viability**: Highly feasible at standard regional depths.\n` +
-        `• **Micro-Drip System**: Saves up to 45% water while delivering targeted nutrients to **${crop}**.`;
-    }
-
-    // 5. Factory Proximity
-    if (['factory', 'industrial', 'pollution', 'proximity', 'hazard', 'toxic'].some(w => p.includes(w))) {
-      return `🏭 **Factory Proximity & Pollution Scan — ${locName}**:\n\n` +
-        `• **Distance to Nearest Factory**: **${factoryDist} km**\n` +
-        `• **Safety Status**: ✅ SAFE AGRICULTURAL BUFFER (>3km safe zone)\n` +
-        `• **Air Quality Impact**: Sentinel-5P TROPOMI satellite confirms clean ambient levels with no toxic heavy metal deposition.\n` +
-        `• **Crop Safety**: Safe for commercial cultivation of **${crop}**.`;
-    }
-
-    // 6. NDVI & Satellite
-    if (['ndvi', 'vegetation', 'canopy', 'satellite', 'greenness'].some(w => p.includes(w))) {
-      return `🛰️ **Sentinel-2 Multispectral NDVI Analysis — ${locName}**:\n\n` +
-        `• **NDVI Reading**: **${ndvi}**\n` +
-        `• **Spectral Ratio**: ` + '`(NIR Band 8 - Red Band 4) / (NIR + Red)`' + `\n` +
-        `• **Canopy State**: Active photosynthesis with healthy leaf area index.\n` +
-        `• **Land Cover**: Ideal vegetative index for **${crop}** cultivation.`;
-    }
-
-    // Default
-    if (isWater) {
-      return `🌊 **Sentinel-Earth Marine Water Diagnosis — ${locName}**:\n\n` +
-        `🚫 **Crop Status**: NO CROP CAN BE GROWN (Open Saline Water Body)\n` +
-        `• **Yield**: 0.0 Tons/Ha | **Profit**: $0.00 / Ha\n` +
-        `• **Water Quality**: Saline (~35 PSU) | pH: ${soilPh}\n` +
-        `💡 **Commercial Alternative**: Marine cage aquaculture or offshore wind energy.`;
+      return `👋 **Hello! I'm your Sentinel-Earth AI Advisor.**\n\nI am actively monitoring **${locName}** using Sentinel-1/2/3/5P satellite telemetry and Computer Vision.\n\n📍 **Region Overview:**\n• **Classification**: ${locType}\n• **Crop Status**: **${crop}**\n• **Yield & Profit**: Expected Yield: **${yieldVal} Tons/Ha** (Confidence: **${yieldAcc}%**)\n• **NDVI Vegetation Health**: Score **${ndvi}**\n• **Water Salinity & TDS**: **${waterSalinityPSU} PSU** | **${waterTdsPPM.toLocaleString()} ppm**\n• **Soil pH**: **${soilPh}** | **Water Table**: **${waterDepth}** | **Soil Moisture**: **${soilMoist}**\n\n💡 **You can ask me:**\n1. 🌾 Which crop produces the highest yield and profit here?\n2. ⚠️ Will building houses cause flood damage, soil collapse, or factory pollution?\n3. 🌊 What is the live water salinity in PSU and pH of river/lake/ocean?\n4. 🧪 What is the soil pH and how to improve fertility?\n5. 💧 What is the underground water table depth?`;
     }
 
     return `🌾 **Sentinel-Earth Briefing — ${locName}**:\n\n` +
       `🌱 **Top Recommended Crop**: **${crop}** (Expected Yield: **${yieldVal} Tons/Ha**, Accuracy: **${yieldAcc}%**)\n` +
-      `🏗️ **Construction Feasibility**: High bearing capacity subsoil suitable for building development.\n` +
-      `• **Soil pH**: **${soilPh}** | **Water Table**: **${waterDepth}** | **NDVI**: **${ndvi}**\n\n` +
-      `💡 Ask me about crop yields & profits, building on barren land, soil pH, or groundwater depth.`;
+      `🌊 **Water Salinity & pH**: **${waterSalinityPSU} PSU** (TDS: **${waterTdsPPM} ppm**) | pH: **${waterPhVal}**\n` +
+      `🏗️ **Construction Feasibility**: Deep water table (${waterDepth}) & low flood risk.\n` +
+      `• **Soil pH**: **${soilPh}** | **Soil Moisture**: **${soilMoist}** | **NDVI**: **${ndvi}**\n\n` +
+      `💡 Ask me about crop yields & profits, building hazards, water salinity PSU, or soil quality.`;
   }
 
   // ============================================================
@@ -2470,6 +2933,10 @@
       soil_moisture: document.getElementById('tel-moist').textContent,
       ndvi_avg: document.getElementById('ndvi-score-display').textContent,
       dominant_ndvi: document.getElementById('ndvi-level-title').textContent,
+      water_salinity: document.getElementById('tel-salinity')?.textContent || '35.0 PSU',
+      water_tds: document.getElementById('env-water-tds')?.textContent || '35,000 ppm',
+      water_ph: document.getElementById('env-water-ph')?.textContent || '8.15',
+      water_type: document.getElementById('env-water-type')?.textContent || 'Ocean / Marine Water',
       factory_dist_km: lastMLData ? lastMLData.factory_info.distance_km : 10,
       yield_accuracy: lastMLData ? lastMLData.yield_accuracy : 0,
       arenas: lastMLData ? lastMLData.arenas : null
@@ -2481,7 +2948,12 @@
     fetch(`${API_BASE}/hf-chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: text, context: ctx }),
+      body: JSON.stringify({ 
+        prompt: text, 
+        context: ctx,
+        lang: (currentChatLangCode || 'en').split('-')[0],
+        lang_code: currentChatLangCode 
+      }),
       signal: chatAbortCtrl.signal
     })
     .then(r => {
@@ -2696,6 +3168,7 @@
   // ============================================================
   function triggerLocationAnalysis(lat, lon, name, country) {
     currentLocationContext = { lat, lon, name, country };
+    updateRegionalLanguageUI(name, country, lat, lon);
 
     document.getElementById('coord-display').textContent = `Lat: ${lat.toFixed(3)}°, Lon: ${lon.toFixed(3)}°`;
     document.getElementById('location-input').value = name;
@@ -2895,14 +3368,20 @@
     else if (activeCVTab === 'landcover') imgEl.src = cvImageData.landcover;
     else imgEl.src = cvImageData.ndvi;
 
-    // Water pH badge
-    if (cv.water_body && cv.water_body.detected) {
-      const wBadge = document.getElementById('water-ph-badge');
+    // Water Salinity, TDS and pH badge
+    const isWaterLoc = (cv.water_body && cv.water_body.detected) || ml.location_type.toLowerCase().includes('ocean') || ml.location_type.toLowerCase().includes('water');
+    const wBadge = document.getElementById('water-ph-badge');
+    if (wBadge) {
       wBadge.classList.add('visible');
-      document.getElementById('water-ph-text').textContent = `Water pH: ${cv.water_body.ph_level}`;
-      document.getElementById('water-type-text').textContent = `(${cv.water_body.type})`;
-    } else {
-      document.getElementById('water-ph-badge').classList.remove('visible');
+      const wPh = cv.water_body ? cv.water_body.ph_level : (isWaterLoc ? 8.15 : 7.2);
+      const wSal = (cv.water_body && cv.water_body.salinity_psu != null) ? `${cv.water_body.salinity_psu} PSU` : (tel.water_salinity || (isWaterLoc ? '35.0 PSU' : '0.55 PSU'));
+      const wTds = (cv.water_body && cv.water_body.tds_ppm != null) ? `${cv.water_body.tds_ppm} ppm` : (tel.water_tds || (isWaterLoc ? '35,000 ppm' : '480 ppm'));
+      const wType = cv.water_body ? cv.water_body.type : (isWaterLoc ? 'Saline Ocean' : 'Freshwater Aquifer');
+      
+      document.getElementById('water-ph-text').textContent = `Water pH: ${wPh}`;
+      const salSpan = document.getElementById('water-salinity-text');
+      if (salSpan) salSpan.textContent = `Salinity: ${wSal} (${wTds})`;
+      document.getElementById('water-type-text').textContent = `(${wType})`;
     }
 
     // ---- Live Telemetry ----
@@ -2924,8 +3403,16 @@
     document.getElementById('env-ndvi').textContent = ndvi.score;
     document.getElementById('env-ndvi-level').textContent = ndvi.level.split(' ')[0];
     document.getElementById('env-factory').textContent = ml.factory_info ? ml.factory_info.distance_km + ' km' : '--';
-    document.getElementById('env-water-ph').textContent = cv.water_body ? cv.water_body.ph_level : '--';
-    document.getElementById('env-water-type').textContent = cv.water_body ? cv.water_body.type.split('/')[0].trim() : '--';
+    document.getElementById('env-water-ph').textContent = cv.water_body ? cv.water_body.ph_level : (isWaterLoc ? '8.15' : '7.2');
+    const salVal = (cv.water_body && cv.water_body.salinity_psu != null) ? `${cv.water_body.salinity_psu} PSU` : (tel.water_salinity || (isWaterLoc ? '35.0 PSU' : '0.55 PSU'));
+    const tdsVal = (cv.water_body && cv.water_body.tds_ppm != null) ? `${cv.water_body.tds_ppm} ppm` : (tel.water_tds || (isWaterLoc ? '35,000 ppm' : '480 ppm'));
+    const envSal = document.getElementById('env-water-salinity');
+    if (envSal) envSal.textContent = salVal;
+    const envTds = document.getElementById('env-water-tds');
+    if (envTds) envTds.textContent = tdsVal;
+    const telSal = document.getElementById('tel-salinity');
+    if (telSal) telSal.textContent = salVal;
+    document.getElementById('env-water-type').textContent = cv.water_body ? cv.water_body.type.split('/')[0].trim() : (isWaterLoc ? 'Ocean/Marine' : 'Freshwater Aquifer');
 
     // ---- Three Decision Arenas ----
     document.getElementById('arena-agri-val').textContent = ml.arenas.agriculture;

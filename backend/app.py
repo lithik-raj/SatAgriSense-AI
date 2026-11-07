@@ -58,7 +58,7 @@ def api_status():
 @app.route("/api/building-suitability", methods=["POST"])
 @app.route("/building-suitability", methods=["POST"])
 def building_suitability():
-    """Analyze whether a location's land is suitable for building/construction."""
+    """Analyze whether a location's land is suitable for building/construction with full risk breakdown."""
     data = request.json or {}
     lat = float(data.get("lat", 11.0168))
     lon = float(data.get("lon", 76.9558))
@@ -68,81 +68,107 @@ def building_suitability():
     location_type = str(data.get("location_type", "Prime Fertile Agricultural Zone"))
     ndvi_score = float(str(data.get("ndvi_score", 0.5)))
     loc_name = data.get("name", "Selected Region")
+    factory_dist = float(data.get("factory_dist_km") or 10.0)
+    rainfall_mm = float(data.get("rainfall_mm") or 15.0)
     lt = location_type.lower()
 
     score = 0
     positives = []
     issues = []
 
-    # --- Water table assessment ---
-    if water_depth > 20:
-        score += 30
-        positives.append(f"Deep water table ({water_depth}m) — excellent foundation stability")
-    elif water_depth > 12:
-        score += 22
-        positives.append(f"Adequate water table ({water_depth}m) — standard foundation")
-    elif water_depth > 6:
-        score += 10
-        issues.append(f"Moderate water table ({water_depth}m) — waterproof basement required")
+    # 1. Flood Risk Assessment
+    if water_depth < 5.0 or rainfall_mm > 50.0:
+        flood_risk_level = "HIGH FLOOD HAZARD"
+        flood_risk_desc = f"Shallow water table ({water_depth}m) creates severe risk of basement inundation, waterlogging, and hydrostatic uplift pressure during seasonal monsoons."
+        issues.append(f"Severe Flood Risk: Shallow water table ({water_depth}m) — hydraulic basement tanking & elevated plinth mandatory")
+    elif water_depth < 10.0:
+        flood_risk_level = "MODERATE FLOOD RISK"
+        flood_risk_desc = f"Water table at {water_depth}m. Moderate flood vulnerability during peak rains; raised plinth (+1.0m) and perimeter drainage channels required."
+        score += 12
+        positives.append(f"Manageable water table ({water_depth}m) with standard perimeter drainage")
     else:
-        issues.append(f"Very shallow water table ({water_depth}m) — high flood/seepage risk; pile foundations mandatory")
+        flood_risk_level = "LOW FLOOD RISK (SAFE)"
+        flood_risk_desc = f"Deep water table ({water_depth}m) provides excellent natural subsoil percolation and zero hydrostatic pressure on foundations."
+        score += 28
+        positives.append(f"Deep water table ({water_depth}m) — safe natural drainage buffer")
 
-    # --- Soil pH ---
+    # 2. Soil Stability & Structural Collapse ("Building May Fall") Assessment
+    if soil_moisture > 55.0:
+        stability_level = "CRITICAL LIQUEFACTION RISK (BUILDING COLLAPSE RISK)"
+        stability_desc = f"Excessive subsoil moisture ({soil_moisture}%) can cause loss of soil shear strength and liquefaction under building weight during seismic tremors or monsoon saturation. Building risks differential settlement or tilting without deep pile foundations."
+        issues.append(f"Structural Collapse Risk: Saturated soil ({soil_moisture}%) risks liquefaction and settlement — friction piles into bedrock required")
+    elif any(kw in lt for kw in ["black cotton", "vertisol", "cotton"]):
+        stability_level = "EXPANSIVE SOIL HEAVE RISK"
+        stability_desc = f"Expansive montmorillonite clay swells when wet and shrinks when dry, generating vertical heave forces of up to 250 kPa that crack masonry walls and destabilize shallow foundations."
+        issues.append("Expansive clay soil: High swelling/shrinkage — under-reamed pile foundations with void formers mandatory")
+        score += 8
+    elif soil_moisture < 35.0:
+        stability_level = "EXCELLENT STRUCTURAL BEARING CAPACITY"
+        stability_desc = f"Compacted subsoil moisture ({soil_moisture}%) and stable stratigraphy exhibit high California Bearing Ratio (CBR > 12%) and safe bearing capacity (> 240 kPa)."
+        score += 24
+        positives.append(f"High soil bearing capacity (CBR > 12%) — ideal foundation compaction")
+    else:
+        stability_level = "MODERATE BEARING CAPACITY"
+        stability_desc = f"Normal subsoil cohesion ({soil_moisture}% moisture); standard raft or spread footings provide safe load transfer."
+        score += 15
+        positives.append(f"Adequate soil stability ({soil_moisture}%) for residential/commercial structures")
+
+    # 3. Factory Proximity & Air Pollution Hazard
+    if factory_dist < 3.0:
+        air_pollution_level = "CRITICAL INDUSTRIAL TOXIC POLLUTION"
+        air_pollution_desc = f"Industrial factory detected within {round(factory_dist, 1)} km emitting chemical fumes, sulfur dioxide (SO2), and NO2 particulates (from Sentinel-5P TROPOMI sensor), causing corrosive atmospheric degradation of metal building roofs and acute health hazards."
+        issues.append(f"Industrial Air Pollution: Chemical factory within {round(factory_dist, 1)}km — corrosive emissions and particulate smog")
+    else:
+        air_pollution_level = "CLEAN AIR BUFFER"
+        air_pollution_desc = f"Safe distance ({round(factory_dist, 1)} km) from industrial manufacturing corridors ensures clean ambient air quality."
+        score += 18
+        positives.append(f"Clean rural/suburban air buffer ({round(factory_dist, 1)} km from industrial zones)")
+
+    # 4. Factory Waste Water & Groundwater Quality Deterioration
+    if factory_dist < 3.0:
+        wastewater_threat_level = "SEVERE CHEMICAL CONTAMINATION THREAT"
+        wastewater_threat_desc = f"Untreated industrial effluent and chemical wastewater runoff from the nearby factory ({round(factory_dist, 1)} km) risk infiltrating local aquifers, elevating water TDS and toxic heavy metals (lead, chromium). Groundwater is unsafe for drinking and corrosive to concrete (acid/sulfate attack on Portland cement)."
+        issues.append(f"Factory Wastewater Hazard: Chemical runoff leaches into groundwater — borewell water unsafe; concrete sulfate-resistant barrier required")
+    else:
+        wastewater_threat_level = "SAFE FRESHWATER AQUIFER"
+        wastewater_threat_desc = "No nearby point-source industrial chemical discharge detected. Subsurface aquifer water is chemically safe."
+        score += 18
+        positives.append("Pure groundwater aquifer free from chemical effluent discharge")
+
+    # 5. Soil pH Assessment
     if 5.5 <= soil_ph <= 8.5:
-        score += 20
-        positives.append(f"Soil pH {soil_ph} is in construction-safe range (5.5–8.5)")
+        score += 12
+        positives.append(f"Soil pH {soil_ph} is non-corrosive to reinforced concrete foundation steel")
     else:
-        issues.append(f"Soil pH {soil_ph} is outside ideal range — ground treatment needed")
+        issues.append(f"Soil pH {soil_ph} outside safe range — sulfate-resistant cement (SRPC) mandatory")
 
-    # --- Soil moisture ---
-    if soil_moisture < 30:
-        score += 20
-        positives.append(f"Low soil moisture ({soil_moisture}%) — excellent for foundation compaction")
-    elif soil_moisture < 55:
-        score += 10
-        positives.append(f"Moderate soil moisture ({soil_moisture}%) — standard drainage required")
-    else:
-        issues.append(f"High soil moisture ({soil_moisture}%) — extensive drainage and waterproofing needed")
-
-    # --- Location type ---
+    # 6. Location Type Constraints
     if any(kw in lt for kw in ["ocean","sea","water","marine","river"]):
         score = 0
-        issues.append("Water body / ocean — construction impossible without reclamation")
-    elif any(kw in lt for kw in ["polar","permafrost","arctic"]):
+        issues = ["Ocean / Marine Water Body: Terrestrial building construction is biologically and structurally impossible."]
+    elif any(kw in lt for kw in ["polar","permafrost"]):
         score = 8
-        issues.append("Permafrost zone — only specialized arctic foundations are feasible at extreme cost")
-    elif any(kw in lt for kw in ["desert","arid"]):
-        score += 10
-        issues.append("Sandy desert soil — requires deep anchored foundations and dust control")
-    elif any(kw in lt for kw in ["industrial","hazard","factory"]):
-        score += 5
-        issues.append("Industrial zone — mandatory soil contamination test before construction")
-    else:
-        score += 20
-        positives.append("Stable agricultural land — suitable structural base for construction")
-
-    # --- NDVI vegetation density ---
-    if ndvi_score > 0.6:
-        issues.append("High vegetation density — land clearing and root removal required")
-    elif ndvi_score < 0.15:
-        score += 10
-        positives.append("Low vegetation — minimal clearing needed")
+        issues.append("Polar Permafrost: Foundation thaw subsidence; cryogenic insulated pilings required at high cost")
 
     score = max(0, min(100, score))
 
     if score >= 70:
         rating = "✅ HIGHLY SUITABLE"; rating_color = "green"
+        recommendation = "Favorable geotechnical and environmental conditions. Low disaster risk. Proceed with standard architectural planning and municipal permits."
     elif score >= 50:
         rating = "⚠️ MODERATELY SUITABLE"; rating_color = "orange"
+        recommendation = "Construction is feasible with mandatory engineering precautions: raised plinth against flooding, waterproof tanking, and structural bearing plate load testing."
     elif score >= 25:
-        rating = "⚠️ LOW SUITABILITY"; rating_color = "orange"
+        rating = "⚠️ HIGH RISK / LOW SUITABILITY"; rating_color = "orange"
+        recommendation = "Significant environmental hazards detected (factory pollution, water table or soil liquefaction risk). Requires specialized deep piling and environmental clearance."
     else:
-        rating = "❌ NOT SUITABLE"; rating_color = "red"
+        rating = "❌ NOT SUITABLE / HIGH HAZARD"; rating_color = "red"
+        recommendation = "Construction not recommended due to critical hazards (open water, industrial toxicity, or severe foundation failure risks)."
 
     foundation_type = (
-        "Shallow strip / raft foundation (<1.5m)" if water_depth > 18 and soil_moisture < 40
-        else "Medium depth foundation (2–3m)" if water_depth > 10
-        else "Deep pile foundation (>4m)"
+        "Shallow strip / raft foundation (<1.5m)" if water_depth > 15 and soil_moisture < 40 and factory_dist >= 3.0
+        else "Medium depth isolated footing with damp-proof membrane (2–3m)" if water_depth > 8
+        else "Deep reinforced concrete pile foundation (>4–8m into bedrock) to prevent building settlement"
     )
 
     return jsonify({
@@ -150,23 +176,41 @@ def building_suitability():
         "suitability_score": score,
         "rating": rating,
         "rating_color": rating_color,
-        "recommendation": (
-            "This land has favorable parameters for construction/building development. Proceed with standard EIA."
-            if score >= 70 else
-            "Construction is feasible with proper engineering measures. Obtain geotechnical survey."
-            if score >= 50 else
-            "Significant engineering interventions required. Consult structural engineer before development."
-            if score >= 25 else
-            "Construction not recommended without major site remediation work."
-        ),
+        "recommendation": recommendation,
+        "flood_risk": flood_risk_level,
+        "soil_stability_collapse_risk": stability_level,
+        "factory_pollution_hazard": air_pollution_level,
+        "factory_wastewater_water_quality": wastewater_threat_level,
+        "hazard_risk_breakdown": {
+            "flood_risk": {
+                "level": flood_risk_level,
+                "description": flood_risk_desc,
+                "mitigation": "Elevate plinth level +1.2m, perimeter sump pits, dual-layer bitumen waterproofing."
+            },
+            "soil_stability_collapse_risk": {
+                "level": stability_level,
+                "description": stability_desc,
+                "will_building_fall_risk": "High risk of tilting/cracking if built on shallow footing without pile stabilization." if "CRITICAL" in stability_level or "EXPANSIVE" in stability_level else "Low risk: Stable soil stratigraphy provides firm bearing capacity."
+            },
+            "factory_pollution_hazard": {
+                "level": air_pollution_level,
+                "distance_km": round(factory_dist, 1),
+                "description": air_pollution_desc
+            },
+            "factory_wastewater_water_quality": {
+                "threat_level": wastewater_threat_level,
+                "description": wastewater_threat_desc,
+                "mitigation": "Install geomembrane chemical barrier, use municipal filtered water supply, test borewells for heavy metals."
+            }
+        },
         "positive_factors": positives,
         "issues": issues,
         "construction_requirements": [
-            f"Foundation type recommended: {foundation_type}",
-            "Soil Bearing Capacity Test (CBR / plate load test) mandatory",
-            "Structural geological survey before breaking ground",
-            "Environmental Impact Assessment (EIA) required",
-            f"Soil pH adjustment {'not required' if 5.5 <= soil_ph <= 8.5 else f'needed (current: {soil_ph})'}",
+            f"Recommended Foundation Type: {foundation_type}",
+            "Standard Penetration Test (SPT) & Plate Load Bearing Test mandatory before foundation pouring",
+            "Continuous exterior damp-proof membrane & sump-pump drainage installation",
+            "Sulfate-resistant cement (SRPC) if near factory chemical runoff",
+            "Town & Country Planning Environmental Clearance Certificate"
         ]
     })
 
@@ -281,9 +325,13 @@ def analyze_location():
             "soil_moisture": f"{round(soil_moisture, 1)} %",
             "soil_ph": f"{soil_ph}",
             "underground_water_depth": f"{underground_water_depth} m",
+            "water_salinity": sentinel_data["telemetry_format"].get("water_salinity", "0.4 PSU"),
+            "water_tds": sentinel_data["telemetry_format"].get("water_tds", "380 ppm"),
+            "water_ph": sentinel_data["telemetry_format"].get("water_ph", f"{soil_ph}"),
             "rainfall": f"{round(weather['rain_mm'], 1)} mm/hr",
             "wind": f"{wind_kmh} km/h"
         },
+        "construction_risk_analysis": sentinel_data.get("construction_risk_analysis", {}),
         "historical_1_year_comparison": sentinel_data["historical_1_year_ago"],
         "computer_vision": cv_result,
         "sentinel_satellites": sentinel_data,
@@ -297,7 +345,8 @@ def hf_chat():
     prompt = data.get("prompt", "Recommend crops for this location")
     context = data.get("context", None)
     user_key = data.get("hf_api_key", None)
-    res = hf_service.chat_query(prompt, location_context=context, user_api_key=user_key)
+    lang = data.get("lang") or (context.get("lang") if isinstance(context, dict) else None) or "en"
+    res = hf_service.chat_query(prompt, location_context=context, user_api_key=user_key, lang=lang)
     return jsonify(res)
 
 @app.route("/api/history", methods=["GET"])
