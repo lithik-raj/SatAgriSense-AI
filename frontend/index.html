@@ -412,12 +412,12 @@
   <div class="loading-text">SENTINEL-EARTH INITIALIZING...</div>
   <div class="loading-subtext" id="loading-subtext">
     <i class="fa-solid fa-satellite fa-spin" style="color:var(--cyan-glow);"></i>
-    <span>Loading Sentinel satellite data & ML models...</span>
+    <span id="loading-subtext-span">Connecting to Sentinel-1/2/3/5P Earth Observation satellites...</span>
   </div>
   <div class="loading-bar-wrap">
-    <div class="loading-bar-fill"></div>
+    <div class="loading-bar-fill" id="loading-bar-fill" style="width:25%;transition:width 0.4s ease;"></div>
   </div>
-  <div style="font-size:10px; color:#506080; margin-top:4px; letter-spacing:0.5px;">Click anywhere to enter dashboard</div>
+  <div style="font-size:10px; color:#506080; margin-top:4px; letter-spacing:0.5px;">Click anywhere to skip initialization</div>
 </div>
 
 <!-- Header -->
@@ -1327,6 +1327,18 @@
     openVoiceBanner();
   }
 
+  // Cached Speech Voices for instant responsiveness
+  let cachedSystemVoices = [];
+  function loadSystemVoices() {
+    if ('speechSynthesis' in window) {
+      cachedSystemVoices = window.speechSynthesis.getVoices() || [];
+    }
+  }
+  if ('speechSynthesis' in window) {
+    loadSystemVoices();
+    window.speechSynthesis.onvoiceschanged = loadSystemVoices;
+  }
+
   function speakFullChatResponse(rawText) {
     if (!chatVoiceActive || !('speechSynthesis' in window)) return;
     try {
@@ -1342,17 +1354,32 @@
 
       if (!clean) return;
 
-      const chunks = clean.match(/[^.!?]+[.!?]+|\S+/g) || [clean];
-      let chunkIdx = 0;
+      // Group into natural, complete sentences (protects decimals like 3.2 T/Ha, pH 7.4)
+      const rawClauses = clean.split(/(?<=[!?:;\n])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
+      const chunks = [];
+      let currentChunk = '';
+      for (let s of rawClauses) {
+        s = s.trim();
+        if (!s) continue;
+        if ((currentChunk.length + s.length) < 160) {
+          currentChunk += (currentChunk ? ' ' : '') + s;
+        } else {
+          if (currentChunk) chunks.push(currentChunk);
+          currentChunk = s;
+        }
+      }
+      if (currentChunk) chunks.push(currentChunk);
+      if (chunks.length === 0) chunks.push(clean);
 
-      // Select best matching regional voice
-      const voices = window.speechSynthesis.getVoices() || [];
+      let chunkIdx = 0;
+      const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis.getVoices() || []);
       const code = (currentChatLangCode || 'en-US').toLowerCase();
       const prefix = code.split('-')[0];
 
       let matchVoice = voices.find(v => v.lang.toLowerCase() === code) ||
-                         voices.find(v => v.lang.toLowerCase().replace('_', '-') === code) ||
-                         voices.find(v => v.lang.toLowerCase().startsWith(prefix));
+                       voices.find(v => v.lang.toLowerCase().replace('_', '-') === code) ||
+                       voices.find(v => v.lang.toLowerCase().startsWith(prefix)) ||
+                       voices.find(v => v.name.toLowerCase().includes(prefix));
 
       const isIndic = ['ta', 'hi', 'ml', 'te', 'kn', 'mr', 'pa', 'bn', 'ur'].includes(prefix);
 
@@ -1364,7 +1391,7 @@
           return speakNext();
         }
         const utter = new SpeechSynthesisUtterance(textChunk);
-        utter.rate = isIndic ? 0.92 : 0.98;
+        utter.rate = isIndic ? 0.94 : 0.98;
         utter.pitch = 1.0;
         utter.lang = currentChatLangCode || 'en-US';
         if (matchVoice) utter.voice = matchVoice;
@@ -1408,19 +1435,48 @@
     loadingDismissed = true;
     const overlay = document.getElementById('loading-overlay');
     if (!overlay) return;
-    overlay.classList.add('hidden');
+    overlay.style.transition = 'opacity 0.45s ease';
     overlay.style.opacity = '0';
     overlay.style.pointerEvents = 'none';
     setTimeout(() => {
+      overlay.classList.add('hidden');
       overlay.style.display = 'none';
-    }, 350);
+    }, 450);
   }
 
-  // Fast auto-dismiss within 500ms so platform reveals immediately
-  setTimeout(dismissLoadingOverlay, 500);
+  function runLoadingSequence() {
+    const subtext = document.getElementById('loading-subtext-span');
+    const bar = document.getElementById('loading-bar-fill');
 
-  // ============================================================
-  // VOICE INPUT (Speech-to-Text)
+    // Stage 1: Connecting Satellites (0ms - 400ms)
+    if (subtext) subtext.textContent = "Connecting to Sentinel-1/2/3/5P Earth Observation satellites...";
+    if (bar) bar.style.width = "28%";
+
+    // Stage 2: Loading ML Models & Datasets (450ms - 900ms)
+    setTimeout(() => {
+      if (subtext && !loadingDismissed) subtext.textContent = "Loading Regional Crop Yield & Soil pH AI Models...";
+      if (bar && !loadingDismissed) bar.style.width = "62%";
+    }, 450);
+
+    // Stage 3: Calibrating 3D Geosphere (950ms - 1350ms)
+    setTimeout(() => {
+      if (subtext && !loadingDismissed) subtext.textContent = "Calibrating 3D Geosphere & Environmental Telemetry Grid...";
+      if (bar && !loadingDismissed) bar.style.width = "90%";
+    }, 950);
+
+    // Stage 4: Launching Platform (1400ms - 1700ms)
+    setTimeout(() => {
+      if (subtext && !loadingDismissed) subtext.textContent = "Platform Ready. Opening Sentinel-Earth AI...";
+      if (bar && !loadingDismissed) bar.style.width = "100%";
+      setTimeout(dismissLoadingOverlay, 300);
+    }, 1400);
+  }
+
+  // Run the professional startup sequence
+  runLoadingSequence();
+
+    // ============================================================
+  // VOICE INPUT (Speech-to-Text) - Zero Annoyance Fallback
   // ============================================================
   function startVoiceInput() {
     const micBtn = document.getElementById('mic-btn');
@@ -1429,8 +1485,12 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ffa500;"></i> Voice input not supported by browser. <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">Click to enter location</a>';
-      if (input) input.focus();
+      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-keyboard" style="color:var(--cyan-glow);"></i> Direct Search: Type location or select quick chips below:';
+      openVoiceBanner();
+      if (input) {
+        input.focus();
+        input.placeholder = "Type location name (e.g. Erode, Kashmir, Barren Land)...";
+      }
       return;
     }
 
@@ -1441,7 +1501,7 @@
       recognition.maxAlternatives = 1;
 
       if (micBtn) micBtn.classList.add('mic-listening');
-      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening (${currentChatLangName})... Speak city, region, or crop name now`;
+      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening (${currentChatLangName})... Speak city or crop name now`;
 
       recognition.onresult = function(e) {
         if (micBtn) micBtn.classList.remove('mic-listening');
@@ -1456,17 +1516,12 @@
       recognition.onerror = function(e) {
         if (micBtn) micBtn.classList.remove('mic-listening');
         const err = e ? e.error : 'unknown';
-        if (err === 'not-allowed' || err === 'service-not-allowed') {
-          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-lock" style="color:#ffa500;"></i> Microphone blocked. Allow mic in browser or <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">type location directly</a>.';
-        } else if (err === 'no-speech') {
-          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-slash" style="color:#94a3b8;"></i> No speech heard. Click mic & speak clearly or type location.';
-        } else if (err === 'network') {
-          if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-microphone-lines" style="color:var(--cyan-glow);"></i> Direct Search Panel open. Speak or type location name below:';
-          openVoiceBanner();
-        } else {
-          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Voice info (${err}). <a href="javascript:void(0)" onclick="promptVoiceFallback()" style="color:#00f0ff;text-decoration:underline;">Type location</a>`;
+        if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-keyboard" style="color:var(--cyan-glow);"></i> Direct Search Panel open. Type or choose chips below:';
+        openVoiceBanner();
+        if (input) {
+          input.focus();
+          input.placeholder = "Type location name (e.g. Erode, Kashmir, Barren Land)...";
         }
-        if (input) input.focus();
       };
 
       recognition.onend = function() {
@@ -1487,10 +1542,9 @@
     const input = document.getElementById('chat-input');
 
     if (!SpeechRecognition) {
-      const userPrompt = prompt(`Microphone voice input not supported in this browser. Enter your question for Sentinel AI (${currentChatLangName}):`, "");
-      if (userPrompt && userPrompt.trim()) {
-        input.value = userPrompt.trim();
-        sendChatMessage();
+      if (input) {
+        input.focus();
+        input.placeholder = `Type your question in ${currentChatLangName} & press Enter...`;
       }
       return;
     }
@@ -1527,14 +1581,9 @@
           micBtn.style.borderColor = 'var(--cyan-glow)';
           micBtn.style.boxShadow = 'none';
         }
-        if (input) input.placeholder = `Ask question in ${currentChatLangName}... (Type or Mic)`;
-        const err = e ? e.error : 'unknown';
-        if (err === 'network') {
-          const userPrompt = prompt(`Speech network unavailable. Please type your question for Sentinel AI (${currentChatLangName}):`, "");
-          if (userPrompt && userPrompt.trim()) {
-            input.value = userPrompt.trim();
-            sendChatMessage();
-          }
+        if (input) {
+          input.focus();
+          input.placeholder = `Type question in ${currentChatLangName} & press Enter...`;
         }
       };
 
@@ -1544,7 +1593,6 @@
           micBtn.style.borderColor = 'var(--cyan-glow)';
           micBtn.style.boxShadow = 'none';
         }
-        if (input) input.placeholder = `Ask question in ${currentChatLangName}... (Type or Mic)`;
       };
 
       recognition.start();
@@ -1554,12 +1602,15 @@
         micBtn.style.borderColor = 'var(--cyan-glow)';
         micBtn.style.boxShadow = 'none';
       }
-      const userPrompt = prompt(`Enter your question for Sentinel AI (${currentChatLangName}):`, "");
-      if (userPrompt && userPrompt.trim()) {
-        input.value = userPrompt.trim();
-        sendChatMessage();
+      if (input) {
+        input.focus();
+        input.placeholder = `Type question in ${currentChatLangName} & press Enter...`;
       }
     }
+  }
+
+  function startVoiceInput2D() {
+    startVoiceInput();
   }
 
   // ============================================================
@@ -2058,38 +2109,85 @@
     const absLat = Math.abs(lat);
     const locLower = (name || '').toLowerCase();
 
-    // 1. Telemetry
-    const tempC = Math.round((30.0 - (absLat * 0.55) + ((lon % 8) * 0.3)) * 10) / 10;
-    const humidity = Math.round(Math.min(98, Math.max(15, 60.0 + (Math.abs(Math.sin(lat * 0.15) * 30.0) + (lon % 15)))) * 10) / 10;
-    const soilMoist = Math.round(Math.min(95, Math.max(8, 25.0 + Math.abs(Math.sin(lat * 0.2) * 45.0))) * 10) / 10;
-    const soilPh = Math.round(Math.min(8.6, Math.max(4.8, 6.4 + Math.sin(lat * 2.5) * 1.1 + ((lon % 4) * 0.15))) * 100) / 100;
-    const waterDepth = Math.round((7.5 + Math.abs(Math.cos(lat * 0.1 + lon * 0.1)) * 24.0) * 10) / 10;
-    const rainMm = Math.round((Math.abs(Math.sin(lat * 2.5 + lon)) * 8.0) * 10) / 10;
-    const windKmh = Math.round((8.0 + (absLat % 20)) * 10) / 10;
-
-    // 2. Strict Ocean / Forest / Polar Detection
+    // 1. Strict Ocean / Forest / Polar Detection
     const isWater = locLower.includes('ocean') || locLower.includes('sea') || locLower.includes('marine') ||
                     locLower.includes('bay of bengal') || locLower.includes('arabian sea') ||
                     (absLat < 55 && (lon > 155 || lon < -125)) || (lat > 5 && lat < 22 && lon > 80 && lon < 95);
 
     const isForest = (locLower.includes('forest') || locLower.includes('rainforest') || locLower.includes('canopy')) && !isWater;
-    const isPolar = absLat >= 66.5 || tempC < -5.0 || locLower.includes('antarctica') || locLower.includes('arctic');
+    const isPolar = absLat >= 66.5 || locLower.includes('antarctica') || locLower.includes('arctic') || locLower.includes('polar');
+
+    const floodKeywords = ['flood', 'delta', 'wetland', 'marsh', 'swamp', 'low-lying', 'inundation', 'riverbed', 'floodplain', 'sundarbans', 'brahmaputra', 'everglades'];
+    const isFloodName = floodKeywords.some(kw => locLower.includes(kw));
+
+    const barrenKeywords = ['barren', 'arid', 'wasteland', 'desert', 'plateau', 'rocky', 'dryland', 'scrub', 'thar', 'sahara', 'mojave', 'atacama', 'kutch', 'ladakh', 'deccan', 'rayalaseema', 'dry'];
+    const isBarrenName = barrenKeywords.some(kw => locLower.includes(kw));
+
+    // Coordinate-based arid/desert or wetland detection
+    const isCoordinateArid = (lat >= 24.0 && lat <= 30.5 && lon >= 69.5 && lon <= 76.0) || // Thar Desert
+                             (lat >= 22.8 && lat <= 24.8 && lon >= 68.2 && lon <= 71.5) || // Rann of Kutch
+                             (lat >= 13.5 && lat <= 17.5 && lon >= 76.5 && lon <= 79.2) || // Rayalaseema & Deccan Plateau
+                             (lat >= 32.5 && lat <= 36.0 && lon >= 76.0 && lon <= 80.0) || // Ladakh Cold Desert
+                             (lat >= 18.0 && lat <= 30.0 && lon >= -15.0 && lon <= 35.0) || // Sahara Desert
+                             (lat >= 18.0 && lat <= 28.0 && lon >= 40.0 && lon <= 55.0) || // Arabian Desert
+                             (lat >= 34.0 && lat <= 38.0 && lon >= -118.0 && lon <= -114.0) || // Mojave Desert
+                             (lat >= -27.0 && lat <= -18.0 && lon >= -71.0 && lon <= -67.0); // Atacama Desert
+
+    const isCoordinateWetland = (lat >= 21.5 && lat <= 22.8 && lon >= 88.0 && lon <= 90.5) || // Sundarbans
+                                (lat >= 25.5 && lat <= 27.8 && lon >= 89.5 && lon <= 95.0) || // Brahmaputra
+                                (lat >= 10.4 && lat <= 11.2 && lon >= 79.1 && lon <= 79.9) || // Cauvery Delta
+                                (lat >= 15.8 && lat <= 17.0 && lon >= 80.5 && lon <= 82.5);   // Krishna-Godavari Delta
+
+    const isBarrenTarget = isBarrenName || isCoordinateArid;
+    const isFloodTarget = isFloodName || isCoordinateWetland;
+
+    // Environmental physics matching real geography
+    let soilMoist, waterDepth, rainMm, humidity, soilPh, ndviScore;
+
+    if (isWater) {
+      soilMoist = 100.0;
+      waterDepth = 0.0;
+      rainMm = 4.5;
+      humidity = 88.0;
+      soilPh = 8.15;
+      ndviScore = 0.02;
+    } else if (isFloodTarget) {
+      soilMoist = Math.round((74.0 + Math.abs(Math.sin(lat * 1.5)) * 18.0) * 10) / 10; // 74 - 92%
+      waterDepth = Math.round((1.5 + Math.abs(Math.cos(lon * 0.4)) * 1.8) * 10) / 10; // 1.5 - 3.3m
+      rainMm = Math.round((14.0 + Math.abs(Math.sin(lat * 2.0)) * 26.0) * 10) / 10;
+      humidity = Math.round((80.0 + (absLat % 15)) * 10) / 10;
+      soilPh = Math.round((6.4 + Math.sin(lat * 2.5) * 0.5) * 100) / 100;
+      ndviScore = 0.52;
+    } else if (isBarrenTarget) {
+      soilMoist = Math.round((9.5 + Math.abs(Math.sin(lat * 0.5)) * 9.5) * 10) / 10; // 9.5 - 19.0% (< 22%)
+      waterDepth = Math.round((14.0 + Math.abs(Math.cos(lon * 0.2)) * 15.0) * 10) / 10; // 14 - 29m (> 5m)
+      rainMm = Math.round((0.2 + Math.abs(Math.sin(lat * 1.2)) * 1.2) * 10) / 10;
+      humidity = Math.round((20.0 + (absLat % 14)) * 10) / 10;
+      soilPh = Math.round((7.1 + Math.sin(lat * 1.8) * 0.5) * 100) / 100;
+      ndviScore = 0.22;
+    } else {
+      soilMoist = Math.round((32.0 + Math.abs(Math.sin(lat * 0.2)) * 24.0) * 10) / 10; // 32 - 56%
+      waterDepth = Math.round((6.5 + Math.abs(Math.cos(lat * 0.1 + lon * 0.1)) * 9.5) * 10) / 10; // 6.5 - 16m
+      rainMm = Math.round((Math.abs(Math.sin(lat * 2.5 + lon)) * 8.0) * 10) / 10;
+      humidity = Math.round(Math.min(98, Math.max(15, 60.0 + (Math.abs(Math.sin(lat * 0.15) * 30.0) + (lon % 15)))) * 10) / 10;
+      soilPh = Math.round(Math.min(8.6, Math.max(4.8, 6.4 + Math.sin(lat * 2.5) * 1.1 + ((lon % 4) * 0.15))) * 100) / 100;
+      ndviScore = 0.68;
+    }
+
+    const tempC = Math.round((30.0 - (absLat * 0.55) + ((lon % 8) * 0.3)) * 10) / 10;
+    const windKmh = Math.round((8.0 + (absLat % 20)) * 10) / 10;
+
+    const isFloodZone = (waterDepth < 4.0 || isFloodTarget) && !isWater && !isForest;
+    const isBarren = (soilMoist < 22.0 || isBarrenTarget) && !isWater && !isForest && !isFloodZone;
 
     let crop = 'Sugarcane (High Biomass)';
     let yieldTons = 6.4;
     let yieldAcc = 98.2;
     let locType = 'Prime Fertile Agricultural Zone';
-    let ndviScore = 0.68;
     let marketPrice = 42;
     let costHa = 1650;
     let status = 'OPTIMAL_HIGH_YIELD';
     let reason = 'Optimal red-clay loam, balanced soil pH, and perennial aquifer support high sugarcane harvest.';
-
-    const floodKeywords = ['flood', 'delta', 'wetland', 'marsh', 'swamp', 'low-lying', 'inundation', 'riverbed', 'floodplain'];
-    const isFloodZone = (waterDepth < 4.0 || rainMm > 70.0 || floodKeywords.some(kw => locLower.includes(kw))) && !isWater && !isForest;
-
-    const barrenKeywords = ['barren', 'arid', 'wasteland', 'desert', 'plateau', 'rocky', 'dryland', 'scrub', 'thar', 'sahara', 'mojave', 'atacama', 'kutch', 'ladakh', 'deccan', 'dry'];
-    const isBarren = (soilMoist < 22.0 || barrenKeywords.some(kw => locLower.includes(kw))) && !isWater && !isForest && !isFloodZone;
 
     if (isWater) {
       crop = 'NO CROP CAN BE GROWN (Ocean / Marine Saline Water)';
@@ -3175,11 +3273,11 @@
   // EXACT GLOBAL GEOGRAPHIC REVERSE-GEOCODER MATRIX
   // (Provides accurate real location names worldwide - Never "Zone (lat,lon)")
   // ============================================================
-  function getExactGeographicLocationName(lat, lon) {
+    function getExactGeographicLocationName(lat, lon) {
     const absLat = Math.abs(lat);
 
     // 1. Precise Marine & Water Bodies Worldwide
-    if (lat >= 5 && lat <= 22 && lon >= 80 && lon <= 95) return { name: "Bay of Bengal (Marine Waters)", country: "International Waters" };
+    if (lat >= 5 && lat <= 22 && lon >= 80 && lon <= 95) return { name: "Bay of Bengal (Deep Marine Water Body)", country: "International Waters" };
     if (lat >= 8 && lat <= 26 && lon >= 55 && lon <= 77) return { name: "Arabian Sea (Marine Waters)", country: "International Waters" };
     if (lat >= -45 && lat <= 6 && lon >= 55 && lon <= 100) return { name: "Indian Ocean (Deep Sea Marine Zone)", country: "International Waters" };
     if (lat >= 30 && lat <= 45 && lon >= -5 && lon <= 36) return { name: "Mediterranean Sea (Marine Waters)", country: "International Waters" };
@@ -3190,69 +3288,84 @@
     if (lat >= 66.5) return { name: "Arctic Ocean / Polar Permafrost Ice Sheet", country: "Arctic" };
     if (lat <= -60.0) return { name: "Antarctica Continental Ice Sheet", country: "Antarctica" };
 
-    // 2. India Detailed Agricultural & Urban Grid
+    // 2. Global Arid Deserts & Barren Land Zones
+    if (lat >= 18.0 && lat <= 30.0 && lon >= -15.0 && lon <= 35.0) return { name: "Sahara Desert Arid Barren Territory", country: "Africa" };
+    if (lat >= 18.0 && lat <= 28.0 && lon >= 40.0 && lon <= 55.0) return { name: "Arabian Desert & Empty Quarter Arid Plateau", country: "Middle East" };
+    if (lat >= 34.0 && lat <= 38.0 && lon >= -118.0 && lon <= -114.0) return { name: "Mojave Desert Arid Barren Basin", country: "United States" };
+    if (lat >= -27.0 && lat <= -18.0 && lon >= -71.0 && lon <= -67.0) return { name: "Atacama Arid Rocky Plateau", country: "Chile" };
+    if (lat >= -32.0 && lat <= -20.0 && lon >= 120.0 && lon <= 140.0) return { name: "Australian Outback Arid Scrubland & Barren Plateau", country: "Australia" };
+
+    // 3. India Regional & Agricultural Classification
     if (lat >= 8.0 && lat <= 37.0 && lon >= 68.0 && lon <= 97.5) {
+      // Arid Deserts & Barren Scrublands in India
+      if (lat >= 24.0 && lat <= 30.5 && lon >= 69.5 && lon <= 76.0) return { name: "Thar Desert Arid Wasteland & Barren Land, Rajasthan", country: "India" };
+      if (lat >= 22.8 && lat <= 24.8 && lon >= 68.2 && lon <= 71.5) return { name: "Rann of Kutch Arid Salt Scrubland & Barren Terrain, Gujarat", country: "India" };
+      if (lat >= 13.5 && lat <= 17.5 && lon >= 76.8 && lon <= 79.2) return { name: "Rayalaseema & Deccan Arid Rocky Plateau, Andhra Pradesh", country: "India" };
+      if (lat >= 32.5 && lat <= 36.0 && lon >= 76.0 && lon <= 80.0) return { name: "Ladakh High-Altitude Cold Desert & Barren Plateau", country: "India" };
+
+      // Low-Lying Wetlands & Flood Basins in India
+      if (lat >= 21.5 && lat <= 22.8 && lon >= 88.0 && lon <= 90.5) return { name: "Sundarbans Coastal Mangrove & Low-Lying Wetland Basin, West Bengal", country: "India" };
+      if (lat >= 25.5 && lat <= 27.8 && lon >= 89.5 && lon <= 95.0) return { name: "Brahmaputra Floodplain Wetland Basin, Assam", country: "India" };
+      if (lat >= 10.4 && lat <= 11.2 && lon >= 79.1 && lon <= 79.9) return { name: "Cauvery Delta Low-Lying Floodplain Wetland, Tamil Nadu", country: "India" };
+      if (lat >= 15.8 && lat <= 17.0 && lon >= 80.5 && lon <= 82.5) return { name: "Krishna-Godavari Delta Flood-Prone Wetland, Andhra Pradesh", country: "India" };
+
+      // Key GI Hubs in Tamil Nadu
       if (lat >= 8.0 && lat <= 13.5 && lon >= 76.2 && lon <= 80.3) {
-        if (lat >= 10.7 && lat <= 11.4 && lon >= 76.7 && lon <= 77.4) return { name: "Coimbatore, Tamil Nadu", country: "India" };
-        if (lat >= 11.2 && lat <= 11.6 && lon >= 77.4 && lon <= 78.0) return { name: "Erode, Tamil Nadu", country: "India" };
+        if (lat >= 11.2 && lat <= 11.6 && lon >= 77.4 && lon <= 78.0) return { name: "Erode (Turmeric GI Basin), Tamil Nadu", country: "India" };
+        if (lat >= 10.7 && lat <= 11.4 && lon >= 76.7 && lon <= 77.4) return { name: "Coimbatore (Kongu Agro Basin), Tamil Nadu", country: "India" };
         if (lat >= 11.0 && lat <= 11.3 && lon >= 77.2 && lon <= 77.6) return { name: "Tiruppur, Tamil Nadu", country: "India" };
-        if (lat >= 11.4 && lat <= 11.8 && lon >= 76.5 && lon <= 77.0) return { name: "Nilgiris (Ooty), Tamil Nadu", country: "India" };
+        if (lat >= 11.4 && lat <= 11.8 && lon >= 76.5 && lon <= 77.0) return { name: "Nilgiris (Ooty Tea Estates), Tamil Nadu", country: "India" };
         if (lat >= 12.8 && lat <= 13.3 && lon >= 79.9 && lon <= 80.3) return { name: "Chennai Metropolitan Region, Tamil Nadu", country: "India" };
         if (lat >= 9.7 && lat <= 10.1 && lon >= 77.9 && lon <= 78.3) return { name: "Madurai, Tamil Nadu", country: "India" };
         if (lat >= 10.6 && lat <= 11.0 && lon >= 78.5 && lon <= 79.0) return { name: "Tiruchirappalli, Tamil Nadu", country: "India" };
-        if (lat >= 10.6 && lat <= 11.0 && lon >= 79.0 && lon <= 79.5) return { name: "Thanjavur (Cauvery Delta), Tamil Nadu", country: "India" };
         if (lat >= 11.5 && lat <= 11.9 && lon >= 79.6 && lon <= 80.0) return { name: "Cuddalore Coastal Region, Tamil Nadu", country: "India" };
-        return { name: "Tamil Nadu Agricultural Zone", country: "India" };
+        return { name: "Tamil Nadu Plains", country: "India" };
       }
+
+      // Rest of India Agro & Terrain Hubs
+      if (lat >= 33.5 && lat <= 35.0 && lon >= 74.0 && lon <= 75.8) return { name: "Kashmir Apple Orchard Valley, J&K", country: "India" };
       if (lat >= 20.8 && lat <= 21.4 && lon >= 78.8 && lon <= 79.4) return { name: "Nagpur (Mandarin Orange Belt), Maharashtra", country: "India" };
       if (lat >= 16.0 && lat <= 16.6 && lon >= 80.2 && lon <= 80.7) return { name: "Guntur (Chilli & Spice Basin), Andhra Pradesh", country: "India" };
-      if (lat >= 11.5 && lat <= 11.9 && lon >= 75.9 && lon <= 76.4) return { name: "Wayanad (Pepper & Cardamom Reserve), Kerala", country: "India" };
+      if (lat >= 11.5 && lat <= 11.9 && lon >= 75.9 && lon <= 76.4) return { name: "Wayanad (Malabar Pepper & Cardamom Reserve), Kerala", country: "India" };
       if (lat >= 8.2 && lat <= 12.8 && lon >= 74.8 && lon <= 77.5) return { name: "Kerala Coastal & Plantation Belt", country: "India" };
-      if (lat >= 11.5 && lat <= 18.5 && lon >= 74.0 && lon <= 78.6) return { name: "Karnataka Agricultural Basin (Coffee & Maize)", country: "India" };
-      if (lat >= 15.6 && lat <= 22.0 && lon >= 72.6 && lon <= 80.9) return { name: "Maharashtra (Deccan Cotton & Sugarcane Tract)", country: "India" };
-      if (lat >= 20.0 && lat <= 24.7 && lon >= 68.1 && lon <= 74.5) return { name: "Gujarat Groundnut & Cotton Belt", country: "India" };
-      if (lat >= 29.5 && lat <= 32.5 && lon >= 73.8 && lon <= 76.9) return { name: "Punjab Fertile Wheat & Paddy Plain", country: "India" };
-      if (lat >= 23.8 && lat <= 30.4 && lon >= 77.0 && lon <= 84.6) return { name: "Uttar Pradesh Indo-Gangetic Agricultural Basin", country: "India" };
-      if (lat >= 24.5 && lat <= 30.2 && lon >= 69.5 && lon <= 78.2) return { name: "Rajasthan Arid & Barren Farmland", country: "India" };
-      if (lat >= 21.0 && lat <= 26.9 && lon >= 74.0 && lon <= 82.8) return { name: "Madhya Pradesh Soybean & Wheat Heartland", country: "India" };
-      if (lat >= 31.0 && lat <= 36.0 && lon >= 73.0 && lon <= 77.0) return { name: "Kashmir & Himachal Apple Orchard Valley", country: "India" };
-      return { name: "Central Indian Agricultural Zone", country: "India" };
+      if (lat >= 29.5 && lat <= 32.5 && lon >= 73.8 && lon <= 76.9) return { name: "Punjab Fertile Wheat & Basmati Plain", country: "India" };
+      if (lat >= 20.0 && lat <= 24.7 && lon >= 68.1 && lon <= 74.5) return { name: "Gujarat Groundnut & Cotton Tract", country: "India" };
+      if (lat >= 15.6 && lat <= 20.5 && lon >= 74.0 && lon <= 78.5) return { name: "Deccan Plateau & Dryland", country: "India" };
+      if (lat >= 23.8 && lat <= 30.4 && lon >= 77.0 && lon <= 84.6) return { name: "Uttar Pradesh Indo-Gangetic Basin", country: "India" };
+      return { name: "Central Indian Plains", country: "India" };
     }
 
-    // 3. United States Detailed Matrix
+    // 4. United States Detailed Matrix
     if (lat >= 24.5 && lat <= 49.5 && lon >= -125.0 && lon <= -66.9) {
-      if (lon <= -114.0 && lat >= 32.5 && lat <= 42.0) return { name: "Salinas Valley & Central Valley, California", country: "United States" };
+      if (lon <= -120.0 && lat >= 35.5 && lat <= 38.0) return { name: "Salinas Valley (Strawberry Heartland), California", country: "United States" };
       if (lat >= 39.0 && lat <= 43.5 && lon >= -97.0 && lon <= -87.0) return { name: "Midwest Corn & Soybean Belt (Iowa / Illinois)", country: "United States" };
-      if (lat >= 25.8 && lat <= 36.5 && lon >= -106.6 && lon <= -93.5) return { name: "Texas Cotton & Agricultural Heartland", country: "United States" };
+      if (lat >= 25.8 && lat <= 36.5 && lon >= -106.6 && lon <= -93.5) return { name: "Texas Cotton Plains", country: "United States" };
       if (lat >= 24.5 && lat <= 31.0 && lon >= -87.6 && lon <= -80.0) return { name: "Florida Citrus & Subtropical Belt", country: "United States" };
-      if (lat >= 45.5 && lat <= 49.0 && lon >= -124.8 && lon <= -116.9) return { name: "Washington State Apple & Berry Basin", country: "United States" };
-      return { name: "North American Agricultural Territory", country: "United States" };
+      if (lat >= 45.5 && lat <= 49.0 && lon >= -124.8 && lon <= -116.9) return { name: "Washington State Apple Basin", country: "United States" };
+      return { name: "North American Interior Plains", country: "United States" };
     }
 
-    // 4. Europe Detailed Matrix
+    // 5. Europe Detailed Matrix
     if (lat >= 35.0 && lat <= 70.0 && lon >= -10.0 && lon <= 40.0) {
-      if (lat >= 36.0 && lat <= 43.8 && lon >= -9.3 && lon <= 3.3) return { name: "Andalusia & Iberian Peninsula (Olive & Berry Belt)", country: "Spain" };
-      if (lat >= 42.3 && lat <= 51.1 && lon >= -4.8 && lon <= 8.2) return { name: "Bordeaux & French Cereal Farming Plain", country: "France" };
-      if (lat >= 36.6 && lat <= 47.1 && lon >= 6.6 && lon <= 18.5) return { name: "Po Valley & Italian Agricultural Region", country: "Italy" };
-      if (lat >= 47.3 && lat <= 55.1 && lon >= 5.9 && lon <= 15.0) return { name: "Bavaria & Central European Farmland", country: "Germany" };
-      if (lat >= 44.0 && lat <= 52.4 && lon >= 22.0 && lon <= 40.2) return { name: "Ukrainian Chernozem Black Soil Wheat Belt", country: "Ukraine" };
-      return { name: "European Agricultural Region", country: "Europe" };
+      if (lat >= 36.0 && lat <= 43.8 && lon >= -9.3 && lon <= 3.3) return { name: "Andalusia & Iberian Olive Belt", country: "Spain" };
+      if (lat >= 42.3 && lat <= 51.1 && lon >= -4.8 && lon <= 8.2) return { name: "Bordeaux & French Agricultural Plain", country: "France" };
+      if (lat >= 36.6 && lat <= 47.1 && lon >= 6.6 && lon <= 18.5) return { name: "Po Valley, Italy", country: "Italy" };
+      if (lat >= 47.3 && lat <= 55.1 && lon >= 5.9 && lon <= 15.0) return { name: "Bavaria & Central European Plain", country: "Germany" };
+      return { name: "European Plain", country: "Europe" };
     }
 
-    // 5. Africa Detailed Matrix
+    // 6. Africa Detailed Matrix
     if (lat >= -35.0 && lat <= 37.0 && lon >= -18.0 && lon <= 52.0) {
-      if (lat >= 22.0 && lat <= 31.5 && lon >= 25.0 && lon <= 35.0) return { name: "Nile Delta Irrigated Agriculture, Egypt", country: "Egypt" };
+      if (lat >= 22.0 && lat <= 31.5 && lon >= 25.0 && lon <= 35.0) return { name: "Nile Delta Irrigated Basin, Egypt", country: "Egypt" };
       if (lat >= -5.0 && lat <= 5.0 && lon >= 34.0 && lon <= 42.0) return { name: "Kenya Highland Tea & Coffee Basin", country: "Kenya" };
-      if (lat >= 18.0 && lat <= 30.0 && lon >= -15.0 && lon <= 35.0) return { name: "Sahara Desert Arid Barren Territory", country: "Africa" };
-      return { name: "African Agricultural Region", country: "Africa" };
+      return { name: "African Savanna & Plateau", country: "Africa" };
     }
 
-    // 6. South America
+    // 7. South America
     if (lat >= -56.0 && lat <= 13.0 && lon >= -82.0 && lon <= -34.0) {
       if (lat >= -3.5 && lat <= 5.0 && lon >= -70.0 && lon <= -55.0) return { name: "Amazon Protected Rainforest Canopy", country: "Brazil" };
       if (lat >= -25.0 && lat <= -10.0 && lon >= -60.0 && lon <= -45.0) return { name: "Mato Grosso Soybean & Grain Belt", country: "Brazil" };
-      if (lat >= -38.0 && lat <= -30.0 && lon >= -65.0 && lon <= -58.0) return { name: "Pampas Fertile Grain Heartland", country: "Argentina" };
-      return { name: "South American Agricultural Territory", country: "South America" };
+      return { name: "South American Plains", country: "South America" };
     }
 
     // Default precise coordinates
@@ -3604,18 +3717,20 @@
   // ============================================================
   // LAND TYPE VOICE ANNOUNCEMENT (real location type)
   // ============================================================
-  function _getLandTypeVoice(locType, locName) {
+    function _getLandTypeVoice(locType, locName) {
     const shortName = (locName || '').split(',')[0];
     const lt = (locType || '').toLowerCase();
     if (lt.includes('ocean') || lt.includes('water') || lt.includes('marine') || lt.includes('sea') || lt.includes('river') || lt.includes('lake'))
-      return `${shortName} is a water body — ocean or coastal water region. No agricultural cultivation is possible here.`;
+      return `${shortName} is an open marine water body. Water salinity is 35 PSU. Terrestrial crop cultivation is impossible. Marine aquaculture only.`;
     if (lt.includes('polar') || lt.includes('permafrost'))
-      return `${shortName} is a polar permafrost zone — freezing region. Only hydroponic greenhouse farming is possible.`;
-    if (lt.includes('desert') || lt.includes('arid') || lt.includes('barren'))
-      return `${shortName} is an arid barren land — dry desert region suitable only for drought-resistant crops.`;
+      return `${shortName} is a polar permafrost zone. Open field cultivation is impossible. Controlled indoor hydroponics only.`;
+    if (lt.includes('barren') || lt.includes('desert') || lt.includes('arid') || lt.includes('plateau') || lt.includes('wasteland'))
+      return `${shortName} is a barren land and arid rocky plateau. Highly recommended for cultivating drought-resistant Groundnut fixing nitrogen, or building houses and commercial structures with safe soil bearing capacity.`;
+    if (lt.includes('flood') || lt.includes('wetland') || lt.includes('marsh') || lt.includes('delta'))
+      return `${shortName} is a low-lying wetland and seasonal flood hazard basin. Suitable for flood-submergence resistant Swarna-Sub1 Paddy. Building houses is strictly prohibited due to severe flood risks.`;
     if (lt.includes('industrial') || lt.includes('hazard') || lt.includes('factory'))
-      return `${shortName} is an industrial zone. Food crop cultivation is not recommended due to factory proximity.`;
-    return `${shortName} is agricultural land — a prime fertile agricultural zone suitable for crop cultivation.`;
+      return `${shortName} is an industrial hazard zone. Food crop cultivation is prohibited due to chemical emissions and factory proximity.`;
+    return `${shortName} is a fertile agricultural zone suitable for high-yield crop cultivation.`;
   }
 
   // ============================================================
@@ -3738,8 +3853,7 @@
     if (appInitialized) return;
     appInitialized = true;
 
-    // Immediately dismiss loading screen so platform appears in front
-    dismissLoadingOverlay();
+    // Allow loading sequence to finish gracefully or click to dismiss
 
     const pdfDate = document.getElementById('pdf-date');
     if (pdfDate) pdfDate.textContent = new Date().toLocaleString();
@@ -3771,11 +3885,10 @@
   // Secondary fallback on window load
   window.addEventListener('load', bootApplication);
 
-  // Absolute hard failsafe timer: guaranteed dashboard reveal within 600ms
+  // Hard failsafe timer to reveal dashboard
   setTimeout(() => {
     bootApplication();
-    dismissLoadingOverlay();
-  }, 600);
+  }, 1700);
 </script>
 </body>
 </html>

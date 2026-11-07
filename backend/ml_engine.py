@@ -322,10 +322,13 @@ class RegionalCropYieldPredictor:
         # 4. FACTORY PROXIMITY HAZARD (<1.0 km)
         # ======================================================
         if factory_dist_km is None:
-            raw_factory = float(0.5 + ((abs(lat * 41.3 + lon * 27.7)) % 15.0))
+            if any(kw in loc_lower for kw in ["desert", "barren", "arid", "plateau", "thar", "sahara", "wetland", "delta", "ocean", "sea", "marine"]):
+                raw_factory = float(12.0 + ((abs(lat * 7.1 + lon * 13.3)) % 18.0))
+            else:
+                raw_factory = float(2.5 + ((abs(lat * 41.3 + lon * 27.7)) % 15.0))
             factory_dist_km = raw_factory
 
-        is_severe_factory = factory_dist_km < 1.0
+        is_severe_factory = factory_dist_km < 1.0 and not any(kw in loc_lower for kw in ["desert", "barren", "arid", "plateau", "thar", "sahara", "wetland", "delta", "ocean", "sea", "marine"])
         if is_severe_factory:
             return {
                 "location_type": "Industrial Factory Hazard Zone",
