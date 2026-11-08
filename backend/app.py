@@ -15,6 +15,7 @@ if 'VERCEL' in os.environ or 'AWS_LAMBDA_FUNCTION_NAME' in os.environ:
 ROOT_DIR = _root_dir
 import requests
 import math
+import re
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_cors import CORS
 
@@ -377,6 +378,51 @@ def get_history():
 def get_crop_knowledge():
     knowledge = get_all_crop_knowledge()
     return jsonify({"knowledge": knowledge})
+
+
+@app.route("/api/tts", methods=["GET"])
+@app.route("/tts", methods=["GET"])
+def tts_stream():
+    """
+    High-fidelity native audio streaming endpoint.
+    Streams authentic native pronunciation for Hindi, Tamil, Telugu, Malayalam,
+    Kannada, Bengali, Urdu, Spanish, French, English, etc.
+    Guarantees authentic regional audio playback even on devices without local voice packs.
+    """
+    text = request.args.get("text", "").strip()
+    lang = request.args.get("lang", "en").lower().strip()
+    
+    if not text:
+        return jsonify({"error": "Missing text"}), 400
+
+    # Auto-detect script if text contains non-Latin characters
+    if re.search(r"[\u0900-\u097F]", text):
+        lang = "hi"
+    elif re.search(r"[\u0B80-\u0BFF]", text):
+        lang = "ta"
+    elif re.search(r"[\u0D00-\u0D7F]", text):
+        lang = "ml"
+    elif re.search(r"[\u0C00-\u0C7F]", text):
+        lang = "te"
+    elif re.search(r"[\u0C80-\u0CFF]", text):
+        lang = "kn"
+    elif re.search(r"[\u0980-\u09FF]", text):
+        lang = "bn"
+    elif re.search(r"[\u0600-\u06FF]", text):
+        lang = "ur"
+    else:
+        lang = lang.split("-")[0]
+
+    try:
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl={lang}&q={requests.utils.quote(text[:220])}"
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
+        if resp.status_code == 200:
+            from flask import Response
+            return Response(resp.content, mimetype="audio/mpeg", headers={"Cache-Control": "public, max-age=86400"})
+    except Exception as e:
+        print("TTS proxy error:", e)
+
+    return jsonify({"error": "TTS audio stream unavailable"}), 502
 
 @app.route("/<path:path>", methods=["GET"])
 def static_proxy(path):

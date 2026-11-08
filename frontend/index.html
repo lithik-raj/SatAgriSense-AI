@@ -123,26 +123,38 @@
     .search-overlay-box {
       position: absolute; top: 16px; left: 16px;
       background: var(--bg-panel); border: 1px solid var(--border-panel);
-      padding: 12px 14px; border-radius: 14px; backdrop-filter: blur(14px);
-      width: 330px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+      padding: 10px 12px; border-radius: 14px; backdrop-filter: blur(14px);
+      width: 375px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.75);
       transition: width 0.3s ease, padding 0.3s ease;
+      overflow: hidden;
     }
     .search-overlay-box.minimized {
-      width: auto; max-width: 290px; padding: 7px 12px;
+      width: auto; max-width: 310px; padding: 7px 12px;
     }
     .search-overlay-box.minimized .search-box-body { display: none; }
-    .search-bar-row { display: flex; gap: 6px; margin-top: 8px; }
-    .search-input {
-      flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.18);
-      color: #fff; padding: 9px 12px; border-radius: 8px; font-size: 12px; outline: none;
+    .search-bar-row {
+      display: flex; align-items: center; margin-top: 8px;
+      background: rgba(0,0,0,0.6); border: 1px solid rgba(0,240,255,0.35);
+      border-radius: 10px; padding: 3px 5px; gap: 4px; box-sizing: border-box;
+      width: 100%; overflow: hidden;
     }
-    .search-input:focus { border-color: var(--cyan-glow); box-shadow: 0 0 8px rgba(0,240,255,0.3); }
+    .search-bar-row:focus-within {
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 10px rgba(0,240,255,0.35);
+    }
+    .search-input {
+      flex: 1; min-width: 0; background: transparent; border: none;
+      color: #fff; padding: 7px 8px; font-size: 12px; outline: none;
+    }
+    .search-input:focus { border: none; box-shadow: none; }
     .btn-icon {
       background: var(--cyan-glow); color: #000; border: none;
-      width: 38px; min-width: 38px; border-radius: 8px; cursor: pointer; font-size: 14px;
+      width: 30px; height: 30px; min-width: 30px; border-radius: 7px; cursor: pointer; font-size: 13px;
       display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+      flex-shrink: 0; margin: 0;
     }
-    .btn-icon:hover { transform: scale(1.08); }
+    .btn-icon:hover { transform: scale(1.06); filter: brightness(1.15); }
     .btn-icon.mic-listening { background: var(--alert-red); color: #fff; animation: pulseMic 1s infinite; }
     @keyframes pulseMic { 0% { box-shadow: 0 0 0 0 rgba(255,51,102,0.7); } 70% { box-shadow: 0 0 0 10px rgba(255,51,102,0); } 100% { box-shadow: 0 0 0 0 rgba(255,51,102,0); } }
 
@@ -328,7 +340,25 @@
     .chat-msg { padding: 10px 12px; border-radius: 10px; max-width: 90%; line-height: 1.5; }
     .chat-msg.user { align-self: flex-end; background: rgba(0,240,255,0.18); border: 1px solid rgba(0,240,255,0.4); color: #fff; }
     .chat-msg.bot { align-self: flex-start; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #dde4ee; }
-    .ai-input-row { padding: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 6px; }
+    .ai-input-row {
+      padding: 6px 8px; margin: 8px 10px 10px 10px;
+      border: 1px solid rgba(0,240,255,0.35); border-radius: 10px;
+      background: rgba(0,0,0,0.55); display: flex; align-items: center; gap: 4px;
+      box-sizing: border-box; overflow: hidden;
+    }
+    .ai-input-row:focus-within {
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 10px rgba(0,240,255,0.35);
+    }
+    .ai-input-row .search-input {
+      flex: 1; min-width: 0; background: transparent; border: none;
+      color: #fff; padding: 7px 8px; font-size: 12px; outline: none;
+    }
+    .ai-input-row .btn-icon {
+      width: 30px; height: 30px; min-width: 30px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin: 0;
+    }
 
     /* ====== TABS - HISTORY + ENV ====== */
     .dash-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
@@ -1080,8 +1110,8 @@
   function toggleChatVoiceSpeech() {
     chatVoiceActive = !chatVoiceActive;
     updateChatVoiceUI();
-    if (!chatVoiceActive && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (!chatVoiceActive) {
+      stopAllVoiceOutput();
     }
   }
 
@@ -1228,13 +1258,53 @@
     regionalLangCode = reg.code;
     regionalLangName = reg.name;
 
+    // Automatically switch AI communication to the native regional language
+    if (reg.code !== 'en-US') {
+      setChatLanguage(reg.code, reg.name);
+    }
+
     const btn = document.getElementById('lang-btn-regional');
     const label = document.getElementById('regional-lang-label');
     if (label) label.textContent = reg.name;
     if (btn) {
       btn.style.display = (reg.code === 'en-US') ? 'none' : 'inline-block';
-      btn.title = `Click to switch AI responses to native language: ${reg.name}`;
+      btn.title = `Active regional language: ${reg.name}`;
     }
+    updateQuickChipsForLanguage(reg.code);
+  }
+
+  function updateQuickChipsForLanguage(code) {
+    const bar = document.getElementById('chat-quick-chips');
+    if (!bar) return;
+    if (code && code.startsWith('hi')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('इस क्षेत्र के लिए सर्वोत्तम फसल कौन सी है और उपज कितनी मिलेगी?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 सर्वोत्तम फसल व उपज?</button>
+        <button type="button" onclick="submitQuickChat('क्या यहाँ बंजर भूमि पर घर या इमारत बना सकते हैं? बाढ़ का खतरा?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ बंजर भूमि पर घर निर्माण?</button>
+        <button type="button" onclick="submitQuickChat('जल लवणता (Salinity) और pH स्तर क्या है?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 पानी का pH और लवणता?</button>
+        <button type="button" onclick="submitQuickChat('क्या पास की फैक्ट्री से प्रदूषण या अपशिष्ट जल का खतरा है?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏭 फैक्ट्री प्रदूषण खतरा?</button>
+      `;
+    } else if (code && code.startsWith('ta')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('இப்பகுதிக்கு உகந்த அதிக மகசூல் தரும் பயிர் எது?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 அதிக மகசூல் பயிர்?</button>
+        <button type="button" onclick="submitQuickChat('தரிசு நிலத்தில் வீடு கட்டலாமா? மண் ஸ்திரத்தன்மை எப்படி?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ தரிசு நிலத்தில் வீடு கட்டலாமா?</button>
+        <button type="button" onclick="submitQuickChat('நீரின் உவர்ப்புத்தன்மை மற்றும் pH அளவு என்ன?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 நீரின் உவர்ப்பு & pH?</button>
+        <button type="button" onclick="submitQuickChat('தொழிற்சாலை காற்று மற்றும் கழிவுநீர் மாசுபாடு உள்ளதா?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏭 தொழிற்சாலை மாசு ஆய்வு?</button>
+      `;
+    } else {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('Which crop gives the highest yield and profit here?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 Best Yield Crop?</button>
+        <button type="button" onclick="submitQuickChat('Can houses be built on barren land here? Flood & collapse risk?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ Build on Barren Land?</button>
+        <button type="button" onclick="submitQuickChat('What is the water salinity in PSU and pH level?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 Water Salinity & pH?</button>
+        <button type="button" onclick="submitQuickChat('Is there factory air pollution or wastewater contamination?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏭 Factory Hazard Analysis?</button>
+      `;
+    }
+  }
+
+  function submitQuickChat(txt) {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    input.value = txt.replace(/^[\u{1F300}-\u{1FAFF}\s]+/u, '').trim();
+    sendChatMessage();
   }
 
   function setChatLanguage(code, name) {
@@ -1339,10 +1409,22 @@
     window.speechSynthesis.onvoiceschanged = loadSystemVoices;
   }
 
+  let activeTTSAudio = null;
+
+  function stopAllVoiceOutput() {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (activeTTSAudio) {
+      activeTTSAudio.pause();
+      activeTTSAudio.currentTime = 0;
+      activeTTSAudio = null;
+    }
+  }
+
   function speakFullChatResponse(rawText) {
-    if (!chatVoiceActive || !('speechSynthesis' in window)) return;
+    if (!chatVoiceActive) return;
     try {
-      window.speechSynthesis.cancel();
+      stopAllVoiceOutput();
+
       let clean = String(rawText || '')
         .replace(/<br\s*\/?>/gi, '. ')
         .replace(/<[^>]+>/g, '')
@@ -1354,14 +1436,36 @@
 
       if (!clean) return;
 
-      // Group into natural, complete sentences (protects decimals like 3.2 T/Ha, pH 7.4)
-      const rawClauses = clean.split(/(?<=[!?:;\n])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
+      // Automatic Script Language Detection from displayed response text
+      let detectedLang = 'en-US';
+      let langCode = 'en';
+      if (/[\u0900-\u097F]/.test(clean)) {
+        detectedLang = 'hi-IN'; langCode = 'hi';
+      } else if (/[\u0B80-\u0BFF]/.test(clean)) {
+        detectedLang = 'ta-IN'; langCode = 'ta';
+      } else if (/[\u0D00-\u0D7F]/.test(clean)) {
+        detectedLang = 'ml-IN'; langCode = 'ml';
+      } else if (/[\u0C00-\u0C7F]/.test(clean)) {
+        detectedLang = 'te-IN'; langCode = 'te';
+      } else if (/[\u0C80-\u0CFF]/.test(clean)) {
+        detectedLang = 'kn-IN'; langCode = 'kn';
+      } else if (/[\u0980-\u09FF]/.test(clean)) {
+        detectedLang = 'bn-IN'; langCode = 'bn';
+      } else if (/[\u0600-\u06FF]/.test(clean)) {
+        detectedLang = 'ur-PK'; langCode = 'ur';
+      } else {
+        detectedLang = currentChatLangCode || 'en-US';
+        langCode = (detectedLang || 'en').split('-')[0].toLowerCase();
+      }
+
+      // Group into natural sentences (preserves units and decimals)
+      const rawClauses = clean.split(/(?<=[!?:;\n।॥])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
       const chunks = [];
       let currentChunk = '';
       for (let s of rawClauses) {
         s = s.trim();
         if (!s) continue;
-        if ((currentChunk.length + s.length) < 160) {
+        if ((currentChunk.length + s.length) < 140) {
           currentChunk += (currentChunk ? ' ' : '') + s;
         } else {
           if (currentChunk) chunks.push(currentChunk);
@@ -1372,43 +1476,98 @@
       if (chunks.length === 0) chunks.push(clean);
 
       let chunkIdx = 0;
-      const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis.getVoices() || []);
-      const code = (currentChatLangCode || 'en-US').toLowerCase();
-      const prefix = code.split('-')[0];
-
-      let matchVoice = voices.find(v => v.lang.toLowerCase() === code) ||
-                       voices.find(v => v.lang.toLowerCase().replace('_', '-') === code) ||
-                       voices.find(v => v.lang.toLowerCase().startsWith(prefix)) ||
-                       voices.find(v => v.name.toLowerCase().includes(prefix));
-
-      const isIndic = ['ta', 'hi', 'ml', 'te', 'kn', 'mr', 'pa', 'bn', 'ur'].includes(prefix);
+      const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
+      
+      // Check if browser has an authentic native voice installed for this language
+      let matchVoice = voices.find(v => {
+        const vl = v.lang.toLowerCase();
+        const vn = v.name.toLowerCase();
+        return vl.startsWith(langCode) || 
+               (langCode === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana'))) ||
+               (langCode === 'ta' && (vn.includes('tamil') || vn.includes('valluvar')));
+      });
 
       function speakNext() {
-        if (!chatVoiceActive || chunkIdx >= chunks.length) return;
+        if (!chatVoiceActive || chunkIdx >= chunks.length) {
+          stopAllVoiceOutput();
+          return;
+        }
         const textChunk = chunks[chunkIdx].trim();
         if (!textChunk) {
           chunkIdx++;
           return speakNext();
         }
-        const utter = new SpeechSynthesisUtterance(textChunk);
-        utter.rate = isIndic ? 0.94 : 0.98;
-        utter.pitch = 1.0;
-        utter.lang = currentChatLangCode || 'en-US';
-        if (matchVoice) utter.voice = matchVoice;
 
-        utter.onend = function() {
-          chunkIdx++;
-          speakNext();
-        };
-        utter.onerror = function() {
-          chunkIdx++;
-          speakNext();
-        };
-        window.speechSynthesis.speak(utter);
+        // If a verified regional voice exists in the user's OS, use SpeechSynthesis
+        if (matchVoice && 'speechSynthesis' in window) {
+          const utter = new SpeechSynthesisUtterance(textChunk);
+          utter.voice = matchVoice;
+          utter.lang = detectedLang;
+          utter.rate = (langCode === 'en') ? 0.98 : 0.94;
+          utter.pitch = 1.0;
+
+          utter.onend = function() {
+            chunkIdx++;
+            speakNext();
+          };
+          utter.onerror = function() {
+            streamNativeTTS(textChunk, langCode, () => {
+              chunkIdx++;
+              speakNext();
+            });
+          };
+          window.speechSynthesis.speak(utter);
+        } else {
+          // Play via authentic native audio stream (Guarantees fluent Hindi/Tamil pronunciation on all devices)
+          streamNativeTTS(textChunk, langCode, () => {
+            chunkIdx++;
+            speakNext();
+          });
+        }
       }
+
+      function streamNativeTTS(textToPlay, lc, callback) {
+        if (!chatVoiceActive) return;
+        const encoded = encodeURIComponent(textToPlay.slice(0, 200));
+        const streamUrl = `${API_BASE}/tts?lang=${lc}&text=${encoded}`;
+        const audio = new Audio(streamUrl);
+        activeTTSAudio = audio;
+
+        audio.onended = function() {
+          activeTTSAudio = null;
+          callback();
+        };
+        audio.onerror = function() {
+          const directUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lc}&q=${encoded}`;
+          const directAudio = new Audio(directUrl);
+          activeTTSAudio = directAudio;
+          directAudio.onended = function() {
+            activeTTSAudio = null;
+            callback();
+          };
+          directAudio.onerror = function() {
+            activeTTSAudio = null;
+            if ('speechSynthesis' in window) {
+              const u = new SpeechSynthesisUtterance(textToPlay);
+              u.lang = detectedLang;
+              u.onend = callback;
+              u.onerror = callback;
+              window.speechSynthesis.speak(u);
+            } else {
+              callback();
+            }
+          };
+          directAudio.play().catch(() => callback());
+        };
+
+        audio.play().catch(e => {
+          callback();
+        });
+      }
+
       speakNext();
     } catch(err) {
-      console.warn('SpeechSynthesis error:', err);
+      console.warn('Speech error:', err);
     }
   }
 
@@ -1497,25 +1656,30 @@
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = currentChatLangCode || 'en-US';
-      recognition.interimResults = false;
+      recognition.interimResults = true;
+      recognition.continuous = false;
       recognition.maxAlternatives = 1;
 
       if (micBtn) micBtn.classList.add('mic-listening');
-      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening (${currentChatLangName})... Speak city or crop name now`;
+      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening in ${currentChatLangName}... Speak city or crop name now`;
 
       recognition.onresult = function(e) {
-        if (micBtn) micBtn.classList.remove('mic-listening');
-        if (e.results && e.results[0] && e.results[0][0]) {
-          const spoken = e.results[0][0].transcript.trim();
-          if (input) input.value = spoken;
-          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "<strong>${spoken}</strong>" — Searching location...`;
+        let transcript = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          transcript += e.results[i][0].transcript;
+        }
+        transcript = transcript.trim();
+        if (input && transcript) input.value = transcript;
+
+        if (e.results && e.results[0] && e.results[0].isFinal) {
+          if (micBtn) micBtn.classList.remove('mic-listening');
+          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "<strong>${transcript}</strong>" — Searching location...`;
           searchLocationByName();
         }
       };
 
       recognition.onerror = function(e) {
         if (micBtn) micBtn.classList.remove('mic-listening');
-        const err = e ? e.error : 'unknown';
         if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-keyboard" style="color:var(--cyan-glow);"></i> Direct Search Panel open. Type or choose chips below:';
         openVoiceBanner();
         if (input) {
@@ -1544,7 +1708,7 @@
     if (!SpeechRecognition) {
       if (input) {
         input.focus();
-        input.placeholder = `Type your question in ${currentChatLangName} & press Enter...`;
+        input.placeholder = `Type question in ${currentChatLangName} or tap a quick chip above...`;
       }
       return;
     }
@@ -1552,44 +1716,50 @@
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = currentChatLangCode || 'en-US';
-      recognition.interimResults = false;
+      recognition.interimResults = true;
+      recognition.continuous = false;
       recognition.maxAlternatives = 1;
 
       if (micBtn) {
-        micBtn.style.background = 'rgba(255,51,102,0.3)';
+        micBtn.style.background = 'rgba(255,51,102,0.35)';
         micBtn.style.borderColor = '#ff3366';
         micBtn.style.boxShadow = '0 0 12px #ff3366';
       }
       if (input) input.placeholder = `🎙️ Listening in ${currentChatLangName}... Speak your question now`;
 
       recognition.onresult = function(e) {
-        if (micBtn) {
-          micBtn.style.background = 'rgba(0,240,255,0.2)';
-          micBtn.style.borderColor = 'var(--cyan-glow)';
-          micBtn.style.boxShadow = 'none';
+        let transcript = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          transcript += e.results[i][0].transcript;
         }
-        if (e.results && e.results[0] && e.results[0][0]) {
-          const spoken = e.results[0][0].transcript.trim();
-          input.value = spoken;
+        transcript = transcript.trim();
+        if (input && transcript) input.value = transcript;
+
+        if (e.results && e.results[0] && e.results[0].isFinal) {
+          if (micBtn) {
+            micBtn.style.background = 'rgba(0,240,255,0.25)';
+            micBtn.style.borderColor = 'var(--cyan-glow)';
+            micBtn.style.boxShadow = 'none';
+          }
           sendChatMessage();
         }
       };
 
       recognition.onerror = function(e) {
         if (micBtn) {
-          micBtn.style.background = 'rgba(0,240,255,0.2)';
+          micBtn.style.background = 'rgba(0,240,255,0.25)';
           micBtn.style.borderColor = 'var(--cyan-glow)';
           micBtn.style.boxShadow = 'none';
         }
         if (input) {
           input.focus();
-          input.placeholder = `Type question in ${currentChatLangName} & press Enter...`;
+          input.placeholder = `Type question in ${currentChatLangName} or tap a quick chip above...`;
         }
       };
 
       recognition.onend = function() {
         if (micBtn) {
-          micBtn.style.background = 'rgba(0,240,255,0.2)';
+          micBtn.style.background = 'rgba(0,240,255,0.25)';
           micBtn.style.borderColor = 'var(--cyan-glow)';
           micBtn.style.boxShadow = 'none';
         }
@@ -1598,13 +1768,13 @@
       recognition.start();
     } catch(err) {
       if (micBtn) {
-        micBtn.style.background = 'rgba(0,240,255,0.2)';
+        micBtn.style.background = 'rgba(0,240,255,0.25)';
         micBtn.style.borderColor = 'var(--cyan-glow)';
         micBtn.style.boxShadow = 'none';
       }
       if (input) {
         input.focus();
-        input.placeholder = `Type question in ${currentChatLangName} & press Enter...`;
+        input.placeholder = "Type your question & press Enter...";
       }
     }
   }
@@ -1619,13 +1789,15 @@
   function speakCurrentLocation() {
     if (!document.getElementById('voice-toggle').checked) return;
     const loc = document.getElementById('location-input').value;
-    if (!loc || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(
-      `Selected location: ${loc}. Latitude ${currentLocationContext.lat.toFixed(2)}, Longitude ${currentLocationContext.lon.toFixed(2)}.`
-    );
-    utter.rate = 0.95;
-    window.speechSynthesis.speak(utter);
+    if (!loc) return;
+    const crop = lastMLData ? (lastMLData.recommended_crop || lastMLData.crop || '') : '';
+    let announcement = `Selected location: ${loc}. Recommended crop: ${crop}.`;
+    if (currentChatLangCode && currentChatLangCode.startsWith('hi')) {
+      announcement = `चयनित स्थान: ${loc}। अनुशंसित फसल: ${crop}।`;
+    } else if (currentChatLangCode && currentChatLangCode.startsWith('ta')) {
+      announcement = `தேர்ந்தெடுக்கப்பட்ட பகுதி: ${loc}। பரிந்துரைக்கப்படும் பயிர்: ${crop}।`;
+    }
+    speakFullChatResponse(announcement);
   }
 
   function speakText(text) {
