@@ -398,13 +398,55 @@ class HuggingFaceLLMService:
         crop_keywords = ["crop", "crops", "which crop", "grows more", "yield", "more yield", "highest yield",
                          "best crop", "recommend crop", "farming", "cultivate", "harvest", "agriculture", "profit",
                          "grow", "plant", "wheat", "rice", "paddy", "turmeric", "apple", "groundnut", "peanut", 
-                         "kadalai", "maize", "cotton", "banana", "coffee", "strawberries", "can we grow"]
-        if any(kw in p_lower for kw in crop_keywords):
+                         "kadalai", "maize", "cotton", "banana", "coffee", "strawberries", "can we grow", "forest", "rainforest"]
+        if any(kw in p_lower for kw in crop_keywords) or any(kw in p_lower for kw in ["forest", "sundarban", "amazon", "boreal", "valdivian", "congo"]):
             if is_water:
                 return {
                     "source": "Sentinel-AI Marine Exclusion Guardrail",
                     "model": "Zero-Hallucination Ocean Classifier",
                     "response": f"🌊 **OCEAN / WATER BODY DETECTED — {loc_name}**:\n\n🚫 **Strict Verdict**: **NO CROPS CAN BE GROWN IN OPEN WATER**\n• **Yield**: **0.0 Tons/Ha** | **Agricultural Profit**: **$0.00 / Ha**\n• **Why**: High water salinity (~35 PSU / 35,000 ppm TDS) causes fatal osmotic shock to roots. Marine aquaculture only."
+                }
+
+            # Protected World Forestry Check (Sundarbans, Amazon, Boreal, Valdivian, Congo, etc.)
+            is_forest_query = is_forest or any(kw in loc_lower for kw in ["forest", "rainforest", "sundarban", "sunderban", "amazon", "boreal", "valdivian", "congo", "taiga"]) or any(kw in p_lower for kw in ["forest", "sundarban", "sunderban", "amazon", "boreal", "valdivian", "congo"])
+            if is_forest_query:
+                forest_display = context.get("forest_name") or "Protected Natural Forest Reserve"
+                if "sundarban" in loc_lower or "sundarban" in p_lower or "sunderban" in loc_lower:
+                    forest_display = "Sundarbans Mangrove Forest Reserve"
+                elif "amazon" in loc_lower or "amazon" in p_lower:
+                    forest_display = "Amazon Tropical Rainforest"
+                elif "boreal" in loc_lower or "boreal" in p_lower or "taiga" in p_lower:
+                    forest_display = "Boreal Forest (Taiga Biome)"
+                elif "valdivian" in loc_lower or "valdivian" in p_lower:
+                    forest_display = "Valdivian Temperate Rainforest"
+                elif "congo" in loc_lower or "congo" in p_lower:
+                    forest_display = "Congo Basin Rainforest"
+
+                if lang.startswith("ta"):
+                    reply = (
+                        f"🌲 **பாதுகாக்கப்பட்ட வனப்பகுதி — {forest_display}**:\n\n"
+                        f"• **தாவர நிலை**: அடர்ந்த இயற்கை முதன்மை மரங்கள் மற்றும் பாதுகாக்கப்பட்ட காடு (NDVI: {round(ndvi, 2)}).\n"
+                        f"• **திட்டவட்டமான முடிவு**: **இங்கு எந்த பயிரும் பயிரிட முடியாது (NO CROPS CAN BE GROWN)**.\n"
+                        f"• **காரணம்**: இது {forest_display} சர்வதேச சுற்றுச்சூழல் பாதுகாப்பு சட்டங்களின் கீழ் பாதுகாக்கப்பட்ட மண்டலம். விவசாயத்திற்காக காடுகளை அழிப்பது சட்டவிரோதமானது."
+                    )
+                elif lang.startswith("hi"):
+                    reply = (
+                        f"🌲 **संरक्षित वन क्षेत्र — {forest_display}**:\n\n"
+                        f"• **वनस्पति स्थिति**: सघन प्राकृतिक छत्र एवं प्राथमिक वनस्पति (NDVI: {round(ndvi, 2)})।\n"
+                        f"• **स्पष्ट निर्णय**: **यहाँ कोई भी व्यावसायिक फसल नहीं उगाई जा सकती (NO CROPS CAN BE GROWN)**।\n"
+                        f"• **कारण**: यह {forest_display} पर्यावरण संरक्षण कानूनों द्वारा संरक्षित क्षेत्र है। व्यावसायिक खेती और पेड़ों की कटाई यहाँ कानूनी रूप से पूर्णतः प्रतिबंधित है।"
+                    )
+                else:
+                    reply = (
+                        f"🌲 **PROTECTED FORESTRY AREA — {forest_display}**:\n\n"
+                        f"• **Vegetation Status**: Dense native primary vegetation and forest canopy (NDVI: {round(ndvi, 2)}).\n"
+                        f"• **Strict Response**: **NO COMMERCIAL CROPS CAN BE GROWN HERE**.\n"
+                        f"• **Ecological Protection**: This is the {forest_display}. Commercial clear-cutting and agricultural crop farming are strictly prohibited by environmental conservation law to protect biodiversity and preserve this vital planetary carbon sink."
+                    )
+                return {
+                    "source": "Sentinel Forest Conservation Guardrail",
+                    "model": "Protected Forest Classifier",
+                    "response": reply
                 }
 
             if lang.startswith("ta"):

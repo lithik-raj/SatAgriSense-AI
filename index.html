@@ -156,6 +156,10 @@
     }
     .btn-icon:hover { transform: scale(1.06); filter: brightness(1.15); }
     .btn-icon.mic-listening { background: var(--alert-red); color: #fff; animation: pulseMic 1s infinite; }
+    @keyframes floatEmoji {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-5px) scale(1.08); }
+    }
     @keyframes pulseMic { 0% { box-shadow: 0 0 0 0 rgba(255,51,102,0.7); } 70% { box-shadow: 0 0 0 10px rgba(255,51,102,0); } 100% { box-shadow: 0 0 0 0 rgba(255,51,102,0); } }
 
     /* ====== SENTINEL BADGES ====== */
@@ -681,8 +685,28 @@
         <span class="card-title"><i class="fa-solid fa-wheat-awn" style="color:#f1c40f;"></i> ML Crop Yield Prediction</span>
         <span id="yield-status-tag" class="status-tag tag-optimal">OPTIMAL</span>
       </div>
+      <!-- Real Attractive Virtual 3D Crop Emoji Hero -->
+      <div id="crop-hero-visual" style="font-size:46px;text-align:center;margin:4px 0 6px 0;filter:drop-shadow(0 0 14px rgba(0,240,255,0.7));animation:floatEmoji 2.5s ease-in-out infinite;">🌾</div>
       <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:3px;" id="rec-crop-name">Pearl Millet (Bajra)</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;" id="yield-reason">Favorable agricultural conditions.</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;" id="yield-reason">Favorable agricultural conditions.</div>
+
+      <!-- Current Sown vs Future AI Harvest Dual Comparison -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 10px 0;background:rgba(0,0,0,0.45);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,0.08);">
+        <div style="border-right:1px solid rgba(255,255,255,0.1);padding-right:6px;">
+          <div style="font-size:9px;color:#ffd166;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:3px;">
+            <span id="current-crop-emoji">🌱</span> Current Sown
+          </div>
+          <div id="current-crop-name" style="font-size:11px;font-weight:700;color:#fff;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Baseline Crop</div>
+          <div id="current-crop-yield" style="font-size:10px;color:#aaa;">1.8 T/Ha ($540/Ha)</div>
+        </div>
+        <div style="padding-left:6px;">
+          <div style="font-size:9px;color:var(--green-glow);text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:3px;">
+            <span id="future-crop-emoji">🚀</span> Future AI Harvest
+          </div>
+          <div id="future-crop-name" style="font-size:11px;font-weight:800;color:var(--green-glow);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">High-Yield Hybrid</div>
+          <div id="future-crop-yield" style="font-size:10px;color:#fff;">+85% Harvest Boost</div>
+        </div>
+      </div>
       <div class="crop-grid">
         <div class="crop-metric cyan">
           <div class="metric-val" id="yield-val">4.01</div>
@@ -1788,16 +1812,75 @@
   // ============================================================
   function speakCurrentLocation() {
     if (!document.getElementById('voice-toggle').checked) return;
-    const loc = document.getElementById('location-input').value;
+    const loc = document.getElementById('location-input')?.value || currentLocationContext?.name || '';
     if (!loc) return;
     const crop = lastMLData ? (lastMLData.recommended_crop || lastMLData.crop || '') : '';
-    let announcement = `Selected location: ${loc}. Recommended crop: ${crop}.`;
+    const yieldVal = lastMLData ? (lastMLData.predicted_yield_tons_ha || '') : '';
+    const locType = lastMLData ? (lastMLData.location_type || '') : '';
+    const isForest = locType.toLowerCase().includes('forest');
+    const isWater = locType.toLowerCase().includes('ocean') || locType.toLowerCase().includes('marine');
+    const city = loc.split(',')[0].trim();
+
+    let announcement = '';
     if (currentChatLangCode && currentChatLangCode.startsWith('hi')) {
-      announcement = `चयनित स्थान: ${loc}। अनुशंसित फसल: ${crop}।`;
+      if (isForest) {
+        announcement = `संरक्षित वन क्षेत्र: ${city}। यहाँ केवल प्राकृतिक वनस्पति मौजूद है, कोई व्यावसायिक फसल नहीं उगाई जा सकती।`;
+      } else if (isWater) {
+        announcement = `समुद्री क्षेत्र: ${city}। अत्यधिक लवणता के कारण यहाँ फसल नहीं उग सकती।`;
+      } else {
+        announcement = `चयनित स्थान: ${city}। अनुशंसित फसल: ${crop}। अनुमानित उपज: ${yieldVal} टन प्रति हेक्टेयर।`;
+      }
     } else if (currentChatLangCode && currentChatLangCode.startsWith('ta')) {
-      announcement = `தேர்ந்தெடுக்கப்பட்ட பகுதி: ${loc}। பரிந்துரைக்கப்படும் பயிர்: ${crop}।`;
+      if (isForest) {
+        announcement = `பாதுகாக்கப்பட்ட வனப்பகுதி: ${city}। அடர்ந்த இயற்கை காடு, இங்கு விவசாய பயிர்கள் பயிரிட முடியாது.`;
+      } else if (isWater) {
+        announcement = `கடல் பகுதி: ${city}। உவர்ப்புத்தன்மை அதிகம் என்பதால் பயிர் வளராது.`;
+      } else {
+        announcement = `தேர்ந்தெடுக்கப்பட்ட பகுதி: ${city}। பரிந்துரைக்கப்படும் பயிர்: ${crop}। விளைச்சல்: ${yieldVal} டன்.`;
+      }
+    } else {
+      if (isForest) {
+        announcement = `Protected Forest Reserve: ${city}. Dense primary vegetation canopy. Commercial crops prohibited.`;
+      } else if (isWater) {
+        announcement = `Marine Open Water: ${city}. Hyper-saline ocean body. No terrestrial crops viable.`;
+      } else {
+        announcement = `${city}. Recommended crop: ${crop}. Expected harvest: ${yieldVal} tons per hectare.`;
+      }
     }
-    speakFullChatResponse(announcement);
+    speakFastNative(announcement);
+  }
+
+  function speakFastNative(textToSpeak) {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      if (window.currentTTSAudio) {
+        window.currentTTSAudio.pause();
+        window.currentTTSAudio = null;
+      }
+      const clean = String(textToSpeak || '').replace(/[*_#`~>•|\-]/g, ' ').replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim();
+      if (!clean) return;
+
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.rate = 1.05; // Fast, fluent, non-laggy
+      utter.pitch = 1.0;
+
+      let detectedLang = currentChatLangCode || 'en-US';
+      if (/[\u0900-\u097F]/.test(clean)) detectedLang = 'hi-IN';
+      else if (/[\u0B80-\u0BFF]/.test(clean)) detectedLang = 'ta-IN';
+      utter.lang = detectedLang;
+
+      const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : window.speechSynthesis.getVoices();
+      const prefix = detectedLang.split('-')[0].toLowerCase();
+      const matched = voices.find(v => v.lang.toLowerCase().startsWith(prefix) || v.name.toLowerCase().includes(prefix));
+      if (matched) utter.voice = matched;
+
+      // Chrome SpeechSynthesis auto-pause bugfix: resume periodic ping
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      console.warn('speakFastNative error:', e);
+    }
   }
 
   function speakText(text) {
@@ -3653,7 +3736,45 @@
     const cv = data.computer_vision;
     const hist = data.historical_1_year_comparison;
     lastMLData = ml;
-    lastCVData = cv;  // store for 2D overlay restore
+    lastCVData = cv;
+
+    // Populate Attractive Crop Hero 3D Emoji
+    const heroEmojiEl = document.getElementById('crop-hero-visual');
+    const heroEmoji = ml.crop_visual_emoji || (ml.location_type?.toLowerCase().includes('forest') ? '🌲' : (ml.location_type?.toLowerCase().includes('ocean') ? '🌊' : '🌾'));
+    if (heroEmojiEl) heroEmojiEl.textContent = heroEmoji;
+
+    // Populate Dual Current Sown vs Future AI Harvest Comparison
+    if (ml.current_cultivated_crop) {
+      const curNameEl = document.getElementById('current-crop-name');
+      const curYieldEl = document.getElementById('current-crop-yield');
+      const curEmojiEl = document.getElementById('current-crop-emoji');
+      if (curNameEl) curNameEl.textContent = ml.current_cultivated_crop.name;
+      if (curYieldEl) curYieldEl.textContent = `${ml.current_cultivated_crop.yield_tons_ha} T/Ha (${ml.current_cultivated_crop.net_profit})`;
+      if (curEmojiEl) curEmojiEl.textContent = ml.current_cultivated_crop.emoji || '🌱';
+    }
+    if (ml.upcoming_future_crop) {
+      const futNameEl = document.getElementById('future-crop-name');
+      const futYieldEl = document.getElementById('future-crop-yield');
+      const futEmojiEl = document.getElementById('future-crop-emoji');
+      if (futNameEl) futNameEl.textContent = ml.upcoming_future_crop.name;
+      if (futYieldEl) futYieldEl.textContent = `${ml.upcoming_future_crop.yield_boost || '+85% Yield'} (${ml.upcoming_future_crop.profit_boost || '+$$$'})`;
+      if (futEmojiEl) futEmojiEl.textContent = ml.upcoming_future_crop.emoji || heroEmoji;
+    }
+
+    // Draw Light Green (Agri) or Dark Green (Forest) 2D Zone Boundary
+    if (leafletMapInstance) {
+      if (window.activeZoneCircle) { leafletMapInstance.removeLayer(window.activeZoneCircle); }
+      const isForestZone = ml.location_type?.toLowerCase().includes('forest');
+      const isAgriZone = !isForestZone && !ml.location_type?.toLowerCase().includes('ocean');
+      const zoneColor = isForestZone ? '#004d20' : (isAgriZone ? '#39ff14' : '#00f0ff');
+      window.activeZoneCircle = L.circle([currentLocationContext.lat, currentLocationContext.lon], {
+        radius: isForestZone ? 6000 : 4500,
+        color: zoneColor,
+        fillColor: zoneColor,
+        fillOpacity: isForestZone ? 0.35 : 0.25,
+        weight: 2
+      }).addTo(leafletMapInstance);
+    }
 
     // ---- Update 2D Leaflet marker with actual land type & NDVI overlay ----
     if (leafletMarker) {
