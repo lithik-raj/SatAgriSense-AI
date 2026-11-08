@@ -1,4 +1,18 @@
 import os
+import sys
+
+# Ensure backend directory and root directory are in sys.path
+_cur_dir = os.path.dirname(os.path.abspath(__file__))
+_root_dir = os.path.abspath(os.path.join(_cur_dir, '..'))
+for _p in [_cur_dir, _root_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# Ensure VERCEL environment flag is set if running on Lambda/Vercel
+if 'VERCEL' in os.environ or 'AWS_LAMBDA_FUNCTION_NAME' in os.environ:
+    os.environ['VERCEL'] = '1'
+
+ROOT_DIR = _root_dir
 import requests
 import math
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
@@ -10,7 +24,7 @@ from ml_engine import regional_ml_predictor
 from sentinel_service import sentinel_service
 from huggingface_service import hf_service
 
-FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+FRONTEND_DIR = os.path.join(ROOT_DIR, 'frontend')
 
 app = Flask(__name__, static_folder=FRONTEND_DIR)
 CORS(app)
@@ -24,7 +38,9 @@ except Exception as e:
 @app.route("/", methods=["GET"])
 def index():
     """Serves the complete frontend directly on localhost:5000"""
-    return send_from_directory(FRONTEND_DIR, "index.html")
+    if os.path.exists(os.path.join(ROOT_DIR, 'index.html')):
+        return send_from_directory(ROOT_DIR, 'index.html')
+    return send_from_directory(FRONTEND_DIR, 'index.html')
 
 @app.route("/api/status", methods=["GET"])
 @app.route("/status", methods=["GET"])
