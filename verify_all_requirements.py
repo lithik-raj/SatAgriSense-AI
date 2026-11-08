@@ -102,4 +102,50 @@ chat_hindi = hf_service.chat_query("नमस्ते, इस बंजर भ�
 assert "नमस्ते" in chat_hindi["response"] or "फसल" in chat_hindi["response"], "Chat Hindi response failed"
 print("[PASS] Test 10: Automatic Hindi language response generated fluently.")
 
-print("\nALL 10 COMPREHENSIVE VERIFICATION TESTS PASSED WITH 100% SUCCESS!")
+# 8. Test Global World Forests (Amazon, Congo, Boreal Taiga)
+res_amazon = regional_ml_predictor.predict(
+    lat=-3.46, lon=-62.21, temp_c=27.5, soil_ph=5.2, rainfall_mm=2600.0,
+    ndvi_avg=0.92, loc_name="Amazon Tropical Rainforest, Manaus, Brazil"
+)
+assert res_amazon["status"] == "ECOLOGICAL_PROTECTION_ZONE", f"Failed Amazon: {res_amazon['status']}"
+assert "NO CROP CAN BE GROWN" in res_amazon["recommended_crop"], f"Failed Amazon crop: {res_amazon['recommended_crop']}"
+assert res_amazon["crop_visual_emoji"] == "🌲", f"Failed Amazon emoji: {res_amazon['crop_visual_emoji']}"
+print("[PASS] Test 11: Amazon Tropical Rainforest identified as strictly protected ecological zone (NDVI 0.92, Emoji 🌲).")
+
+res_congo = regional_ml_predictor.predict(
+    lat=0.5, lon=24.5, temp_c=26.0, soil_ph=5.4, rainfall_mm=2100.0,
+    ndvi_avg=0.89, loc_name="Congo Basin Rainforest, Central Africa"
+)
+assert res_congo["status"] == "ECOLOGICAL_PROTECTION_ZONE", f"Failed Congo: {res_congo['status']}"
+assert res_congo["crop_visual_emoji"] == "🌲", f"Failed Congo emoji: {res_congo['crop_visual_emoji']}"
+print("[PASS] Test 12: Congo Basin Rainforest identified as strictly protected ecological zone (NDVI 0.89, Emoji 🌲).")
+
+res_boreal = regional_ml_predictor.predict(
+    lat=60.0, lon=100.0, temp_c=12.0, soil_ph=5.5, rainfall_mm=500.0,
+    ndvi_avg=0.86, loc_name="Siberian Boreal Forest (Taiga Biome)"
+)
+assert res_boreal["status"] == "ECOLOGICAL_PROTECTION_ZONE", f"Failed Boreal: {res_boreal['status']}"
+assert res_boreal["crop_visual_emoji"] == "🌲", f"Failed Boreal emoji: {res_boreal['crop_visual_emoji']}"
+print("[PASS] Test 13: Boreal Forest Taiga Biome identified as strictly protected ecological zone (NDVI 0.86, Emoji 🌲).")
+
+# 9. Test Dynamic Crop Virtual Emojis
+from ml_engine import get_crop_visual_emoji
+assert get_crop_visual_emoji("Turmeric") == "🌿", "Turmeric emoji failed"
+assert get_crop_visual_emoji("Apples") == "🍎", "Apple emoji failed"
+assert get_crop_visual_emoji("Strawberries") == "🍓", "Strawberry emoji failed"
+assert get_crop_visual_emoji("Banana") == "🍌", "Banana emoji failed"
+assert get_crop_visual_emoji("Coconut") == "🌴", "Coconut emoji failed"
+assert get_crop_visual_emoji("Groundnut") == "🥜", "Groundnut emoji failed"
+assert get_crop_visual_emoji("Paddy Rice") == "🍚", "Rice emoji failed"
+assert get_crop_visual_emoji("Wheat") == "🌾", "Wheat emoji failed"
+assert get_crop_visual_emoji("Ocean Marine Waters") == "🌊", "Ocean emoji failed"
+print("[PASS] Test 14: Dynamic Virtual Crop Emojis verified (Turmeric 🌿, Apple 🍎, Strawberry 🍓, Banana 🍌, Coconut 🌴, Groundnut 🥜, Rice 🍚, Wheat 🌾, Ocean 🌊).")
+
+# 10. Test Dual Comparison (Currently Sown vs Upcoming Future Crop)
+assert "current_cultivated_crop" in res_erode, "Missing current_cultivated_crop in Erode"
+assert "upcoming_future_crop" in res_erode, "Missing upcoming_future_crop in Erode"
+assert res_erode["upcoming_future_crop"]["yield_boost"] is not None
+print("[PASS] Test 15: Dual Comparison card correctly compares traditional sown crop with future AI high-yield crop.")
+
+print("\nALL 15 COMPREHENSIVE VERIFICATION TESTS PASSED WITH 100% SUCCESS!")
+

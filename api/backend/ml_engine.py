@@ -1,63 +1,125 @@
 
 def identify_world_forest(lat, lon, loc_name):
-    s = (loc_name or "").lower()
-    if any(k in s for k in ["wetland", "flood basin", "flood prone", "flood hazard"]):
+    s = (loc_name or '').lower()
+    if any(k in s for k in ['wetland', 'flood basin', 'flood prone', 'flood hazard']):
         return None
-    if any(k in s for k in ["sundarban", "sunderban", "sundarbans"]) or (21.4 <= lat <= 22.8 and 88.3 <= lon <= 89.9):
-        return "Sundarbans Mangrove Forest Reserve"
-    if any(k in s for k in ["amazon", "amazonia", "manaus"]) or (-12.0 <= lat <= 5.0 and -75.0 <= lon <= -48.0):
-        return "Amazon Tropical Rainforest"
-    if any(k in s for k in ["boreal", "taiga"]) or (54.0 <= lat <= 68.0 and (-135.0 <= lon <= -60.0 or 25.0 <= lon <= 135.0)):
-        return "Boreal Forest (Taiga Biome)"
-    if any(k in s for k in ["valdivian", "valdivia"]) or (-44.0 <= lat <= -37.0 and -74.5 <= lon <= -70.5):
-        return "Valdivian Temperate Rainforest"
-    if any(k in s for k in ["congo", "zaire"]) or (-5.0 <= lat <= 5.0 and 12.0 <= lon <= 30.0):
-        return "Congo Basin Rainforest"
-    if any(k in s for k in ["western ghats", "silent valley", "mudumalai", "wayanad forest"]) or (8.5 <= lat <= 15.5 and 75.0 <= lon <= 77.2 and any(k in s for k in ["forest", "sanctuary", "reserve", "hills", "ghats"])):
-        return "Western Ghats Rainforest Reserve"
-    if any(k in s for k in ["black forest", "schwarzwald"]) or (47.8 <= lat <= 48.8 and 7.8 <= lon <= 8.6):
-        return "Black Forest (Schwarzwald Reserve)"
-    if any(k in s for k in ["daintree"]) or (-16.5 <= lat <= -15.8 and 145.2 <= lon <= 145.6):
-        return "Daintree Tropical Rainforest"
-    if any(k in s for k in ["forest", "rainforest", "wildlife sanctuary", "tiger reserve", "canopy reserve", "national park"]):
-        clean = loc_name.split(",")[0].strip()
-        if "forest" not in clean.lower():
-            clean += " Forest Reserve"
+    # 1. Sundarbans Mangrove Forest
+    if any(k in s for k in ['sundarban', 'sunderban', 'sundarbans']) or (21.4 <= lat <= 22.8 and 88.3 <= lon <= 89.9):
+        return 'Sundarbans Mangrove Forest Reserve'
+    # 2. Amazon Rainforest
+    if any(k in s for k in ['amazon', 'amazonia', 'manaus']) or (-15.0 <= lat <= 6.0 and -79.0 <= lon <= -45.0):
+        return 'Amazon Tropical Rainforest'
+    # 3. Congo Basin Rainforest
+    if any(k in s for k in ['congo', 'zaire', 'ituri']) or (-6.0 <= lat <= 6.0 and 11.0 <= lon <= 31.0):
+        return 'Congo Basin Rainforest'
+    # 4. Boreal Forest (Taiga Biome)
+    if any(k in s for k in ['boreal', 'taiga', 'siberian forest']) or (52.0 <= lat <= 70.0 and ((-140.0 <= lon <= -55.0) or (10.0 <= lon <= 175.0))):
+        return 'Boreal Forest (Taiga Biome)'
+    # 5. Valdivian Temperate Rainforest
+    if any(k in s for k in ['valdivian', 'valdivia']) or (-46.0 <= lat <= -35.0 and -75.0 <= lon <= -70.0):
+        return 'Valdivian Temperate Rainforest'
+    # 6. Western Ghats Rainforest & Nilgiris
+    if any(k in s for k in ['western ghats', 'silent valley', 'mudumalai', 'wayanad forest', 'periyar tiger reserve', 'nilgiris forest', 'shola forest']) or (8.5 <= lat <= 16.0 and 74.5 <= lon <= 77.5 and any(k in s for k in ['forest', 'sanctuary', 'reserve', 'hills', 'ghats', 'shola', 'wildlife'])):
+        return 'Western Ghats Rainforest Reserve'
+    # 7. Black Forest (Schwarzwald)
+    if any(k in s for k in ['black forest', 'schwarzwald']) or (47.5 <= lat <= 49.0 and 7.5 <= lon <= 8.8):
+        return 'Black Forest (Schwarzwald Reserve)'
+    # 8. Daintree Tropical Rainforest
+    if any(k in s for k in ['daintree', 'cape tribulation']) or (-17.0 <= lat <= -15.0 and 145.0 <= lon <= 145.8):
+        return 'Daintree Tropical Rainforest'
+    # 9. Redwood Ancient Forest
+    if any(k in s for k in ['redwood', 'sequoia']) or (40.5 <= lat <= 42.0 and -124.5 <= lon <= -123.8):
+        return 'Redwood Ancient Canopy Reserve'
+    # 10. Tongass National Rainforest
+    if any(k in s for k in ['tongass', 'chugach']) or (54.5 <= lat <= 60.5 and -137.0 <= lon <= -129.5):
+        return 'Tongass National Rainforest Reserve'
+    # 11. Great Smoky Mountains
+    if any(k in s for k in ['great smoky mountains', 'smoky mountain forest']) or (35.3 <= lat <= 35.8 and -84.0 <= lon <= -83.0):
+        return 'Great Smoky Mountains Ancient Forest'
+    # 12. Olympic Rainforest & Hoh
+    if any(k in s for k in ['olympic rainforest', 'hoh rainforest']) or (47.4 <= lat <= 48.2 and -124.4 <= lon <= -123.4):
+        return 'Olympic Temperate Rainforest'
+    # 13. Białowieża Primeval Forest
+    if any(k in s for k in ['bialowieza', 'białowieski', 'belovezhskaya pushcha']) or (52.6 <= lat <= 52.9 and 23.5 <= lon <= 24.2):
+        return 'Białowieża Primeval Forest Reserve'
+    # 14. Borneo & Sumatra Rainforest
+    if any(k in s for k in ['borneo', 'sumatra', 'kalimantan']) or (-4.5 <= lat <= 5.0 and 96.0 <= lon <= 118.0 and any(k in s for k in ['forest', 'reserve', 'park', 'jungle'])):
+        return 'Borneo & Sumatra Tropical Rainforest'
+    # 15. Madagascar Rainforest
+    if any(k in s for k in ['madagascar forest', 'atsinanana', 'ranomafana']):
+        return 'Madagascar Primary Rainforest Reserve'
+    # 16. Bwindi & Mau Forest
+    if any(k in s for k in ['bwindi', 'mau forest', 'virunga']):
+        return 'Bwindi & Mau East African Forest Reserve'
+    # 17. Monteverde Cloud Forest
+    if any(k in s for k in ['monteverde', 'costa rica cloud forest']):
+        return 'Monteverde Tropical Cloud Forest Reserve'
+    # 18. Indian National Parks
+    if any(k in s for k in ['corbett', 'kaziranga', 'gir forest', 'bandipur', 'kanha', 'ranthambore', 'nagarhole']):
+        clean = loc_name.split(',')[0].strip()
+        return f'{clean} Protected Forest Sanctuary'
+    # 19. Generic Forest Match
+    if any(k in s for k in ['forest', 'rainforest', 'wildlife sanctuary', 'tiger reserve', 'canopy reserve', 'national park', 'taiga', 'woods', 'jungle']):
+        clean = loc_name.split(',')[0].strip()
+        if 'forest' not in clean.lower():
+            clean += ' Forest Reserve'
         return clean
     return None
 
-def get_crop_visual_emoji(crop_name, loc_type=""):
-    c = (crop_name or "").lower()
-    lt = (loc_type or "").lower()
-    if any(k in c or k in lt for k in ["ocean", "marine", "sea", "water body", "saline water"]):
-        return "🌊"
-    if any(k in c or k in lt for k in ["forest", "canopy", "reserve", "rainforest"]):
-        return "🌲"
-    if any(k in c for k in ["strawberry", "strawberries"]):
-        return "🍓"
-    if any(k in c for k in ["coconut", "palm"]):
-        return "🌴"
-    if any(k in c for k in ["banana"]):
-        return "🍌"
-    if any(k in c for k in ["turmeric", "curcuma"]):
-        return "🌿"
-    if any(k in c for k in ["apple", "malus"]):
-        return "🍎"
-    if any(k in c for k in ["groundnut", "peanut", "kadalai", "arachis"]):
-        return "🥜"
-    if any(k in c for k in ["rice", "paddy", "swarna", "basmati"]):
-        return "🍚"
-    if any(k in c for k in ["wheat", "durum"]):
-        return "🌾"
-    if any(k in c for k in ["cotton", "gossypium"]):
-        return "☁️"
-    if any(k in c for k in ["coffee", "arabica"]):
-        return "☕"
-    if any(k in c for k in ["orange", "citrus", "mandarin"]):
-        return "🍊"
-    if any(k in c for k in ["corn", "maize", "sweet corn"]):
-        return "🌽"
-    return "🌾"
+def get_crop_visual_emoji(crop_name, loc_type=''):
+    c = (crop_name or '').lower()
+    lt = (loc_type or '').lower()
+    if any(k in c or k in lt for k in ['ocean', 'marine', 'sea', 'water body', 'saline water', 'bay of bengal', 'arabian']):
+        return '🌊'
+    if any(k in c or k in lt for k in ['forest', 'canopy', 'reserve', 'rainforest', 'taiga', 'jungle', 'woods']):
+        return '🌲'
+    if any(k in c or k in lt for k in ['polar', 'permafrost', 'arctic', 'antarctica']):
+        return '❄️'
+    if any(k in c for k in ['strawberry', 'strawberries', 'fragaria']):
+        return '🍓'
+    if any(k in c for k in ['coconut', 'palm', 'tall local']):
+        return '🌴'
+    if any(k in c for k in ['banana', 'plantain', 'musa']):
+        return '🍌'
+    if any(k in c for k in ['turmeric', 'curcuma', 'bsr-2']):
+        return '🌿'
+    if any(k in c for k in ['apple', 'malus', 'ambri']):
+        return '🍎'
+    if any(k in c for k in ['groundnut', 'peanut', 'kadalai', 'arachis', 'tmv-7', 'tag-24']):
+        return '🥜'
+    if any(k in c for k in ['rice', 'paddy', 'swarna', 'basmati', 'sub1', 'oryza']):
+        return '🍚'
+    if any(k in c for k in ['wheat', 'durum', 'rabi hd', 'triticum']):
+        return '🌾'
+    if any(k in c for k in ['cotton', 'gossypium']):
+        return '☁️'
+    if any(k in c for k in ['chilli', 'pepper', 'capsicum', 'guntur', 's4']):
+        return '🌶️'
+    if any(k in c for k in ['coffee', 'arabica', 'robusta']):
+        return '☕'
+    if any(k in c for k in ['tea', 'camellia', 'ooty', 'nilgiri orthodox']):
+        return '🍵'
+    if any(k in c for k in ['orange', 'citrus', 'mandarin', 'santra']):
+        return '🍊'
+    if any(k in c for k in ['corn', 'maize', 'sweet corn', 'zea']):
+        return '🌽'
+    if any(k in c for k in ['sugarcane', 'cane', 'co-0238', 'saccharum']):
+        return '🎋'
+    if any(k in c for k in ['potato', 'tuber', 'kufri', 'russet']):
+        return '🥔'
+    if any(k in c for k in ['tomato', 'solanum lycopersicum']):
+        return '🍅'
+    if any(k in c for k in ['grape', 'vineyard', 'vitis']):
+        return '🍇'
+    if any(k in c for k in ['olive', 'olea']):
+        return '🫒'
+    if any(k in c for k in ['mango', 'alphonso']):
+        return '🥭'
+    if any(k in c or k in lt for k in ['barren', 'arid', 'desert']):
+        return '🥜'
+    if any(k in c or k in lt for k in ['flood', 'wetland']):
+        return '🍚'
+    return '🌾'
 
 import numpy as np
 import math

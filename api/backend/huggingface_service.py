@@ -56,7 +56,7 @@ class HuggingFaceLLMService:
                         "return_full_text": False
                     }
                 }
-                response = requests.post(self.model_url, headers=headers, json=payload, timeout=10)
+                response = requests.post(self.model_url, headers=headers, json=payload, timeout=2.5)
                 if response.status_code == 200:
                     data = response.json()
                     if isinstance(data, list) and len(data) > 0:

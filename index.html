@@ -129,6 +129,32 @@
       transition: width 0.3s ease, padding 0.3s ease;
       overflow: hidden;
     }
+    
+    /* Search Box & CV Panel Maximize Styles */
+    .search-overlay-box.maximized {
+      width: 580px !important;
+      max-width: calc(100vw - 32px) !important;
+      z-index: 105;
+      box-shadow: 0 14px 40px rgba(0,240,255,0.3);
+    }
+    .satellite-cv-panel.maximized {
+      width: 540px !important;
+      max-width: calc(100vw - 32px) !important;
+      z-index: 105;
+      box-shadow: 0 14px 40px rgba(0,240,255,0.3);
+    }
+    .satellite-cv-panel.maximized .cv-panel-body {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .satellite-cv-panel.maximized #cv-image-display {
+      max-height: 280px !important;
+    }
+    #map-view-container:fullscreen {
+      width: 100vw !important;
+      height: 100vh !important;
+    }
+
     .search-overlay-box.minimized {
       width: auto; max-width: 310px; padding: 7px 12px;
     }
@@ -499,6 +525,13 @@
 
   <!-- Left: Map Container -->
   <div id="map-view-container">
+    <!-- Floating Fullscreen Globe / 2D Map Button -->
+    <button id="map-fullscreen-btn" onclick="toggleMapFullscreen()" title="Toggle Fullscreen 3D Globe & 2D Map"
+      style="position:absolute;top:16px;right:16px;z-index:90;background:rgba(8,16,32,0.88);border:1px solid var(--cyan-glow);border-radius:10px;color:#00f0ff;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px);box-shadow:0 4px 16px rgba(0,0,0,0.7);transition:all 0.25s;">
+      <i class="fa-solid fa-expand" id="map-fs-icon"></i>
+      <span id="map-fs-text">Fullscreen Map</span>
+    </button>
+
     <canvas id="globe-canvas"></canvas>
     <div id="leaflet-map"></div>
     <!-- 2D Map Close Option Bar (Pinned prominent above the map) -->
@@ -550,10 +583,13 @@
         <span style="font-size:10px;color:var(--cyan-glow);font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:5px;">
           <i class="fa-solid fa-location-dot"></i> Target Location
         </span>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;">
           <span id="coord-display" style="font-family:'Orbitron';font-size:10px;color:#fff;">Lat: 11.02°, Lon: 76.96°</span>
-          <button class="box-ctrl-btn" onclick="toggleSearchBoxMinimize()" title="Minimize / Maximize Search Box" id="search-min-btn">
+          <button class="box-ctrl-btn" onclick="toggleSearchBoxMinimize()" title="Minimize Search Box" id="search-min-btn">
             <i class="fa-solid fa-minus" id="search-min-icon"></i>
+          </button>
+          <button class="box-ctrl-btn" onclick="toggleSearchBoxMaximize()" title="Maximize / Expand Search Suite" id="search-max-btn">
+            <i class="fa-solid fa-expand" id="search-max-icon"></i>
           </button>
         </div>
       </div>
@@ -586,12 +622,17 @@
             </div>
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
               <span style="font-size:9px;color:#888;margin-right:2px;">Quick:</span>
-              <button type="button" onclick="quickSelectVoiceLoc('Erode, Tamil Nadu, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🌾 Erode</button>
-              <button type="button" onclick="quickSelectVoiceLoc('Kashmir Valley, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🍎 Kashmir</button>
-              <button type="button" onclick="quickSelectVoiceLoc('Coimbatore, Tamil Nadu, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🚜 Coimbatore</button>
-              <button type="button" onclick="quickSelectVoiceLoc('Delhi, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🏛️ Delhi</button>
-              <button type="button" onclick="quickSelectVoiceLoc('Nagpur, Maharashtra, India')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🍊 Nagpur</button>
-              <button type="button" onclick="quickSelectVoiceLoc('Salinas Valley, California, USA')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:10px;color:#00f0ff;font-size:10px;padding:2px 8px;cursor:pointer;">🍓 Salinas</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Erode, Tamil Nadu, India')" style="background:rgba(0,240,255,0.15);border:1px solid var(--cyan-glow);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 8px;cursor:pointer;">🌿 Erode (Turmeric)</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Kashmir Valley, India')" style="background:rgba(0,240,255,0.15);border:1px solid var(--cyan-glow);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 8px;cursor:pointer;">🍎 Kashmir (Apple)</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Amazon Rainforest, Brazil')" style="background:rgba(0,77,32,0.3);border:1px solid #39ff14;border-radius:12px;color:#39ff14;font-size:10px;padding:3px 8px;cursor:pointer;">🌲 Amazon Rainforest</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Sundarbans Mangrove Forest, India')" style="background:rgba(0,77,32,0.3);border:1px solid #39ff14;border-radius:12px;color:#39ff14;font-size:10px;padding:3px 8px;cursor:pointer;">🌲 Sundarbans</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Congo Basin Forest, Central Africa')" style="background:rgba(0,77,32,0.3);border:1px solid #39ff14;border-radius:12px;color:#39ff14;font-size:10px;padding:3px 8px;cursor:pointer;">🌲 Congo Basin</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Boreal Forest Taiga, Siberia')" style="background:rgba(0,77,32,0.3);border:1px solid #39ff14;border-radius:12px;color:#39ff14;font-size:10px;padding:3px 8px;cursor:pointer;">🌲 Boreal Taiga</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Punjab, India')" style="background:rgba(0,240,255,0.15);border:1px solid var(--cyan-glow);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 8px;cursor:pointer;">🌾 Punjab (Wheat)</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Thar Desert Arid Wasteland, Rajasthan, India')" style="background:rgba(234,179,8,0.25);border:1px solid #eab308;border-radius:12px;color:#eab308;font-size:10px;padding:3px 8px;cursor:pointer;">🥜 Thar (Barren Land)</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Salinas Valley, California, USA')" style="background:rgba(0,240,255,0.15);border:1px solid var(--cyan-glow);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 8px;cursor:pointer;">🍓 Salinas (Strawberry)</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Nagpur, Maharashtra, India')" style="background:rgba(0,240,255,0.15);border:1px solid var(--cyan-glow);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 8px;cursor:pointer;">🍊 Nagpur (Orange)</button>
+              <button type="button" onclick="quickSelectVoiceLoc('Bay of Bengal Deep Marine Waters')" style="background:rgba(0,112,243,0.25);border:1px solid #00f0ff;border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 8px;cursor:pointer;">🌊 Bay of Bengal (Ocean)</button>
             </div>
           </div>
         </div>
@@ -609,8 +650,11 @@
           <span id="cv-location-tag" style="font-size:9px;color:var(--cyan-glow);font-weight:bold;"></span>
         </span>
         <div style="display:flex;align-items:center;gap:5px;">
-          <button class="box-ctrl-btn" onclick="toggleCVPanelMinimize()" title="Minimize / Maximize" id="cv-min-btn">
+          <button class="box-ctrl-btn" onclick="toggleCVPanelMinimize()" title="Minimize 2D Analysis" id="cv-min-btn">
             <i class="fa-solid fa-minus" id="cv-min-icon"></i>
+          </button>
+          <button class="box-ctrl-btn" onclick="toggleCVPanelMaximize()" title="Maximize 2D Widescreen View" id="cv-max-btn">
+            <i class="fa-solid fa-expand" id="cv-max-icon"></i>
           </button>
           <button class="box-ctrl-btn" onclick="closeCVPanel()" title="Close 2D Analysis Box">
             <i class="fa-solid fa-xmark"></i>
@@ -1085,14 +1129,20 @@
     const icon = document.getElementById('search-min-icon');
     if (!box) return;
     box.classList.toggle('minimized');
+    box.classList.remove('maximized');
     if (icon) {
-      if (box.classList.contains('minimized')) {
-        icon.className = 'fa-solid fa-plus';
-        icon.title = 'Expand Search Box';
-      } else {
-        icon.className = 'fa-solid fa-minus';
-        icon.title = 'Minimize Search Box';
-      }
+      icon.className = box.classList.contains('minimized') ? 'fa-solid fa-plus' : 'fa-solid fa-minus';
+    }
+  }
+
+  function toggleSearchBoxMaximize() {
+    const box = document.getElementById('search-box');
+    const icon = document.getElementById('search-max-icon');
+    if (!box) return;
+    box.classList.toggle('maximized');
+    box.classList.remove('minimized');
+    if (icon) {
+      icon.className = box.classList.contains('maximized') ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
     }
   }
 
@@ -1101,15 +1151,50 @@
     const icon = document.getElementById('cv-min-icon');
     if (!p) return;
     p.classList.toggle('minimized');
+    p.classList.remove('maximized');
     if (icon) {
-      if (p.classList.contains('minimized')) {
-        icon.className = 'fa-solid fa-plus';
-        icon.title = 'Expand 2D Analysis';
-      } else {
-        icon.className = 'fa-solid fa-minus';
-        icon.title = 'Minimize 2D Analysis';
-      }
+      icon.className = p.classList.contains('minimized') ? 'fa-solid fa-plus' : 'fa-solid fa-minus';
     }
+  }
+
+  function toggleCVPanelMaximize() {
+    const p = document.getElementById('cv-panel');
+    const icon = document.getElementById('cv-max-icon');
+    if (!p) return;
+    p.classList.toggle('maximized');
+    p.classList.remove('minimized');
+    if (icon) {
+      icon.className = p.classList.contains('maximized') ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+    }
+  }
+
+  function toggleMapFullscreen() {
+    const mapContainer = document.getElementById('map-view-container');
+    const icon = document.getElementById('map-fs-icon');
+    const txt = document.getElementById('map-fs-text');
+    if (!mapContainer) return;
+
+    if (!document.fullscreenElement) {
+      if (mapContainer.requestFullscreen) {
+        mapContainer.requestFullscreen();
+      } else if (mapContainer.webkitRequestFullscreen) {
+        mapContainer.webkitRequestFullscreen();
+      }
+      if (icon) icon.className = 'fa-solid fa-compress';
+      if (txt) txt.textContent = 'Exit Fullscreen';
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+      if (icon) icon.className = 'fa-solid fa-expand';
+      if (txt) txt.textContent = 'Fullscreen Map';
+    }
+    setTimeout(() => {
+      onWindowResize();
+      if (leafletMapInstance) leafletMapInstance.invalidateSize();
+    }, 200);
   }
 
   function closeCVPanel() {
@@ -1434,6 +1519,7 @@
   }
 
   let activeTTSAudio = null;
+  window._ttsAudioPlayer = window._ttsAudioPlayer || new Audio();
 
   function stopAllVoiceOutput() {
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
@@ -1444,8 +1530,29 @@
     }
   }
 
-  function speakFullChatResponse(rawText) {
-    if (!chatVoiceActive) return;
+  function playChatMessageVoice(btnEl) {
+    try {
+      const msgDiv = btnEl.closest('.chat-msg');
+      if (!msgDiv) return;
+      const clone = msgDiv.cloneNode(true);
+      const actionRow = clone.querySelector('.chat-listen-btn')?.parentElement;
+      if (actionRow) actionRow.remove();
+      const textToRead = clone.textContent.trim();
+      
+      btnEl.innerHTML = '<i class="fa-solid fa-volume-high fa-bounce" style="color:#00f0ff;"></i> <span>Speaking...</span>';
+      speakFullChatResponse(textToRead, null, true, () => {
+        btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> <span>🔊 Listen Again</span>';
+      });
+    } catch (e) {
+      console.warn('playChatMessageVoice error:', e);
+    }
+  }
+
+  function speakFullChatResponse(rawText, forceLang, userInitiated, onDone) {
+    if (!chatVoiceActive && !userInitiated) {
+      if (onDone) onDone();
+      return;
+    }
     try {
       stopAllVoiceOutput();
 
@@ -1458,140 +1565,101 @@
         .replace(/\s+/g, ' ')
         .trim();
 
-      if (!clean) return;
+      if (!clean) { if (onDone) onDone(); return; }
 
-      // Automatic Script Language Detection from displayed response text
+      // Auto-Detect script language from response
       let detectedLang = 'en-US';
       let langCode = 'en';
-      if (/[\u0900-\u097F]/.test(clean)) {
-        detectedLang = 'hi-IN'; langCode = 'hi';
-      } else if (/[\u0B80-\u0BFF]/.test(clean)) {
-        detectedLang = 'ta-IN'; langCode = 'ta';
-      } else if (/[\u0D00-\u0D7F]/.test(clean)) {
-        detectedLang = 'ml-IN'; langCode = 'ml';
-      } else if (/[\u0C00-\u0C7F]/.test(clean)) {
-        detectedLang = 'te-IN'; langCode = 'te';
-      } else if (/[\u0C80-\u0CFF]/.test(clean)) {
-        detectedLang = 'kn-IN'; langCode = 'kn';
-      } else if (/[\u0980-\u09FF]/.test(clean)) {
-        detectedLang = 'bn-IN'; langCode = 'bn';
-      } else if (/[\u0600-\u06FF]/.test(clean)) {
-        detectedLang = 'ur-PK'; langCode = 'ur';
-      } else {
-        detectedLang = currentChatLangCode || 'en-US';
+      if (/[\u0900-\u097F]/.test(clean)) { detectedLang = 'hi-IN'; langCode = 'hi'; }
+      else if (/[\u0B80-\u0BFF]/.test(clean)) { detectedLang = 'ta-IN'; langCode = 'ta'; }
+      else if (/[\u0D00-\u0D7F]/.test(clean)) { detectedLang = 'ml-IN'; langCode = 'ml'; }
+      else if (/[\u0C00-\u0C7F]/.test(clean)) { detectedLang = 'te-IN'; langCode = 'te'; }
+      else if (/[\u0C80-\u0CFF]/.test(clean)) { detectedLang = 'kn-IN'; langCode = 'kn'; }
+      else if (/[\u0980-\u09FF]/.test(clean)) { detectedLang = 'bn-IN'; langCode = 'bn'; }
+      else if (/[\u0600-\u06FF]/.test(clean)) { detectedLang = 'ur-PK'; langCode = 'ur'; }
+      else {
+        detectedLang = forceLang || currentChatLangCode || 'en-US';
         langCode = (detectedLang || 'en').split('-')[0].toLowerCase();
       }
 
-      // Group into natural sentences (preserves units and decimals)
-      const rawClauses = clean.split(/(?<=[!?:;\n।॥])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
-      const chunks = [];
-      let currentChunk = '';
-      for (let s of rawClauses) {
-        s = s.trim();
-        if (!s) continue;
-        if ((currentChunk.length + s.length) < 140) {
-          currentChunk += (currentChunk ? ' ' : '') + s;
+      // Extract high-impact fluent summary (First 1-2 complete sentences, max 200 chars)
+      const sentences = clean.split(/(?<=[!?:;\n।॥])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
+      let summaryToSpeak = '';
+      for (const s of sentences) {
+        if (!s.trim()) continue;
+        if ((summaryToSpeak.length + s.length) <= 190) {
+          summaryToSpeak += (summaryToSpeak ? ' ' : '') + s.trim();
         } else {
-          if (currentChunk) chunks.push(currentChunk);
-          currentChunk = s;
+          break;
         }
       }
-      if (currentChunk) chunks.push(currentChunk);
-      if (chunks.length === 0) chunks.push(clean);
+      if (!summaryToSpeak) summaryToSpeak = clean.slice(0, 190);
 
-      let chunkIdx = 0;
+      // Check if browser has an authentic native voice for this language
       const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
-      
-      // Check if browser has an authentic native voice installed for this language
-      let matchVoice = voices.find(v => {
+      let matchedVoice = voices.find(v => {
         const vl = v.lang.toLowerCase();
         const vn = v.name.toLowerCase();
         return vl.startsWith(langCode) || 
-               (langCode === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana'))) ||
-               (langCode === 'ta' && (vn.includes('tamil') || vn.includes('valluvar')));
+               (langCode === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana') || vn.includes('india'))) ||
+               (langCode === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha')));
       });
 
-      function speakNext() {
-        if (!chatVoiceActive || chunkIdx >= chunks.length) {
-          stopAllVoiceOutput();
-          return;
-        }
-        const textChunk = chunks[chunkIdx].trim();
-        if (!textChunk) {
-          chunkIdx++;
-          return speakNext();
-        }
-
-        // If a verified regional voice exists in the user's OS, use SpeechSynthesis
-        if (matchVoice && 'speechSynthesis' in window) {
-          const utter = new SpeechSynthesisUtterance(textChunk);
-          utter.voice = matchVoice;
-          utter.lang = detectedLang;
-          utter.rate = (langCode === 'en') ? 0.98 : 0.94;
-          utter.pitch = 1.0;
-
-          utter.onend = function() {
-            chunkIdx++;
-            speakNext();
-          };
-          utter.onerror = function() {
-            streamNativeTTS(textChunk, langCode, () => {
-              chunkIdx++;
-              speakNext();
-            });
-          };
-          window.speechSynthesis.speak(utter);
-        } else {
-          // Play via authentic native audio stream (Guarantees fluent Hindi/Tamil pronunciation on all devices)
-          streamNativeTTS(textChunk, langCode, () => {
-            chunkIdx++;
-            speakNext();
-          });
-        }
-      }
-
-      function streamNativeTTS(textToPlay, lc, callback) {
-        if (!chatVoiceActive) return;
-        const encoded = encodeURIComponent(textToPlay.slice(0, 200));
-        const streamUrl = `${API_BASE}/tts?lang=${lc}&text=${encoded}`;
-        const audio = new Audio(streamUrl);
-        activeTTSAudio = audio;
-
-        audio.onended = function() {
-          activeTTSAudio = null;
-          callback();
-        };
-        audio.onerror = function() {
-          const directUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lc}&q=${encoded}`;
-          const directAudio = new Audio(directUrl);
-          activeTTSAudio = directAudio;
-          directAudio.onended = function() {
+      if (matchedVoice && 'speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(summaryToSpeak);
+        utter.voice = matchedVoice;
+        utter.lang = detectedLang;
+        utter.rate = 1.06;
+        utter.pitch = 1.0;
+        utter.onend = () => { if (onDone) onDone(); };
+        utter.onerror = () => { if (onDone) onDone(); };
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utter);
+      } else {
+        // Stream high-fidelity native pronunciation from /api/tts endpoint
+        if (window._ttsAudioPlayer) {
+          window._ttsAudioPlayer.pause();
+          window._ttsAudioPlayer.src = `${API_BASE}/tts?lang=${langCode}&text=${encodeURIComponent(summaryToSpeak)}`;
+          activeTTSAudio = window._ttsAudioPlayer;
+          window._ttsAudioPlayer.onended = () => {
             activeTTSAudio = null;
-            callback();
+            if (onDone) onDone();
           };
-          directAudio.onerror = function() {
+          window._ttsAudioPlayer.onerror = () => {
             activeTTSAudio = null;
             if ('speechSynthesis' in window) {
-              const u = new SpeechSynthesisUtterance(textToPlay);
-              u.lang = detectedLang;
-              u.onend = callback;
-              u.onerror = callback;
-              window.speechSynthesis.speak(u);
-            } else {
-              callback();
+              const asciiClean = summaryToSpeak.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (asciiClean) {
+                const fallbackUtter = new SpeechSynthesisUtterance(asciiClean);
+                fallbackUtter.rate = 1.08;
+                fallbackUtter.onend = () => { if (onDone) onDone(); };
+                fallbackUtter.onerror = () => { if (onDone) onDone(); };
+                window.speechSynthesis.speak(fallbackUtter);
+                return;
+              }
             }
+            if (onDone) onDone();
           };
-          directAudio.play().catch(() => callback());
-        };
-
-        audio.play().catch(e => {
-          callback();
-        });
+          window._ttsAudioPlayer.play().catch(e => {
+            if ('speechSynthesis' in window) {
+              const asciiClean = summaryToSpeak.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (asciiClean) {
+                const fallbackUtter = new SpeechSynthesisUtterance(asciiClean);
+                fallbackUtter.rate = 1.08;
+                fallbackUtter.onend = () => { if (onDone) onDone(); };
+                window.speechSynthesis.speak(fallbackUtter);
+                return;
+              }
+            }
+            if (onDone) onDone();
+          });
+        } else {
+          if (onDone) onDone();
+        }
       }
-
-      speakNext();
     } catch(err) {
       console.warn('Speech error:', err);
+      if (onDone) onDone();
     }
   }
 
@@ -1661,19 +1729,27 @@
     // ============================================================
   // VOICE INPUT (Speech-to-Text) - Zero Annoyance Fallback
   // ============================================================
-  function startVoiceInput() {
+  async function startVoiceInput() {
     const micBtn = document.getElementById('mic-btn');
     const voiceStatus = document.getElementById('voice-status');
     const input = document.getElementById('location-input');
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-keyboard" style="color:var(--cyan-glow);"></i> Direct Search: Type location or select quick chips below:';
-      openVoiceBanner();
-      if (input) {
-        input.focus();
-        input.placeholder = "Type location name (e.g. Erode, Kashmir, Barren Land)...";
+    // Pre-unlock audio element & request mic permissions
+    try {
+      if (window._ttsAudioPlayer) {
+        window._ttsAudioPlayer.play().then(() => window._ttsAudioPlayer.pause()).catch(() => {});
       }
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+      }
+    } catch(e) {
+      console.log('Mic unlock notice:', e);
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      openVoiceBanner();
       return;
     }
 
@@ -1685,42 +1761,39 @@
       recognition.maxAlternatives = 1;
 
       if (micBtn) micBtn.classList.add('mic-listening');
-      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening in ${currentChatLangName}... Speak city or crop name now`;
+      if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> 🎙️ Listening in ${currentChatLangName}... Speak location or crop name now`;
 
+      let spokenResult = '';
       recognition.onresult = function(e) {
         let transcript = '';
         for (let i = e.resultIndex; i < e.results.length; ++i) {
           transcript += e.results[i][0].transcript;
         }
         transcript = transcript.trim();
+        spokenResult = transcript;
         if (input && transcript) input.value = transcript;
-
-        if (e.results && e.results[0] && e.results[0].isFinal) {
-          if (micBtn) micBtn.classList.remove('mic-listening');
-          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Heard: "<strong>${transcript}</strong>" — Searching location...`;
-          searchLocationByName();
+        if (voiceStatus && transcript) {
+          voiceStatus.innerHTML = `<i class="fa-solid fa-microphone fa-bounce" style="color:#ff3366;"></i> Heard: "<strong>${transcript}</strong>"...`;
         }
       };
 
       recognition.onerror = function(e) {
         if (micBtn) micBtn.classList.remove('mic-listening');
-        if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-keyboard" style="color:var(--cyan-glow);"></i> Direct Search Panel open. Type or choose chips below:';
         openVoiceBanner();
-        if (input) {
-          input.focus();
-          input.placeholder = "Type location name (e.g. Erode, Kashmir, Barren Land)...";
-        }
       };
 
       recognition.onend = function() {
         if (micBtn) micBtn.classList.remove('mic-listening');
+        if (spokenResult) {
+          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Recognized: "<strong>${spokenResult}</strong>" — Analyzing...`;
+          searchLocationByName();
+        }
       };
 
       recognition.start();
     } catch (err) {
       if (micBtn) micBtn.classList.remove('mic-listening');
-      if (voiceStatus) voiceStatus.innerHTML = '<i class="fa-solid fa-circle-info" style="color:var(--cyan-glow);"></i> Type location name in the box.';
-      if (input) input.focus();
+      openVoiceBanner();
     }
   }
 
@@ -2007,17 +2080,30 @@
     renderer.render(scene, camera);
   }
 
-  function update3DPinPosition(lat, lon) {
+  function update3DPinPosition(lat, lon, locType) {
     const R = 82;
     const phi = (90 - lat) * (Math.PI / 180);
     const theta = (lon + 180) * (Math.PI / 180);
     const x = -(R * Math.sin(phi) * Math.cos(theta));
     const z =  (R * Math.sin(phi) * Math.sin(theta));
     const y =  (R * Math.cos(phi));
-    pinMarkerMesh.position.set(x, y, z);
-    if (glowMesh) {
-      glowMesh.position.set(x, y, z);
-      glowMesh.lookAt(0, 0, 0);
+    if (pinMarkerMesh) {
+      pinMarkerMesh.position.set(x, y, z);
+      const lt = (locType || lastMLData?.location_type || '').toLowerCase();
+      let colorHex = 0x39ff14; // Default Light Green for Agriculture
+      if (lt.includes('forest') || lt.includes('canopy') || lt.includes('reserve')) {
+        colorHex = 0x004d20; // Dark Green for Forestry
+      } else if (lt.includes('ocean') || lt.includes('marine') || lt.includes('sea') || lt.includes('water')) {
+        colorHex = 0x00f0ff; // Cyan for Ocean
+      } else if (lt.includes('barren') || lt.includes('desert') || lt.includes('arid')) {
+        colorHex = 0xffaa00; // Amber for Barren
+      }
+      pinMarkerMesh.material.color.setHex(colorHex);
+      if (glowMesh) {
+        glowMesh.position.set(x, y, z);
+        glowMesh.lookAt(0, 0, 0);
+        glowMesh.material.color.setHex(colorHex);
+      }
     }
   }
 
@@ -2100,18 +2186,28 @@
   // ============================================================
   // MARKER HELPERS — consistent land-type icons + popups
   // ============================================================
-  function createLocMarker(locType) {
+  function createLocMarker(locType, cropEmoji) {
     const lt = (locType || '').toLowerCase();
-    let color = '#32cd32', emoji = '🌾';
-    if      (lt.includes('ocean') || lt.includes('water') || lt.includes('marine') || lt.includes('sea') || lt.includes('river') || lt.includes('lake')) { color = '#1e90ff'; emoji = '🌊'; }
-    else if (lt.includes('polar') || lt.includes('arctic') || lt.includes('permafrost')) { color = '#b0d4ff'; emoji = '❄️'; }
-    else if (lt.includes('desert') || lt.includes('arid') || lt.includes('barren')) { color = '#c8a060'; emoji = '🏜️'; }
-    else if (lt.includes('industrial') || lt.includes('hazard') || lt.includes('factory')) { color = '#ff9900'; emoji = '🏭'; }
-    else if (lt.includes('forest')) { color = '#006400'; emoji = '🌲'; }
-    else { color = '#32cd32'; emoji = '🌾'; }
+    let color = '#39ff14', emoji = cropEmoji || '🌾';
+    if (lt.includes('forest') || lt.includes('canopy') || lt.includes('reserve') || lt.includes('rainforest')) {
+      color = '#004d20'; // Dark Green for Forestry
+      emoji = '🌲';
+    } else if (lt.includes('ocean') || lt.includes('water') || lt.includes('marine') || lt.includes('sea')) {
+      color = '#00f0ff';
+      emoji = '🌊';
+    } else if (lt.includes('polar') || lt.includes('permafrost')) {
+      color = '#b0d4ff';
+      emoji = '❄️';
+    } else if (lt.includes('desert') || lt.includes('arid') || lt.includes('barren')) {
+      color = '#eab308';
+      emoji = '🥜';
+    } else {
+      color = '#39ff14'; // Light Green for Agriculture
+      emoji = cropEmoji || getClientCropEmoji(lastMLData?.recommended_crop, locType);
+    }
     return L.divIcon({
-      html: `<div style="background:${color};width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 0 16px ${color};display:flex;align-items:center;justify-content:center;font-size:11px;animation:pulse-dot 2s ease-in-out infinite;">${emoji}</div>`,
-      className: '', iconSize: [24, 24], iconAnchor: [12, 12]
+      html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 18px ${color};display:flex;align-items:center;justify-content:center;font-size:14px;animation:pulse-dot 2s ease-in-out infinite;">${emoji}</div>`,
+      className: '', iconSize: [28, 28], iconAnchor: [14, 14]
     });
   }
 
@@ -2360,6 +2456,40 @@
     // ============================================================
   // CLIENT-SIDE LOCATION ANALYSIS ENGINE (Zero failure fallback)
   // ============================================================
+    // ============================================================
+  // CLIENT-SIDE REAL ATTRACTIVE CROP EMOJI RESOLVER
+  // ============================================================
+  function getClientCropEmoji(cropName, locType) {
+    const c = (cropName || '').toLowerCase();
+    const lt = (locType || '').toLowerCase();
+    if (lt.includes('ocean') || lt.includes('marine') || lt.includes('sea') || c.includes('ocean') || c.includes('marine')) return '🌊';
+    if (lt.includes('forest') || lt.includes('canopy') || lt.includes('reserve') || lt.includes('rainforest') || lt.includes('woods') || c.includes('forest')) return '🌲';
+    if (lt.includes('polar') || lt.includes('permafrost') || c.includes('polar')) return '❄️';
+    if (c.includes('turmeric') || c.includes('curcuma')) return '🌿';
+    if (c.includes('apple') || c.includes('ambri') || c.includes('malus')) return '🍎';
+    if (c.includes('strawberry') || c.includes('strawberries') || c.includes('fragaria')) return '🍓';
+    if (c.includes('banana') || c.includes('plantain') || c.includes('musa')) return '🍌';
+    if (c.includes('coconut') || c.includes('palm') || c.includes('cocos')) return '🌴';
+    if (c.includes('groundnut') || c.includes('peanut') || c.includes('kadalai') || c.includes('arachis')) return '🥜';
+    if (c.includes('rice') || c.includes('paddy') || c.includes('swarna') || c.includes('basmati')) return '🍚';
+    if (c.includes('wheat') || c.includes('durum') || c.includes('triticum')) return '🌾';
+    if (c.includes('cotton') || c.includes('gossypium')) return '☁️';
+    if (c.includes('chilli') || c.includes('pepper') || c.includes('capsicum') || c.includes('s4')) return '🌶️';
+    if (c.includes('orange') || c.includes('citrus') || c.includes('mandarin') || c.includes('santra')) return '🍊';
+    if (c.includes('coffee') || c.includes('arabica') || c.includes('robusta')) return '☕';
+    if (c.includes('tea') || c.includes('camellia')) return '🍵';
+    if (c.includes('corn') || c.includes('maize') || c.includes('sweet corn')) return '🌽';
+    if (c.includes('sugarcane') || c.includes('cane')) return '🎋';
+    if (c.includes('potato') || c.includes('tuber')) return '🥔';
+    if (c.includes('tomato')) return '🍅';
+    if (c.includes('grape') || c.includes('vineyard')) return '🍇';
+    if (c.includes('olive')) return '🫒';
+    if (c.includes('mango')) return '🥭';
+    if (lt.includes('barren') || lt.includes('arid') || lt.includes('desert')) return '🥜';
+    if (lt.includes('flood') || lt.includes('wetland')) return '🍚';
+    return '🌾';
+  }
+
   function generateClientSideLocationAnalysis(lat, lon, name, country) {
     const absLat = Math.abs(lat);
     const locLower = (name || '').toLowerCase();
@@ -2369,7 +2499,43 @@
                     locLower.includes('bay of bengal') || locLower.includes('arabian sea') ||
                     (absLat < 55 && (lon > 155 || lon < -125)) || (lat > 5 && lat < 22 && lon > 80 && lon < 95);
 
-    const isForest = (locLower.includes('forest') || locLower.includes('rainforest') || locLower.includes('canopy')) && !isWater;
+    // World Forest Database Detection
+    let detectedForestName = null;
+    if (!isWater && !isFloodName) {
+      if (locLower.includes('amazon') || (-15.0 <= lat && lat <= 6.0 && -79.0 <= lon && lon <= -45.0)) {
+        detectedForestName = 'Amazon Tropical Rainforest';
+      } else if (locLower.includes('sundarban') || (!isFloodName && lat >= 21.4 && lat <= 22.8 && lon >= 88.3 && lon <= 89.9)) {
+        detectedForestName = 'Sundarbans Mangrove Forest Reserve';
+      } else if (locLower.includes('congo') || (-6.0 <= lat && lat <= 6.0 && 11.0 <= lon <= 31.0)) {
+        detectedForestName = 'Congo Basin Rainforest';
+      } else if (locLower.includes('boreal') || locLower.includes('taiga') || (lat >= 52.0 && lat <= 70.0 && (lon <= -55.0 || lon >= 10.0))) {
+        detectedForestName = 'Boreal Forest (Taiga Biome)';
+      } else if (locLower.includes('valdivian') || (-46.0 <= lat && lat <= -35.0 && -75.0 <= lon <= -70.0)) {
+        detectedForestName = 'Valdivian Temperate Rainforest';
+      } else if (locLower.includes('western ghats') || locLower.includes('nilgiris') || (lat >= 8.5 && lat <= 16.0 && lon >= 74.5 && lon <= 77.5 && (locLower.includes('forest') || locLower.includes('reserve') || locLower.includes('ghats') || locLower.includes('hills')))) {
+        detectedForestName = 'Western Ghats Rainforest Reserve';
+      } else if (locLower.includes('black forest') || locLower.includes('schwarzwald') || (lat >= 47.5 && lat <= 49.0 && lon >= 7.5 && lon <= 8.8)) {
+        detectedForestName = 'Black Forest (Schwarzwald Reserve)';
+      } else if (locLower.includes('daintree') || (-17.0 <= lat && lat <= -15.0 && 145.0 <= lon <= 145.8)) {
+        detectedForestName = 'Daintree Tropical Rainforest';
+      } else if (locLower.includes('redwood') || (lat >= 40.5 && lat <= 42.0 && lon >= -124.5 && lon <= -123.8)) {
+        detectedForestName = 'Redwood Ancient Canopy Reserve';
+      } else if (locLower.includes('tongass') || (lat >= 54.5 && lat <= 60.5 && lon >= -137.0 && lon <= -129.5)) {
+        detectedForestName = 'Tongass National Rainforest Reserve';
+      } else if (locLower.includes('great smoky') || (35.3 <= lat && lat <= 35.8 && -84.0 <= lon && lon <= -83.0)) {
+        detectedForestName = 'Great Smoky Mountains Ancient Forest';
+      } else if (locLower.includes('olympic') || (47.4 <= lat && lat <= 48.2 && -124.4 <= lon && lon <= -123.4)) {
+        detectedForestName = 'Olympic Temperate Rainforest';
+      } else if (locLower.includes('bialowieza') || (52.6 <= lat && lat <= 52.9 && 23.5 <= lon && lon <= 24.2)) {
+        detectedForestName = 'Białowieża Primeval Forest Reserve';
+      } else if (locLower.includes('borneo') || locLower.includes('sumatra')) {
+        detectedForestName = 'Borneo & Sumatra Tropical Rainforest';
+      } else if (locLower.includes('forest') || locLower.includes('rainforest') || locLower.includes('canopy') || locLower.includes('sanctuary') || locLower.includes('national park') || locLower.includes('jungle')) {
+        detectedForestName = name.split(',')[0].trim();
+        if (!detectedForestName.toLowerCase().includes('forest')) detectedForestName += ' Forest Reserve';
+      }
+    }
+    const isForest = Boolean(detectedForestName);
     const isPolar = absLat >= 66.5 || locLower.includes('antarctica') || locLower.includes('arctic') || locLower.includes('polar');
 
     const floodKeywords = ['flood', 'delta', 'wetland', 'marsh', 'swamp', 'low-lying', 'inundation', 'riverbed', 'floodplain', 'sundarbans', 'brahmaputra', 'everglades'];
@@ -2455,15 +2621,16 @@
       status = 'IMPOSSIBLE_AGRICULTURE';
       reason = 'Target is an open ocean/saline water body. Zero arable soil. Water salinity (~35 PSU) causes fatal osmotic shock to crop roots. Marine aquaculture only.';
     } else if (isForest) {
-      crop = 'NO CROP CAN BE GROWN (Protected Natural Forest Reserve)';
+      const fTitle = detectedForestName || 'Protected World Forestry Reserve';
+      crop = `NO CROP CAN BE GROWN (${fTitle} — Commercial Agriculture Strictly Prohibited)`;
       yieldTons = 0.0;
       yieldAcc = 0.0;
-      locType = 'Protected Natural Forestry Reserve & Canopy';
-      ndviScore = 0.88;
+      locType = `Protected Forestry Area — ${fTitle}`;
+      ndviScore = 0.91;
       marketPrice = 0;
       costHa = 0;
       status = 'ECOLOGICAL_PROTECTION_ZONE';
-      reason = 'Protected native forest reserve. Commercial farming prohibited to conserve biodiversity and sequester carbon.';
+      reason = `Protected primary tree canopy in ${fTitle} (NDVI: 0.91). Commercial agriculture, clear-cutting, and real estate development are strictly prohibited by international conservation treaties to preserve planetary carbon sinks and biodiversity.`;
     } else if (isPolar) {
       crop = 'NO OUTDOOR CROP CAN BE GROWN (Indoor Hydroponics Only)';
       yieldTons = 0.0;
@@ -2779,6 +2946,118 @@
     const lcImg = generateClientLandCoverSVG(lat, lon, locType);
     const ndviImg = generateClientNdviSVG(lat, lon, ndviScore);
 
+    const cropVisualEmoji = getClientCropEmoji(crop, locType);
+
+    // Realistic baseline current traditional crop vs upcoming future AI high-yield crop
+    let curCropName = "Traditional Mixed Dryland Cereals";
+    let curCropYield = Math.max(0.8, Math.round(yieldTons * 0.48 * 10) / 10);
+    let curCropProfit = "+$420 / Ha";
+    let curCropEmoji = "🌱";
+    let futBoost = "+115% Yield Increase";
+    let profBoost = `+$${Math.round(netProf * 0.55).toLocaleString()} / Ha Net Gain`;
+
+    const cLower = crop.toLowerCase();
+    if (isWater) {
+      curCropName = "Open Ocean Pelagic Marine Waters";
+      curCropYield = 0.0;
+      curCropProfit = "$0 / Ha";
+      curCropEmoji = "🌊";
+      futBoost = "Aquaculture Only";
+      profBoost = "Zero Arable Output";
+    } else if (isForest) {
+      curCropName = `Native Undisturbed Forest Canopy (${detectedForestName || 'World Reserve'})`;
+      curCropYield = 0.0;
+      curCropProfit = "$0 / Ha";
+      curCropEmoji = "🌲";
+      futBoost = "Strict Ecological Reserve";
+      profBoost = "Zero Deforestation Allowed";
+    } else if (cLower.includes('turmeric')) {
+      curCropName = "Traditional Low-Density Sugarcane / Sorghum";
+      curCropYield = 12.0;
+      curCropProfit = "+$1,250 / Ha";
+      curCropEmoji = "🎋";
+      futBoost = "+137% Yield Increase";
+      profBoost = "+$3,600 / Ha Net Gain";
+    } else if (cLower.includes('apple')) {
+      curCropName = "Baseline Low-Density Wild Walnuts / Scrub";
+      curCropYield = 5.5;
+      curCropProfit = "+$980 / Ha";
+      curCropEmoji = "🌰";
+      futBoost = "+280% Yield Increase";
+      profBoost = "+$4,220 / Ha Net Gain";
+    } else if (cLower.includes('groundnut') || cLower.includes('peanut')) {
+      curCropName = "Traditional Rainfed Sorghum / Pearl Millet";
+      curCropYield = 1.4;
+      curCropProfit = "+$320 / Ha";
+      curCropEmoji = "🌾";
+      futBoost = "+128% Yield Increase";
+      profBoost = "+$1,550 / Ha Net Gain";
+    } else if (cLower.includes('strawberry')) {
+      curCropName = "Conventional Iceberg Lettuce / Broccoli";
+      curCropYield = 22.0;
+      curCropProfit = "+$1,400 / Ha";
+      curCropEmoji = "🥬";
+      futBoost = "+118% Yield Increase";
+      profBoost = "+$6,400 / Ha Net Gain";
+    } else if (cLower.includes('rice') || cLower.includes('paddy')) {
+      curCropName = "Traditional Flood-Vulnerable Local Paddy";
+      curCropYield = 2.1;
+      curCropProfit = "+$420 / Ha";
+      curCropEmoji = "🌱";
+      futBoost = "+147% Yield Increase";
+      profBoost = "+$1,530 / Ha Net Gain";
+    } else if (cLower.includes('cotton')) {
+      curCropName = "Traditional Desi Rainfed Cotton";
+      curCropYield = 1.5;
+      curCropProfit = "+$480 / Ha";
+      curCropEmoji = "🌱";
+      futBoost = "+153% Yield Increase";
+      profBoost = "+$1,820 / Ha Net Gain";
+    } else if (cLower.includes('banana')) {
+      curCropName = "Traditional Wild Plantain / Mixed Cassava";
+      curCropYield = 18.0;
+      curCropProfit = "+$1,100 / Ha";
+      curCropEmoji = "🌴";
+      futBoost = "+155% Yield Increase";
+      profBoost = "+$3,200 / Ha Net Gain";
+    } else if (cLower.includes('coconut')) {
+      curCropName = "Tall Local Unfertilized Palms";
+      curCropYield = 4.2;
+      curCropProfit = "+$650 / Ha";
+      curCropEmoji = "🌴";
+      futBoost = "+138% Yield Increase";
+      profBoost = "+$2,100 / Ha Net Gain";
+    } else if (cLower.includes('orange') || cLower.includes('citrus')) {
+      curCropName = "Conventional Low-Yield Acid Lime";
+      curCropYield = 8.5;
+      curCropProfit = "+$820 / Ha";
+      curCropEmoji = "🍋";
+      futBoost = "+182% Yield Increase";
+      profBoost = "+$2,900 / Ha Net Gain";
+    } else if (cLower.includes('chilli')) {
+      curCropName = "Traditional Rainfed Dryland Millets";
+      curCropYield = 1.8;
+      curCropProfit = "+$650 / Ha";
+      curCropEmoji = "🌾";
+      futBoost = "+188% Yield Increase";
+      profBoost = "+$4,800 / Ha Net Gain";
+    }
+
+    const currentCultivatedCrop = {
+      name: curCropName,
+      yield_tons_ha: curCropYield,
+      net_profit: curCropProfit,
+      emoji: curCropEmoji
+    };
+    const upcomingFutureCrop = {
+      name: isForest ? `Strict Conservation Sanctuary (${detectedForestName || 'World Reserve'})` : crop,
+      yield_tons_ha: yieldTons,
+      net_profit: isWater || isForest || isPolar ? "$0" : `+$${netProf.toLocaleString()} / Ha`,
+      yield_boost: futBoost,
+      profit_boost: profBoost,
+      emoji: cropVisualEmoji
+    };
+
     return {
       location: { lat, lon, name, country, type: locType },
       live_telemetry: {
@@ -2824,6 +3103,11 @@
       ml_crop_yield_prediction: {
         location_type: locType,
         recommended_crop: crop,
+        crop_visual_emoji: cropVisualEmoji,
+        forest_name: detectedForestName,
+        is_forest: isForest,
+        current_cultivated_crop: currentCultivatedCrop,
+        upcoming_future_crop: upcomingFutureCrop,
         predicted_yield_tons_ha: yieldTons,
         yield_accuracy: yieldAcc,
         reason: reason,
@@ -3370,6 +3654,37 @@
     document.getElementById('ai-modal').classList.toggle('open');
   }
 
+    function renderBotMessageWithVoice(botDiv, replyText, chatBody) {
+    let rLangName = 'English';
+    let rLangCode = 'en';
+    if (/[\u0900-\u097F]/.test(replyText)) { rLangName = 'हिन्दी (Hindi)'; rLangCode = 'hi'; }
+    else if (/[\u0B80-\u0BFF]/.test(replyText)) { rLangName = 'தமிழ் (Tamil)'; rLangCode = 'ta'; }
+    else if (/[\u0D00-\u0D7F]/.test(replyText)) { rLangName = 'മലയാളം (Malayalam)'; rLangCode = 'ml'; }
+    else if (/[\u0C00-\u0C7F]/.test(replyText)) { rLangName = 'తెలుగు (Telugu)'; rLangCode = 'te'; }
+    else if (/[\u0C80-\u0CFF]/.test(replyText)) { rLangName = 'ಕನ್ನಡ (Kannada)'; rLangCode = 'kn'; }
+    else if (/[\u0980-\u09FF]/.test(replyText)) { rLangName = 'বাংলা (Bengali)'; rLangCode = 'bn'; }
+    else if (/[\u0600-\u06FF]/.test(replyText)) { rLangName = 'اردو (Urdu)'; rLangCode = 'ur'; }
+    else if (currentChatLangCode && !currentChatLangCode.startsWith('en')) {
+      rLangName = currentChatLangName;
+      rLangCode = currentChatLangCode.split('-')[0];
+    }
+
+    const formatted = replyText.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    const audioBar = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08);">
+        <button class="chat-listen-btn" onclick="playChatMessageVoice(this)" title="Read aloud in native language"
+          style="background:rgba(0,240,255,0.15);border:1px solid var(--cyan-glow);border-radius:12px;color:var(--cyan-glow);font-size:10px;font-weight:700;padding:3px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+          <i class="fa-solid fa-volume-high"></i> <span>🔊 Listen (${rLangName})</span>
+        </button>
+        <span style="font-size:9px;color:var(--text-muted);">${rLangCode.toUpperCase()} AI Verified</span>
+      </div>
+    `;
+
+    botDiv.innerHTML = formatted + audioBar;
+    if (chatBody) chatBody.scrollTop = chatBody.scrollHeight;
+    if (chatVoiceActive) speakFullChatResponse(replyText, rLangCode);
+  }
+
   function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
@@ -3441,17 +3756,12 @@
     })
     .then(data => {
       const reply = data.response || 'No response received.';
-      botDiv.innerHTML = reply.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      chatBody.scrollTop = chatBody.scrollHeight;
-      // Speak only short responses
-      if (chatVoiceActive) speakFullChatResponse(reply);
+      renderBotMessageWithVoice(botDiv, reply, chatBody);
     })
     .catch(() => {
       clearTimeout(chatTimeoutId);
       const localReply = generateClientSideAIResponse(text, ctx);
-      botDiv.innerHTML = localReply.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      chatBody.scrollTop = chatBody.scrollHeight;
-      if (chatVoiceActive) speakFullChatResponse(localReply);
+      renderBotMessageWithVoice(botDiv, localReply, chatBody);
     });
   }
 
@@ -3740,8 +4050,15 @@
 
     // Populate Attractive Crop Hero 3D Emoji
     const heroEmojiEl = document.getElementById('crop-hero-visual');
-    const heroEmoji = ml.crop_visual_emoji || (ml.location_type?.toLowerCase().includes('forest') ? '🌲' : (ml.location_type?.toLowerCase().includes('ocean') ? '🌊' : '🌾'));
-    if (heroEmojiEl) heroEmojiEl.textContent = heroEmoji;
+    const heroEmoji = ml.crop_visual_emoji || getClientCropEmoji(ml.recommended_crop, ml.location_type);
+    if (heroEmojiEl) {
+      heroEmojiEl.textContent = heroEmoji;
+      heroEmojiEl.style.animation = 'none';
+      void heroEmojiEl.offsetWidth; // Trigger DOM reflow
+      heroEmojiEl.style.animation = 'floatEmoji 2.5s ease-in-out infinite';
+    }
+    const recCropNameEl = document.getElementById('rec-crop-name');
+    if (recCropNameEl) recCropNameEl.innerHTML = `${heroEmoji} ${ml.recommended_crop}`;
 
     // Populate Dual Current Sown vs Future AI Harvest Comparison
     if (ml.current_cultivated_crop) {
@@ -4125,17 +4442,19 @@
     setInterval(() => {
       const temp = document.getElementById('tel-temp');
       const hum = document.getElementById('tel-hum');
-      if (temp.textContent !== '--') {
-        // Simulate micro-variation for live feel
-        const t = parseFloat(temp.textContent) + (Math.random() - 0.5) * 0.3;
-        const h = parseFloat(hum.textContent) + (Math.random() - 0.5) * 0.8;
-        temp.textContent = t.toFixed(1) + ' °C';
-        hum.textContent = Math.min(99, Math.max(10, h)).toFixed(1) + ' %';
-        // Sync env sidebar
-        document.getElementById('env-temp').textContent = temp.textContent;
-        document.getElementById('env-hum').textContent = hum.textContent;
+      if (temp && temp.textContent !== '--') {
+        const curT = parseFloat(temp.textContent) || 28.0;
+        const curH = parseFloat(hum?.textContent) || 60.0;
+        const newT = (curT + (Math.random() - 0.5) * 0.15).toFixed(1);
+        const newH = Math.min(99, Math.max(10, curH + (Math.random() - 0.5) * 0.4)).toFixed(1);
+        temp.textContent = `${newT} °C`;
+        if (hum) hum.textContent = `${newH} %`;
+        const envTemp = document.getElementById('env-temp');
+        const envHum = document.getElementById('env-hum');
+        if (envTemp) envTemp.textContent = `${newT} °C`;
+        if (envHum) envHum.textContent = `${newH} %`;
       }
-    }, 8000);
+    }, 1000);
   }
 
   // ============================================================

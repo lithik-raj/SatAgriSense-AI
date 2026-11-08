@@ -241,7 +241,7 @@ def fetch_live_weather(lat, lon):
             f"&hourly=soil_moisture_0_to_7cm"
             f"&forecast_days=1"
         )
-        resp = requests.get(url, timeout=8)
+        resp = requests.get(url, timeout=2.0)
         if resp.status_code == 200:
             d = resp.json()
             cur = d.get("current", {})
@@ -380,11 +380,13 @@ def get_crop_knowledge():
     return jsonify({"knowledge": knowledge})
 
 
+_tts_cache = {}
+
 @app.route("/api/tts", methods=["GET"])
 @app.route("/tts", methods=["GET"])
 def tts_stream():
     """
-    High-fidelity native audio streaming endpoint.
+    High-fidelity native audio streaming endpoint with in-memory caching.
     Streams authentic native pronunciation for Hindi, Tamil, Telugu, Malayalam,
     Kannada, Bengali, Urdu, Spanish, French, English, etc.
     Guarantees authentic regional audio playback even on devices without local voice packs.
@@ -396,27 +398,35 @@ def tts_stream():
         return jsonify({"error": "Missing text"}), 400
 
     # Auto-detect script if text contains non-Latin characters
-    if re.search(r"[\u0900-\u097F]", text):
+    if re.search(r"[ऀ-ॿ]", text):
         lang = "hi"
-    elif re.search(r"[\u0B80-\u0BFF]", text):
+    elif re.search(r"[஀-௿]", text):
         lang = "ta"
-    elif re.search(r"[\u0D00-\u0D7F]", text):
+    elif re.search(r"[ഀ-ൿ]", text):
         lang = "ml"
-    elif re.search(r"[\u0C00-\u0C7F]", text):
+    elif re.search(r"[ఀ-౿]", text):
         lang = "te"
-    elif re.search(r"[\u0C80-\u0CFF]", text):
+    elif re.search(r"[ಀ-೿]", text):
         lang = "kn"
-    elif re.search(r"[\u0980-\u09FF]", text):
+    elif re.search(r"[ঀ-৿]", text):
         lang = "bn"
-    elif re.search(r"[\u0600-\u06FF]", text):
+    elif re.search(r"[؀-ۿ]", text):
         lang = "ur"
     else:
         lang = lang.split("-")[0]
 
+    cache_key = f"{lang}:{text[:200]}"
+    if cache_key in _tts_cache:
+        from flask import Response
+        return Response(_tts_cache[cache_key], mimetype="audio/mpeg", headers={"Cache-Control": "public, max-age=86400"})
+
     try:
         url = f"https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl={lang}&q={requests.utils.quote(text[:220])}"
-        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
-        if resp.status_code == 200:
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3.5)
+        if resp.status_code == 200 and len(resp.content) > 300:
+            if len(_tts_cache) > 300:
+                _tts_cache.clear()
+            _tts_cache[cache_key] = resp.content
             from flask import Response
             return Response(resp.content, mimetype="audio/mpeg", headers={"Cache-Control": "public, max-age=86400"})
     except Exception as e:
