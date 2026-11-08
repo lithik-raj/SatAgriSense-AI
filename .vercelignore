@@ -1,6 +1,12 @@
-# Vercel ignore — do not deploy these files
-backend/__pycache__/
-backend/*.db
-backend/*.pyc
+# Vercel Deployment Ignore Rules
+**/__pycache__/**
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 *.bat
-.gitignore
+verify_*.py
+test_*.py
+chat_output.txt
+.git/
+.vscode/

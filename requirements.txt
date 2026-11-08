@@ -1,9 +1,8 @@
-# SatAgriSense-AI — Python Dependencies (Vercel + Local)
-# opencv-python is NOT listed here (too large for Vercel 50MB limit).
-# cv_engine.py auto-detects cv2 and falls back to PIL if unavailable.
+# SatAgriSense-AI — Python Dependencies (Vercel Serverless + Local)
+# Prebuilt binary wheels for Python 3.10, 3.11, 3.12 (Zero compilation, instant install on Vercel)
 
-flask>=2.0.0
-flask-cors>=3.0.0
-Pillow>=9.0.0
-numpy>=1.21.0
-requests>=2.28.0
+flask>=2.3.0
+flask-cors>=4.0.0
+Pillow>=10.0.0
+numpy>=1.26.0
+requests>=2.31.0
