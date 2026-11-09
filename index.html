@@ -124,7 +124,7 @@
       position: absolute; top: 16px; left: 16px;
       background: var(--bg-panel); border: 1px solid var(--border-panel);
       padding: 10px 12px; border-radius: 14px; backdrop-filter: blur(14px);
-      width: 375px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
+      width: 395px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
       box-shadow: 0 10px 30px rgba(0,0,0,0.75);
       transition: width 0.3s ease, padding 0.3s ease;
       overflow: hidden;
@@ -160,10 +160,15 @@
     }
     .search-overlay-box.minimized .search-box-body { display: none; }
     .search-bar-row {
-      display: flex; align-items: center; margin-top: 8px;
+      display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
       background: rgba(0,0,0,0.6); border: 1px solid rgba(0,240,255,0.35);
       border-radius: 10px; padding: 3px 5px; gap: 4px; box-sizing: border-box;
-      width: 100%; overflow: hidden;
+      width: 100%; max-width: 100%; overflow: hidden;
+    }
+    .search-bar-row .btn-icon {
+      width: 28px; height: 28px; min-width: 28px; max-width: 28px;
+      font-size: 11px; flex-shrink: 0; margin: 0; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
     }
     .search-bar-row:focus-within {
       border-color: var(--cyan-glow);
@@ -1260,6 +1265,11 @@
   function detectRegionalLanguage(locName, country, lat, lon) {
     const s = ((locName || '') + ' ' + (country || '')).toLowerCase();
     
+    // Strict Ocean / Marine Check -> English
+    if (s.includes('ocean') || s.includes('marine') || s.includes('sea') || s.includes('bay of bengal') || s.includes('arabian sea')) {
+      return { code: 'en-US', name: 'English (Ocean / Marine)' };
+    }
+
     // Tamil Nadu & Sri Lanka (Tamil regions)
     if (s.includes('tamil nadu') || s.includes('chennai') || s.includes('coimbatore') || 
         s.includes('madurai') || s.includes('erode') || s.includes('salem') || 
@@ -1276,7 +1286,7 @@
     // Andhra Pradesh & Telangana
     if (s.includes('andhra') || s.includes('telangana') || s.includes('hyderabad') || 
         s.includes('visakhapatnam') || s.includes('vijayawada') || s.includes('guntur') || 
-        s.includes('tirupati') || s.includes('warangal')) {
+        s.includes('tirupati') || s.includes('warangal') || s.includes('amaravati')) {
       return { code: 'te-IN', name: 'Telugu (తెలుగు)' };
     }
     // Karnataka
@@ -1291,20 +1301,20 @@
         s.includes('solapur') || s.includes('kolhapur')) {
       return { code: 'mr-IN', name: 'Marathi (मराठी)' };
     }
-    // Punjab & Haryana
-    if (s.includes('punjab') || s.includes('amritsar') || s.includes('ludhiana') || 
-        s.includes('jalandhar') || s.includes('patiala') || s.includes('bathinda')) {
-      return { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' };
+    // Gujarat
+    if (s.includes('gujarat') || s.includes('ahmedabad') || s.includes('surat') || 
+        s.includes('vadodara') || s.includes('rajkot') || s.includes('bhavnagar') || s.includes('gandhinagar')) {
+      return { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' };
     }
     // West Bengal & Bangladesh
     if (s.includes('bengal') || s.includes('kolkata') || s.includes('siliguri') || 
         s.includes('asansol') || s.includes('bangladesh') || s.includes('dhaka') || s.includes('chittagong')) {
       return { code: 'bn-IN', name: 'Bengali (বাংলা)' };
     }
-    // Gujarat
-    if (s.includes('gujarat') || s.includes('ahmedabad') || s.includes('surat') || 
-        s.includes('vadodara') || s.includes('rajkot') || s.includes('bhavnagar')) {
-      return { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' };
+    // Punjab & Haryana
+    if (s.includes('punjab') || s.includes('amritsar') || s.includes('ludhiana') || 
+        s.includes('jalandhar') || s.includes('patiala') || s.includes('bathinda') || s.includes('chandigarh')) {
+      return { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' };
     }
     // Pakistan
     if (s.includes('pakistan') || s.includes('lahore') || s.includes('karachi') || 
@@ -1355,7 +1365,7 @@
         s.includes('uttar pradesh') || s.includes('lucknow') || s.includes('varanasi') || 
         s.includes('bihar') || s.includes('patna') || s.includes('madhya pradesh') || 
         s.includes('bhopal') || s.includes('indore') || s.includes('rajasthan') || 
-        s.includes('jaipur') || s.includes('haryana') || s.includes('uttarakhand')) {
+        s.includes('jaipur') || s.includes('haryana') || s.includes('uttarakhand') || s.includes('thar')) {
       return { code: 'hi-IN', name: 'Hindi (हिन्दी)' };
     }
 
@@ -1398,6 +1408,54 @@
         <button type="button" onclick="submitQuickChat('தரிசு நிலத்தில் வீடு கட்டலாமா? மண் ஸ்திரத்தன்மை எப்படி?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ தரிசு நிலத்தில் வீடு கட்டலாமா?</button>
         <button type="button" onclick="submitQuickChat('நீரின் உவர்ப்புத்தன்மை மற்றும் pH அளவு என்ன?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 நீரின் உவர்ப்பு & pH?</button>
         <button type="button" onclick="submitQuickChat('தொழிற்சாலை காற்று மற்றும் கழிவுநீர் மாசுபாடு உள்ளதா?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏭 தொழிற்சாலை மாசு ஆய்வு?</button>
+      `;
+    } else if (code && code.startsWith('te')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('ఈ ప్రాంతానికి అనువైన అత్యధిక దిగుబడి ఇచ్చే పంట ఏది?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 ఉత్తమ పంట & దిగుబడి?</button>
+        <button type="button" onclick="submitQuickChat('బంజరు భూమిపై ఇల్లు నిర్మించవచ్చా? వరద ముప్పు ఉందా?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ భవన నిర్మాణ భద్రత?</button>
+        <button type="button" onclick="submitQuickChat('నీటి లవణీయత (Salinity) మరియు pH స్థాయి ఎంత?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 నీటి లవణీయత & pH?</button>
+      `;
+    } else if (code && code.startsWith('kn')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('ಈ ಪ್ರದೇಶಕ್ಕೆ ಗರಿಷ್ಠ ಇಳುವರಿ ನೀಡುವ ಬೆಳೆ ಯಾವುದು?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 ಉತ್ತಮ ಬೆಳೆ & ಇಳುವರಿ?</button>
+        <button type="button" onclick="submitQuickChat('ಬಂಜರು ಭೂಮಿಯಲ್ಲಿ ಮನೆ ಕಟ್ಟಬಹುದೇ? ಪ್ರವಾಹದ ಅಪಾಯವಿದೆಯೇ?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ ಕಟ್ಟಡ ನಿರ್ಮಾಣ ಸುರಕ್ಷತೆ?</button>
+        <button type="button" onclick="submitQuickChat('ನೀರಿನ ಲವಣಾಂಶ (Salinity) ಮತ್ತು pH ಮಟ್ಟ ಎಷ್ಟು?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 ನೀರಿನ ಲವಣಾಂಶ & pH?</button>
+      `;
+    } else if (code && code.startsWith('bn')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('এই অঞ্চলের জন্য সবচেয়ে ভালো ফসল কোনটি এবং ফলন কেমন হবে?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 সেরা ফসল ও ফলন?</button>
+        <button type="button" onclick="submitQuickChat('পতিত জমিতে কি বাড়ি তৈরি করা নিরাপদ? বন্যার ঝুঁকি আছে কি?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ ভবন নির্মাণ নিরাপত্তা?</button>
+        <button type="button" onclick="submitQuickChat('পানির লবণাক্ততা (Salinity) এবং pH এর মাত্রা কত?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 পানির লবণাক্ততা & pH?</button>
+      `;
+    } else if (code && code.startsWith('ml')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('ഈ പ്രദേശത്തിന് അനുയോജ്യമായ ഏറ്റവും ഉയർന്ന വിളവ് തരുന്ന വിള ഏതാണ്?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 മികച്ച വിള & വിളവ്?</button>
+        <button type="button" onclick="submitQuickChat('തരിശുഭൂമിയിൽ വീട് നിർമ്മിക്കാൻ സുരക്ഷിതമാണോ? പ്രളയ സാധ്യത?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ കെട്ടിട നിർമ്മാണ സുരക്ഷ?</button>
+        <button type="button" onclick="submitQuickChat('ജലത്തിന്റെ ലവണാംശവും (Salinity) pH ലെവലും എത്രയാണ്?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 ജല ലവണാംശം & pH?</button>
+      `;
+    } else if (code && code.startsWith('mr')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('येथे सर्वाधिक उत्पादन देणारे शिफारस केलेले पीक कोणते?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 सर्वोत्तम पीक व उत्पादन?</button>
+        <button type="button" onclick="submitQuickChat('पडिक जमिनीवर घर बांधणे सुरक्षित आहे का? पूर धोका?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ इमारत बांधकाम सुरक्षा?</button>
+        <button type="button" onclick="submitQuickChat('पाण्याची क्षारता (Salinity) आणि pH पातळी काय आहे?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 पाण्याची क्षारता & pH?</button>
+      `;
+    } else if (code && code.startsWith('gu')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('અહીં સૌથી વધુ ઉપજ આપતો પાક કયો છે?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 શ્રેષ્ઠ પાક અને ઉપજ?</button>
+        <button type="button" onclick="submitQuickChat('બંજર જમીન પર મકાન બનાવવું સુરક્ષિત છે? પૂરનું જોખમ?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ મકાન બાંધકામ સુરક્ષા?</button>
+        <button type="button" onclick="submitQuickChat('પાણીની ક્ષારતા (Salinity) અને pH સ્તર કેટલું છે?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 પાણીની ક્ષારતા & pH?</button>
+      `;
+    } else if (code && code.startsWith('pa')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('ਇਸ ਖੇਤਰ ਲਈ ਸਭ ਤੋਂ ਵਧੀਆ ਫ਼ਸਲ ਕਿਹੜੀ ਹੈ ਅਤੇ ਝਾੜ ਕਿੰਨਾ ਮਿਲੇਗਾ?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 ਸਭ ਤੋਂ ਵਧੀਆ ਫ਼ਸਲ & ਝਾੜ?</button>
+        <button type="button" onclick="submitQuickChat('ਕੀ ਬੰਜਰ ਜ਼ਮੀਨ ਤੇ ਮਕਾਨ ਬਣਾਉਣਾ ਸੁਰੱਖਿਅਤ ਹੈ? ਹੜ੍ਹ ਦਾ ਖ਼ਤਰਾ?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ ਮਕਾਨ ਉਸਾਰੀ ਸੁਰੱਖਿਆ?</button>
+        <button type="button" onclick="submitQuickChat('ਪਾਣੀ ਦਾ ਖਾਰਾਪਣ (Salinity) ਅਤੇ pH ਪੱਧਰ ਕੀ ਹੈ?')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 ਪਾਣੀ ਦਾ ਖਾਰਾਪਣ & pH?</button>
+      `;
+    } else if (code && code.startsWith('ur')) {
+      bar.innerHTML = `
+        <button type="button" onclick="submitQuickChat('اس خطے کے لیے سب سے بہترین فصل کون سی ہے اور کتنی پیداوار ملے گی؟')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌾 بہترین فصل و پیداوار؟</button>
+        <button type="button" onclick="submitQuickChat('کیا بنجر زمین پر عمارت تعمیر کرنا محفوظ ہے؟ سیلاب کا خطرہ؟')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🏗️ تعمیراتی خطرات جائزہ؟</button>
+        <button type="button" onclick="submitQuickChat('پانی کی نمکیات (Salinity) اور pH لیول کیا ہے؟')" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:12px;color:#00f0ff;font-size:10px;padding:3px 9px;cursor:pointer;flex-shrink:0;">🌊 نمکیات اور pH؟</button>
       `;
     } else {
       bar.innerHTML = `
@@ -1560,7 +1618,7 @@
         .replace(/<br\s*\/?>/gi, '. ')
         .replace(/<[^>]+>/g, '')
         .replace(/https?:\/\/\S+/g, '')
-        .replace(/[*_#`~>•|\-]/g, ' ')
+        .replace(/[*_#~>\u2022|\-]/g, ' ')
         .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
         .replace(/\s+/g, ' ')
         .trim();
@@ -1570,30 +1628,35 @@
       // Auto-Detect script language from response
       let detectedLang = 'en-US';
       let langCode = 'en';
-      if (/[\u0900-\u097F]/.test(clean)) { detectedLang = 'hi-IN'; langCode = 'hi'; }
+      if (/[\u0900-\u097F]/.test(clean)) { 
+        detectedLang = (currentChatLangCode && currentChatLangCode.startsWith('mr')) ? 'mr-IN' : 'hi-IN';
+        langCode = (currentChatLangCode && currentChatLangCode.startsWith('mr')) ? 'mr' : 'hi'; 
+      }
       else if (/[\u0B80-\u0BFF]/.test(clean)) { detectedLang = 'ta-IN'; langCode = 'ta'; }
       else if (/[\u0D00-\u0D7F]/.test(clean)) { detectedLang = 'ml-IN'; langCode = 'ml'; }
       else if (/[\u0C00-\u0C7F]/.test(clean)) { detectedLang = 'te-IN'; langCode = 'te'; }
       else if (/[\u0C80-\u0CFF]/.test(clean)) { detectedLang = 'kn-IN'; langCode = 'kn'; }
       else if (/[\u0980-\u09FF]/.test(clean)) { detectedLang = 'bn-IN'; langCode = 'bn'; }
+      else if (/[\u0A80-\u0AFF]/.test(clean)) { detectedLang = 'gu-IN'; langCode = 'gu'; }
+      else if (/[\u0A00-\u0A7F]/.test(clean)) { detectedLang = 'pa-IN'; langCode = 'pa'; }
       else if (/[\u0600-\u06FF]/.test(clean)) { detectedLang = 'ur-PK'; langCode = 'ur'; }
       else {
         detectedLang = forceLang || currentChatLangCode || 'en-US';
         langCode = (detectedLang || 'en').split('-')[0].toLowerCase();
       }
 
-      // Extract high-impact fluent summary (First 1-2 complete sentences, max 200 chars)
-      const sentences = clean.split(/(?<=[!?:;\n।॥])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
+      // Extract high-impact fluent summary (First 1-2 complete sentences, max 220 chars)
+      const sentences = clean.split(/(?<=[!?:;\n\u0964\u0965])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
       let summaryToSpeak = '';
       for (const s of sentences) {
         if (!s.trim()) continue;
-        if ((summaryToSpeak.length + s.length) <= 190) {
+        if ((summaryToSpeak.length + s.length) <= 220) {
           summaryToSpeak += (summaryToSpeak ? ' ' : '') + s.trim();
         } else {
           break;
         }
       }
-      if (!summaryToSpeak) summaryToSpeak = clean.slice(0, 190);
+      if (!summaryToSpeak) summaryToSpeak = clean.slice(0, 220);
 
       // Check if browser has an authentic native voice for this language
       const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
@@ -1602,8 +1665,48 @@
         const vn = v.name.toLowerCase();
         return vl.startsWith(langCode) || 
                (langCode === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana') || vn.includes('india'))) ||
-               (langCode === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha')));
+               (langCode === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha'))) ||
+               (langCode === 'te' && (vn.includes('telugu') || vn.includes('mohan'))) ||
+               (langCode === 'kn' && (vn.includes('kannada') || vn.includes('gagan'))) ||
+               (langCode === 'ml' && (vn.includes('malayalam') || vn.includes('midhun'))) ||
+               (langCode === 'bn' && (vn.includes('bengali') || vn.includes('bangla') || vn.includes('bashkar'))) ||
+               (langCode === 'mr' && (vn.includes('marathi') || vn.includes('aarohi'))) ||
+               (langCode === 'gu' && (vn.includes('gujarati') || vn.includes('dhwani'))) ||
+               (langCode === 'pa' && (vn.includes('punjabi') || vn.includes('gurmukhi'))) ||
+               (langCode === 'ur' && (vn.includes('urdu') || vn.includes('gul')));
       });
+
+      function streamNativeChatAudio() {
+        try {
+          const ttsUrl = API_BASE + '/tts?lang=' + encodeURIComponent(langCode) + '&text=' + encodeURIComponent(summaryToSpeak.slice(0, 200));
+          const audio = new Audio(ttsUrl);
+          activeTTSAudio = audio;
+          window.currentTTSAudio = audio;
+          audio.onended = () => { activeTTSAudio = null; window.currentTTSAudio = null; if (onDone) onDone(); };
+          audio.onerror = () => {
+            const directUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + encodeURIComponent(langCode) + '&q=' + encodeURIComponent(summaryToSpeak.slice(0, 160));
+            const directAudio = new Audio(directUrl);
+            activeTTSAudio = directAudio;
+            window.currentTTSAudio = directAudio;
+            directAudio.onended = () => { activeTTSAudio = null; window.currentTTSAudio = null; if (onDone) onDone(); };
+            directAudio.onerror = () => {
+              activeTTSAudio = null; window.currentTTSAudio = null;
+              if ('speechSynthesis' in window) {
+                const asciiOnly = summaryToSpeak.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim() || (currentLocationContext?.name ? currentLocationContext.name.split(',')[0] + ' analysis complete.' : 'Region analysis complete.');
+                const finalUtter = new SpeechSynthesisUtterance(asciiOnly);
+                finalUtter.rate = 1.06;
+                finalUtter.onend = () => { if (onDone) onDone(); };
+                finalUtter.onerror = () => { if (onDone) onDone(); };
+                window.speechSynthesis.speak(finalUtter);
+              } else if (onDone) onDone();
+            };
+            directAudio.play().catch(() => { directAudio.onerror(); });
+          };
+          audio.play().catch(() => { audio.onerror(); });
+        } catch(e) {
+          if (onDone) onDone();
+        }
+      }
 
       if (matchedVoice && 'speechSynthesis' in window) {
         const utter = new SpeechSynthesisUtterance(summaryToSpeak);
@@ -1612,50 +1715,24 @@
         utter.rate = 1.06;
         utter.pitch = 1.0;
         utter.onend = () => { if (onDone) onDone(); };
+        utter.onerror = () => { streamNativeChatAudio(); };
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utter);
+        return;
+      }
+
+      if (langCode !== 'en') {
+        streamNativeChatAudio();
+      } else if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(summaryToSpeak);
+        utter.lang = 'en-US';
+        utter.rate = 1.06;
+        utter.onend = () => { if (onDone) onDone(); };
         utter.onerror = () => { if (onDone) onDone(); };
         window.speechSynthesis.resume();
         window.speechSynthesis.speak(utter);
       } else {
-        // Stream high-fidelity native pronunciation from /api/tts endpoint
-        if (window._ttsAudioPlayer) {
-          window._ttsAudioPlayer.pause();
-          window._ttsAudioPlayer.src = `${API_BASE}/tts?lang=${langCode}&text=${encodeURIComponent(summaryToSpeak)}`;
-          activeTTSAudio = window._ttsAudioPlayer;
-          window._ttsAudioPlayer.onended = () => {
-            activeTTSAudio = null;
-            if (onDone) onDone();
-          };
-          window._ttsAudioPlayer.onerror = () => {
-            activeTTSAudio = null;
-            if ('speechSynthesis' in window) {
-              const asciiClean = summaryToSpeak.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
-              if (asciiClean) {
-                const fallbackUtter = new SpeechSynthesisUtterance(asciiClean);
-                fallbackUtter.rate = 1.08;
-                fallbackUtter.onend = () => { if (onDone) onDone(); };
-                fallbackUtter.onerror = () => { if (onDone) onDone(); };
-                window.speechSynthesis.speak(fallbackUtter);
-                return;
-              }
-            }
-            if (onDone) onDone();
-          };
-          window._ttsAudioPlayer.play().catch(e => {
-            if ('speechSynthesis' in window) {
-              const asciiClean = summaryToSpeak.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
-              if (asciiClean) {
-                const fallbackUtter = new SpeechSynthesisUtterance(asciiClean);
-                fallbackUtter.rate = 1.08;
-                fallbackUtter.onend = () => { if (onDone) onDone(); };
-                window.speechSynthesis.speak(fallbackUtter);
-                return;
-              }
-            }
-            if (onDone) onDone();
-          });
-        } else {
-          if (onDone) onDone();
-        }
+        if (onDone) onDone();
       }
     } catch(err) {
       console.warn('Speech error:', err);
@@ -1779,6 +1856,17 @@
 
       recognition.onerror = function(e) {
         if (micBtn) micBtn.classList.remove('mic-listening');
+        if (e.error === 'no-speech') {
+          if (voiceStatus) voiceStatus.innerHTML = `<i class="fa-solid fa-microphone" style="color:var(--cyan-glow);"></i> No speech detected. Tap mic to retry or choose below:`;
+          return;
+        }
+        if (e.error === 'network' && recognition.lang !== 'en-US') {
+          try {
+            recognition.lang = 'en-US';
+            recognition.start();
+            return;
+          } catch(err){}
+        }
         openVoiceBanner();
       };
 
@@ -1805,7 +1893,7 @@
     if (!SpeechRecognition) {
       if (input) {
         input.focus();
-        input.placeholder = `Type question in ${currentChatLangName} or tap a quick chip above...`;
+        input.placeholder = 'Type question in ' + currentChatLangName + ' or tap a quick chip above...';
       }
       return;
     }
@@ -1822,17 +1910,21 @@
         micBtn.style.borderColor = '#ff3366';
         micBtn.style.boxShadow = '0 0 12px #ff3366';
       }
-      if (input) input.placeholder = `🎙️ Listening in ${currentChatLangName}... Speak your question now`;
+      if (input) input.placeholder = 'Listening in ' + currentChatLangName + '... Speak your question now';
 
+      let spokenTranscript = '';
+      let chatSent = false;
       recognition.onresult = function(e) {
         let transcript = '';
         for (let i = e.resultIndex; i < e.results.length; ++i) {
           transcript += e.results[i][0].transcript;
         }
         transcript = transcript.trim();
+        spokenTranscript = transcript;
         if (input && transcript) input.value = transcript;
 
-        if (e.results && e.results[0] && e.results[0].isFinal) {
+        if (e.results && e.results[0] && e.results[0].isFinal && !chatSent) {
+          chatSent = true;
           if (micBtn) {
             micBtn.style.background = 'rgba(0,240,255,0.25)';
             micBtn.style.borderColor = 'var(--cyan-glow)';
@@ -1848,9 +1940,16 @@
           micBtn.style.borderColor = 'var(--cyan-glow)';
           micBtn.style.boxShadow = 'none';
         }
+        if (e.error === 'network' && recognition.lang !== 'en-US') {
+          try {
+            recognition.lang = 'en-US';
+            recognition.start();
+            return;
+          } catch(err){}
+        }
         if (input) {
           input.focus();
-          input.placeholder = `Type question in ${currentChatLangName} or tap a quick chip above...`;
+        input.placeholder = 'Type question in ' + currentChatLangName + ' or tap a quick chip above...';
         }
       };
 
@@ -1859,6 +1958,10 @@
           micBtn.style.background = 'rgba(0,240,255,0.25)';
           micBtn.style.borderColor = 'var(--cyan-glow)';
           micBtn.style.boxShadow = 'none';
+        }
+        if (!chatSent && spokenTranscript && input && input.value.trim()) {
+          chatSent = true;
+          sendChatMessage();
         }
       };
 
@@ -1871,7 +1974,7 @@
       }
       if (input) {
         input.focus();
-        input.placeholder = "Type your question & press Enter...";
+        input.placeholder = 'Type question in ' + currentChatLangName + '...';
       }
     }
   }
@@ -1890,40 +1993,177 @@
     const crop = lastMLData ? (lastMLData.recommended_crop || lastMLData.crop || '') : '';
     const yieldVal = lastMLData ? (lastMLData.predicted_yield_tons_ha || '') : '';
     const locType = lastMLData ? (lastMLData.location_type || '') : '';
-    const isForest = locType.toLowerCase().includes('forest');
-    const isWater = locType.toLowerCase().includes('ocean') || locType.toLowerCase().includes('marine');
+    const ltLower = locType.toLowerCase();
+    const isForest = ltLower.includes('forest') || ltLower.includes('canopy') || ltLower.includes('reserve');
+    const isWater = ltLower.includes('ocean') || ltLower.includes('marine') || ltLower.includes('sea');
+    const isBarren = ltLower.includes('barren') || ltLower.includes('desert') || ltLower.includes('arid');
+    const isFlood = ltLower.includes('flood') || ltLower.includes('wetland');
     const city = loc.split(',')[0].trim();
 
     let announcement = '';
-    if (currentChatLangCode && currentChatLangCode.startsWith('hi')) {
-      if (isForest) {
-        announcement = `संरक्षित वन क्षेत्र: ${city}। यहाँ केवल प्राकृतिक वनस्पति मौजूद है, कोई व्यावसायिक फसल नहीं उगाई जा सकती।`;
-      } else if (isWater) {
-        announcement = `समुद्री क्षेत्र: ${city}। अत्यधिक लवणता के कारण यहाँ फसल नहीं उग सकती।`;
-      } else {
-        announcement = `चयनित स्थान: ${city}। अनुशंसित फसल: ${crop}। अनुमानित उपज: ${yieldVal} टन प्रति हेक्टेयर।`;
-      }
-    } else if (currentChatLangCode && currentChatLangCode.startsWith('ta')) {
+    let phoneticFallback = '';
+    const lang = (currentChatLangCode || 'en').toLowerCase();
+
+    if (lang.startsWith('ta')) {
       if (isForest) {
         announcement = `பாதுகாக்கப்பட்ட வனப்பகுதி: ${city}। அடர்ந்த இயற்கை காடு, இங்கு விவசாய பயிர்கள் பயிரிட முடியாது.`;
+        phoneticFallback = `Paadhukaakkappatta vanappagudhi: ${city}. Adarndha iyarkai kaadu, ingu vivasaaya payirgal payirida mudiyaadhu.`;
       } else if (isWater) {
-        announcement = `கடல் பகுதி: ${city}। உவர்ப்புத்தன்மை அதிகம் என்பதால் பயிர் வளராது.`;
+        announcement = `கடல் பகுதி: ${city}। உவர்ப்புத்தன்மை 35 PSU அதிகம் என்பதால் பயிர் வளராது.`;
+        phoneticFallback = `Kadal pagudhi: ${city}. Uvarpputhanmai 35 PSU adhigam enbadhaal payir valaraadhu.`;
+      } else if (isBarren) {
+        announcement = `தரிசு நிலம்: ${city}। நிலக்கடலை சாகுபடிக்கு உகந்தது அல்லது வீடுகள் கட்ட மிகவும் பாதுகாப்பானது.`;
+        phoneticFallback = `Tharisu nilam: ${city}. Nilakkadalai saagupadikku ugandhadhu alladhu veedugal katta migavum paadhukaappaanadhu.`;
       } else {
         announcement = `தேர்ந்தெடுக்கப்பட்ட பகுதி: ${city}। பரிந்துரைக்கப்படும் பயிர்: ${crop}। விளைச்சல்: ${yieldVal} டன்.`;
+        phoneticFallback = `Therndhedukkappatta pagudhi: ${city}. Parindhuraikkappadum payir: ${crop}. Vilaichal: ${yieldVal} tons per hectare.`;
+      }
+    } else if (lang.startsWith('hi')) {
+      if (isForest) {
+        announcement = `संरक्षित वन क्षेत्र: ${city}। यहाँ केवल प्राकृतिक वनस्पति मौजूद है, कोई व्यावसायिक फसल नहीं उगाई जा सकती।`;
+        phoneticFallback = `Sanrakshit van kshetra: ${city}. Yahan keval prakritik vanaspati maujood hai, koi vyavsayik fasal nahi ugai ja sakti.`;
+      } else if (isWater) {
+        announcement = `समुद्री क्षेत्र: ${city}। अत्यधिक लवणता 35 PSU के कारण यहाँ फसल नहीं उग सकती।`;
+        phoneticFallback = `Samudri kshetra: ${city}. Atyadhik lavanata 35 PSU ke karan yahan fasal nahi ug sakti.`;
+      } else if (isBarren) {
+        announcement = `बंजर भूमि: ${city}। मूंगफली की खेती के लिए उत्तम अथवा भवन निर्माण के लिए सुरक्षित।`;
+        phoneticFallback = `Banjar bhoomi: ${city}. Moongphali ki kheti ke liye uttam athva bhavan nirman ke liye surakshit.`;
+      } else {
+        announcement = `चयनित स्थान: ${city}। अनुशंसित फसल: ${crop}। अनुमानित उपज: ${yieldVal} टन प्रति हेक्टेयर।`;
+        phoneticFallback = `Chayanit sthan: ${city}. Anushansit fasal: ${crop}. Anumanit upaj: ${yieldVal} ton prati hectare.`;
+      }
+    } else if (lang.startsWith('ml')) {
+      if (isForest) {
+        announcement = `സംരക്ഷിത വനമേഖല: ${city}. സ്വാഭാവിക വനമാണ്, വിളകൾ കൃഷി ചെയ്യാൻ കഴിയില്ല.`;
+        phoneticFallback = `Samrakshitha vanamekhela: ${city}. Swabhavika vanamanu, vilakal krishi cheyyan kazhiyilla.`;
+      } else if (isWater) {
+        announcement = `സമുദ്ര പ്രദേശം: ${city}. ഉയർന്ന ലവണാംശം 35 PSU കാരണം വിളകൾ വളരില്ല.`;
+        phoneticFallback = `Samudra pradhesham: ${city}. Uyarnna lavanamsam 35 PSU karanam vilakal valarilla.`;
+      } else if (isBarren) {
+        announcement = `തരിശുഭൂമി: ${city}. നിലക്കടല കൃഷിക്കോ കെട്ടിട നിർമ്മാണത്തിനോ വളരെ അനുയോജ്യം.`;
+        phoneticFallback = `Tharishubhoomi: ${city}. Nilakkadala krishikko kettida nirmaanathino valare anuyojyam.`;
+      } else {
+        announcement = `തിരഞ്ഞെടുത്ത പ്രദേശം: ${city}. ശുപാർശ ചെയ്യുന്ന വിള: ${crop}. വിളവ്: ${yieldVal} ടൺ.`;
+        phoneticFallback = `Thiranjedutha pradhesham: ${city}. Shuparsha cheyyunna vila: ${crop}. Vilavu: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('te')) {
+      if (isForest) {
+        announcement = `రక్షిత అటవీ ప్రాంతం: ${city}. సహజ అటవీ ప్రాంతం, పంటల సాగు అనుమతించబడదు.`;
+        phoneticFallback = `Rakshitha atavee praantham: ${city}. Sahaja atavee praantham, pantala saagu anumatimchabadadu.`;
+      } else if (isWater) {
+        announcement = `సముద్ర ప్రాంతం: ${city}. అధిక లవణీయత 35 PSU వలన పంటలు పండవు.`;
+        phoneticFallback = `Samudra praantham: ${city}. Adhika lavaneeyatha 35 PSU valana pantalu pandavu.`;
+      } else if (isBarren) {
+        announcement = `బంజరు భూమి: ${city}. వేరుశనగ సాగుకు లేదా భవన నిర్మాణానికి అత్యంత అనుకూలం.`;
+        phoneticFallback = `Bamjaru bhoomi: ${city}. Verushanaga saaguku leda bhavana nirmaanaaniki atyanta anukoolam.`;
+      } else {
+        announcement = `ఎంచుకున్న ప్రాంతం: ${city}. సిఫార్సు చేయబడిన పంట: ${crop}. దిగుబడి: ${yieldVal} టన్నులు.`;
+        phoneticFallback = `Emchukunna praantham: ${city}. Sifaarsu cheyabadina panta: ${crop}. Digubadi: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('kn')) {
+      if (isForest) {
+        announcement = `ರಕ್ಷಿತ ಅರಣ್ಯ ಪ್ರದೇಶ: ${city}. ನೈಸರ್ಗಿಕ ಅರಣ್ಯ, ವಾಣಿಜ್ಯ ಬೆಳೆ ಬೆಳೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.`;
+        phoneticFallback = `Rakshitha aranya pradesha: ${city}. Naisargika aranya, vanijya bele beleyalu sadhyavilla.`;
+      } else if (isWater) {
+        announcement = `ಸಾಗರ ಪ್ರದೇಶ: ${city}. ನೀರಿನ ಲವಣಾಂಶ 35 PSU ಹೆಚ್ಚಿರುವುದರಿಂದ ಬೆಳೆ ಬೆಳೆಯಲಾಗುವುದಿಲ್ಲ.`;
+        phoneticFallback = `Sagara pradesha: ${city}. Neerina lavanamsha 35 PSU hecchiruvarinda bele beleyalaaguvudilla.`;
+      } else if (isBarren) {
+        announcement = `ಬಂಜರು ಭೂಮಿ: ${city}. ಕಡಲೆಕಾಯಿ ಕೃಷಿಗೆ ಅಥವಾ ಮನೆ ನಿರ್ಮಾಣಕ್ಕೆ ಅತ್ಯುತ್ತಮ.`;
+        phoneticFallback = `Banjary bhoomi: ${city}. Kadalekayi krushige athava mane nirmaanakke atyuttama.`;
+      } else {
+        announcement = `ಆಯ್ಕೆಮಾಡಿದ ಸ್ಥಳ: ${city}. ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆ: ${crop}. ಇಳುವರಿ: ${yieldVal} ಟನ್.`;
+        phoneticFallback = `Aaykemadida sthala: ${city}. Shifarassu madida bele: ${crop}. Iluvari: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('bn')) {
+      if (isForest) {
+        announcement = `সংরক্ষিত বনভূমি: ${city}। প্রাকৃতিক অরণ্য, এখানে বাণিজ্যিক ফসল চাষ নিষিদ্ধ।`;
+        phoneticFallback = `Songrokkhito bonomomi: ${city}. Prakritik oronno, ekhane banijjik phoshol chash nishiddho.`;
+      } else if (isWater) {
+        announcement = `সামুদ্রিক অঞ্চল: ${city}। অতিরিক্ত লবণাক্ততার কারণে ফসল চাষ অসম্ভব।`;
+        phoneticFallback = `Samudrik onchol: ${city}. Otirikto lobonaktotar karone phoshol chash oshombhob.`;
+      } else if (isBarren) {
+        announcement = `অনাবাদী পতিত জমি: ${city}। চিনা বাদাম চাষ অথবা ভবন নির্মাণের জন্য অত্যন্ত উপযোগী।`;
+        phoneticFallback = `Onabadi potit jomi: ${city}. China badam chash othoba bhobon nirmaner jonno ontonto upojogi.`;
+      } else {
+        announcement = `নির্বাচিত এলাকা: ${city}। প্রস্তাবিত ফসল: ${crop}। আনুমানিক ফলন: ${yieldVal} টন।`;
+        phoneticFallback = `Nirbachito elaka: ${city}. Prostabito phoshol: ${crop}. Anumanik pholon: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('mr')) {
+      if (isForest) {
+        announcement = `संरक्षित वनक्षेत्र: ${city}। नैसर्गिक वनराई, व्यावसायिक पिके घेता येत नाहीत.`;
+        phoneticFallback = `Sanrakshit vanakshetra: ${city}. Nisargik vanrai, vyavasayik pike gheta yet nahit.`;
+      } else if (isWater) {
+        announcement = `सागरी क्षेत्र: ${city}। अति क्षारतेमुळे पिके घेता येत नाहीत.`;
+        phoneticFallback = `Sagari kshetra: ${city}. Ati ksharatemule pike gheta yet nahit.`;
+      } else if (isBarren) {
+        announcement = `पडिक जमीन: ${city}। भुईमूग शेतीसाठी किंवा इमारत बांधकामासाठी अत्यंत सुरक्षित.`;
+        phoneticFallback = `Padik jameen: ${city}. Bhuimug shetisathi kivha imarat bandhkaamasathi atyant surakshit.`;
+      } else {
+        announcement = `निवडलेले स्थान: ${city}। शिफारस केलेले पीक: ${crop}। अपेक्षित उत्पादन: ${yieldVal} टन.`;
+        phoneticFallback = `Nivadlele sthan: ${city}. Shifaras kelele peek: ${crop}. Apekshit utpadan: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('gu')) {
+      if (isForest) {
+        announcement = `સંરક્ષિત વન વિસ્તાર: ${city}. કુદરતી જંગલ, વ્યવસાયિક પાક ઉગાડી શકાતો નથી.`;
+        phoneticFallback = `Sanrakshit van vistaar: ${city}. Kudrati jangal, vyavsayik paak ugaadi shakaato nathi.`;
+      } else if (isWater) {
+        announcement = `દરિયાઈ વિસ્તાર: ${city}. વધુ ક્ષારતાને લીધે પાક થઈ શકતો નથી.`;
+        phoneticFallback = `Dariyaai vistaar: ${city}. Vadhu kshaarataane lidhe paak thai shakato nathi.`;
+      } else if (isBarren) {
+        announcement = `બંજર જમીન: ${city}. મગફળીની ખેતી અથવા મકાન બાંધકામ માટે શ્રેષ્ઠ.`;
+        phoneticFallback = `Banjar jameen: ${city}. Magfali ni kheti athava makaan baandhkaam maate shreshth.`;
+      } else {
+        announcement = `પસંદ કરેલ સ્થળ: ${city}. ભલામણ કરેલ પાક: ${crop}. અંદાજિત ઉપજ: ${yieldVal} ટન.`;
+        phoneticFallback = `Pasand karela sthal: ${city}. Bhalaman karel paak: ${crop}. Andajit upaj: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('pa')) {
+      if (isForest) {
+        announcement = `ਸੁਰੱਖਿਅਤ ਜੰਗਲ ਖੇਤਰ: ${city}। ਕੁਦਰਤੀ ਜੰਗਲ, ਕੋਈ ਵਪਾਰਕ ਫ਼ਸਲ ਨਹੀਂ ਉਗਾਈ ਜਾ ਸਕਦੀ।`;
+        phoneticFallback = `Surakhiat jangal khetar: ${city}. Kudrati jangal, koi vaparak phasal nahi ugayi ja sakdi.`;
+      } else if (isWater) {
+        announcement = `ਸਮੁੰਦਰੀ ਖੇਤਰ: ${city}। ਜ਼ਿਆਦਾ ਖਾਰੇਪਣ ਕਾਰਨ ਫ਼ਸਲ ਸੰਭਵ ਨਹੀਂ।`;
+        phoneticFallback = `Samundari khetar: ${city}. Zyada kharepan kaaran phasal sambhav nahi.`;
+      } else if (isBarren) {
+        announcement = `ਬੰਜਰ ਜ਼ਮੀਨ: ${city}। ਮੂੰਗਫਲੀ ਦੀ ਖੇਤੀ ਜਾਂ ਮਕਾਨ ਨਿਰਮਾਣ ਲਈ ਢੁਕਵੀਂ।`;
+        phoneticFallback = `Banjar zameen: ${city}. Moongphali di kheti ya makaan nirmaan layi dhukveen.`;
+      } else {
+        announcement = `ਚੁਣਿਆ ਗਿਆ ਸਥਾਨ: ${city}। ਸਿਫਾਰਸ਼ ਕੀਤੀ ਫ਼ਸਲ: ${crop}। ਝਾੜ: ${yieldVal} ਟਨ.`;
+        phoneticFallback = `Chuniya geya sthaan: ${city}. Sifarash keeti phasal: ${crop}. Jhaad: ${yieldVal} tons.`;
+      }
+    } else if (lang.startsWith('ur')) {
+      if (isForest) {
+        announcement = `محفوظ جنگلاتی علاقہ: ${city}۔ قدرتی جنگل، تجارتی فصل کاشت نہیں کی جا سکتی۔`;
+        phoneticFallback = `Mehfooz janglati ilaqah: ${city}. Qudrati jangal, tijarti fasal kasht nahi ki ja sakti.`;
+      } else if (isWater) {
+        announcement = `سمندری علاقہ: ${city}۔ زیادہ نمکیات 35 PSU کی وجہ سے فصل ممکن نہیں۔`;
+        phoneticFallback = `Samandari ilaqah: ${city}. Zyada namkiyat 35 PSU ki wajah se fasal mumkin nahi.`;
+      } else if (isBarren) {
+        announcement = `بنجر زمین: ${city}۔ مونگ پھلی کی کاشت یا عمارت کی تعمیر کے لیے بہترین۔`;
+        phoneticFallback = `Banjar zameen: ${city}. Mong phalli ki kasht ya imarat ki tameer ke liye behtareen.`;
+      } else {
+        announcement = `منتخب مقام: ${city}۔ تجویز کردہ فصل: ${crop}۔ پیداوار: ${yieldVal} ٹن۔`;
+        phoneticFallback = `Muntakhib maqaam: ${city}. Tajveez kardah fasal: ${crop}. Paidaawar: ${yieldVal} tons.`;
       }
     } else {
       if (isForest) {
         announcement = `Protected Forest Reserve: ${city}. Dense primary vegetation canopy. Commercial crops prohibited.`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `Marine Open Water: ${city}. Hyper-saline ocean body. No terrestrial crops viable.`;
+        announcement = `Marine Open Water: ${city}. Hyper-saline ocean body (35 PSU). Terrestrial crop cultivation is impossible.`;
+        phoneticFallback = announcement;
+      } else if (isBarren) {
+        announcement = `Barren Land & Arid Rocky Plateau: ${city}. Highly recommended for cultivating Groundnut or constructing residential buildings safely.`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `${city}. Recommended crop: ${crop}. Expected harvest: ${yieldVal} tons per hectare.`;
+        announcement = `Selected Location: ${city}. Recommended crop: ${crop}. Projected harvest: ${yieldVal} tons per hectare.`;
+        phoneticFallback = announcement;
       }
     }
-    speakFastNative(announcement);
+
+    speakFastNative(announcement, currentChatLangCode, phoneticFallback);
   }
 
-  function speakFastNative(textToSpeak) {
+  function speakFastNative(textToSpeak, langCode, phoneticFallback) {
     if (!('speechSynthesis' in window)) return;
     try {
       window.speechSynthesis.cancel();
@@ -1938,17 +2178,102 @@
       utter.rate = 1.05; // Fast, fluent, non-laggy
       utter.pitch = 1.0;
 
-      let detectedLang = currentChatLangCode || 'en-US';
-      if (/[\u0900-\u097F]/.test(clean)) detectedLang = 'hi-IN';
+      let detectedLang = langCode || currentChatLangCode || 'en-US';
+      if (/[\u0900-\u097F]/.test(clean)) detectedLang = (detectedLang && detectedLang.startsWith('mr')) ? 'mr-IN' : 'hi-IN';
       else if (/[\u0B80-\u0BFF]/.test(clean)) detectedLang = 'ta-IN';
+      else if (/[\u0D00-\u0D7F]/.test(clean)) detectedLang = 'ml-IN';
+      else if (/[\u0C00-\u0C7F]/.test(clean)) detectedLang = 'te-IN';
+      else if (/[\u0C80-\u0CFF]/.test(clean)) detectedLang = 'kn-IN';
+      else if (/[\u0980-\u09FF]/.test(clean)) detectedLang = 'bn-IN';
+      else if (/[\u0A80-\u0AFF]/.test(clean)) detectedLang = 'gu-IN';
+      else if (/[\u0A00-\u0A7F]/.test(clean)) detectedLang = 'pa-IN';
+      else if (/[\u0600-\u06FF]/.test(clean)) detectedLang = 'ur-PK';
+
       utter.lang = detectedLang;
 
       const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : window.speechSynthesis.getVoices();
       const prefix = detectedLang.split('-')[0].toLowerCase();
-      const matched = voices.find(v => v.lang.toLowerCase().startsWith(prefix) || v.name.toLowerCase().includes(prefix));
-      if (matched) utter.voice = matched;
+      const matched = voices.find(v => {
+        const vl = v.lang.toLowerCase();
+        const vn = v.name.toLowerCase();
+        return vl.startsWith(prefix) || 
+               (prefix === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana') || vn.includes('india'))) ||
+               (prefix === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha'))) ||
+               (prefix === 'te' && (vn.includes('telugu') || vn.includes('mohan'))) ||
+               (prefix === 'kn' && (vn.includes('kannada') || vn.includes('gagan'))) ||
+               (prefix === 'ml' && (vn.includes('malayalam') || vn.includes('midhun'))) ||
+               (prefix === 'bn' && (vn.includes('bengali') || vn.includes('bangla') || vn.includes('bashkar'))) ||
+               (prefix === 'mr' && (vn.includes('marathi') || vn.includes('aarohi'))) ||
+               (prefix === 'gu' && (vn.includes('gujarati') || vn.includes('dhwani'))) ||
+               (prefix === 'pa' && (vn.includes('punjabi') || vn.includes('gurmukhi'))) ||
+               (prefix === 'ur' && (vn.includes('urdu') || vn.includes('gul')));
+      });
 
-      // Chrome SpeechSynthesis auto-pause bugfix: resume periodic ping
+      if (matched) {
+        utter.voice = matched;
+        utter.onerror = function(errEvent) {
+          if (phoneticFallback && phoneticFallback !== clean) {
+            try {
+              const fallbackUtter = new SpeechSynthesisUtterance(phoneticFallback);
+              fallbackUtter.rate = 1.05;
+              window.speechSynthesis.speak(fallbackUtter);
+            } catch(e) {}
+          }
+        };
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utter);
+        return;
+      }
+
+      // Dual Engine: If OS has no native voice installed for this Indian/regional script, stream authentic native audio
+      if (prefix !== 'en') {
+        try {
+          const ttsUrl = API_BASE + '/tts?lang=' + encodeURIComponent(prefix) + '&text=' + encodeURIComponent(clean.slice(0, 180));
+          const audio = new Audio(ttsUrl);
+          window.currentTTSAudio = audio;
+          audio.onended = () => { window.currentTTSAudio = null; };
+          audio.onerror = () => {
+            window.currentTTSAudio = null;
+            // Direct Google fallback or phonetic speech synthesis
+            const directUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + encodeURIComponent(prefix) + '&q=' + encodeURIComponent(clean.slice(0, 160));
+            const dirAudio = new Audio(directUrl);
+            window.currentTTSAudio = dirAudio;
+            dirAudio.onended = () => { window.currentTTSAudio = null; };
+            dirAudio.onerror = () => {
+              window.currentTTSAudio = null;
+              if (phoneticFallback) {
+                try {
+                  const fallbackUtter = new SpeechSynthesisUtterance(phoneticFallback);
+                  fallbackUtter.rate = 1.05;
+                  window.speechSynthesis.speak(fallbackUtter);
+                } catch(e) {}
+              }
+            };
+            dirAudio.play().catch(() => {
+              window.currentTTSAudio = null;
+              if (phoneticFallback) {
+                try {
+                  const fallbackUtter = new SpeechSynthesisUtterance(phoneticFallback);
+                  fallbackUtter.rate = 1.05;
+                  window.speechSynthesis.speak(fallbackUtter);
+                } catch(e) {}
+              }
+            });
+          };
+          audio.play().catch(() => { audio.onerror(); });
+          return;
+        } catch(e) {}
+      }
+
+      utter.onerror = function(errEvent) {
+        if (phoneticFallback && phoneticFallback !== clean) {
+          try {
+            const fallbackUtter = new SpeechSynthesisUtterance(phoneticFallback);
+            fallbackUtter.rate = 1.05;
+            window.speechSynthesis.speak(fallbackUtter);
+          } catch(e) {}
+        }
+      };
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(utter);
     } catch (e) {
@@ -1958,14 +2283,9 @@
 
   function speakText(text) {
     if (!document.getElementById('voice-toggle').checked) return;
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 0.92;
-    window.speechSynthesis.speak(utter);
+    speakFastNative(text, currentChatLangCode);
   }
 
-  // ============================================================
   // THREE.JS 3D GLOBE - REALISTIC RENDERING
   // ============================================================
   let scene, camera, renderer, globeMesh, cloudMesh, pinMarkerMesh, controls, raycaster, mouse;
@@ -2335,7 +2655,7 @@
         leafletMapInstance.setView([currentLocationContext.lat, currentLocationContext.lon], 14);
         // Restore marker icon & popup with known land type
         if (leafletMarker && lastMLData) {
-          leafletMarker.setIcon(createLocMarker(lastMLData.location_type));
+          leafletMarker.setIcon(createLocMarker(lastMLData.location_type, heroEmoji));
           leafletMarker.setPopupContent(buildMarkerPopup(currentLocationContext.name, lastMLData.location_type, lastCVData ? lastCVData.dominant_ndvi?.score : null));
         }
         // Restore NDVI overlay
@@ -2363,29 +2683,157 @@
   // ============================================================
   function generateClientSatelliteSVG(lat, lon, landType) {
     const lt = (landType || '').toLowerCase();
-    const isWater = lt.includes('water') || lt.includes('ocean');
-    const isBarren = lt.includes('barren') || lt.includes('desert');
-    const isPolar = lt.includes('polar') || lt.includes('ice');
+    const isWater = lt.includes('water') || lt.includes('ocean') || lt.includes('marine') || lt.includes('sea');
+    const isForest = (lt.includes('forest') || lt.includes('canopy') || lt.includes('reserve') || lt.includes('rainforest')) && !isWater;
+    const isBarren = (lt.includes('barren') || lt.includes('desert') || lt.includes('arid') || lt.includes('plateau')) && !isWater;
+    const isFlood = (lt.includes('flood') || lt.includes('wetland') || lt.includes('marsh') || lt.includes('delta')) && !isWater;
+    const isPolar = (lt.includes('polar') || lt.includes('ice') || lt.includes('permafrost')) && !isWater;
 
-    const baseFill = isWater ? '#103055' : isBarren ? '#8a6538' : isPolar ? '#dbe8f5' : '#1f3d1f';
-    const gridColor1 = isWater ? '#1b4d80' : isBarren ? '#a67d48' : isPolar ? '#edf4fa' : '#2d5a27';
-    const gridColor2 = isWater ? '#0c233f' : isBarren ? '#6f502b' : isPolar ? '#c8dbee' : '#3a7232';
+    if (isWater) {
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
+          <defs>
+            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#041426"/>
+              <stop offset="40%" stop-color="#0b2e59"/>
+              <stop offset="75%" stop-color="#114b8b"/>
+              <stop offset="100%" stop-color="#072242"/>
+            </linearGradient>
+            <radialGradient id="sunGlint" cx="60%" cy="40%" r="50%">
+              <stop offset="0%" stop-color="#2a75c7" stop-opacity="0.45"/>
+              <stop offset="100%" stop-color="#0b2e59" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="260" fill="url(#oceanGrad)"/>
+          <rect width="480" height="260" fill="url(#sunGlint)"/>
+          <path d="M0,70 Q120,50 240,75 T480,65" stroke="#1f63ab" stroke-width="2" fill="none" opacity="0.4"/>
+          <path d="M0,135 Q140,115 260,140 T480,130" stroke="#2572c4" stroke-width="2.5" fill="none" opacity="0.35"/>
+          <path d="M0,195 Q100,180 220,205 T480,190" stroke="#1f63ab" stroke-width="2" fill="none" opacity="0.4"/>
+          <ellipse cx="260" cy="140" rx="180" ry="80" stroke="#388be6" stroke-width="1" stroke-dasharray="4,4" fill="none" opacity="0.25"/>
+          <ellipse cx="270" cy="140" rx="110" ry="50" stroke="#5fa6f5" stroke-width="1" stroke-dasharray="3,3" fill="none" opacity="0.3"/>
+          <rect x="10" y="10" width="460" height="42" rx="6" fill="rgba(4,20,38,0.85)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+          <text x="22" y="27" fill="#00f0ff" font-family="sans-serif" font-size="11" font-weight="bold">🛰️ Sentinel-3 OLCI Marine Multispectral Surface</text>
+          <text x="22" y="43" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.9">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | Salinity: 35.0 PSU | Hyper-Saline Ocean</text>
+          <rect x="360" y="17" width="100" height="18" rx="4" fill="#00f0ff" fill-opacity="0.2" stroke="#00f0ff"/>
+          <text x="375" y="30" fill="#00f0ff" font-family="sans-serif" font-size="9" font-weight="bold">PELAGIC SEA</text>
+        </svg>
+      `);
+    }
 
+    if (isForest) {
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
+          <defs>
+            <radialGradient id="canopy1" cx="30%" cy="30%" r="70%">
+              <stop offset="0%" stop-color="#145228"/>
+              <stop offset="60%" stop-color="#0a3317"/>
+              <stop offset="100%" stop-color="#051f0c"/>
+            </radialGradient>
+            <pattern id="forestPattern" width="30" height="30" patternUnits="userSpaceOnUse">
+              <circle cx="15" cy="15" r="14" fill="#0e3d1c" opacity="0.9"/>
+              <circle cx="6" cy="6" r="9" fill="#17592c" opacity="0.7"/>
+              <circle cx="22" cy="22" r="10" fill="#0a2e15" opacity="0.8"/>
+            </pattern>
+          </defs>
+          <rect width="480" height="260" fill="url(#canopy1)"/>
+          <rect width="480" height="260" fill="url(#forestPattern)"/>
+          <path d="M0,130 Q110,80 180,140 T320,110 T480,160" stroke="#1a5c8c" stroke-width="7" fill="none" opacity="0.85"/>
+          <path d="M0,130 Q110,80 180,140 T320,110 T480,160" stroke="#3385c6" stroke-width="3" fill="none" opacity="0.6"/>
+          <rect x="10" y="10" width="460" height="42" rx="6" fill="rgba(5,31,12,0.9)" stroke="#39ff14" stroke-width="1"/>
+          <text x="22" y="27" fill="#39ff14" font-family="sans-serif" font-size="11" font-weight="bold">🌲 Sentinel-2 MSI Primary Forest Canopy (10m Res)</text>
+          <text x="22" y="43" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.9">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | Protected Ecological Reserve | Zero Logging</text>
+          <rect x="360" y="17" width="100" height="18" rx="4" fill="#004d20" stroke="#39ff14"/>
+          <text x="367" y="30" fill="#39ff14" font-family="sans-serif" font-size="9" font-weight="bold">CANOPY 95%</text>
+        </svg>
+      `);
+    }
+
+    if (isBarren) {
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
+          <defs>
+            <linearGradient id="barrenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#b0864a"/>
+              <stop offset="45%" stop-color="#916a34"/>
+              <stop offset="80%" stop-color="#6e4d20"/>
+              <stop offset="100%" stop-color="#543711"/>
+            </linearGradient>
+          </defs>
+          <rect width="480" height="260" fill="url(#barrenGrad)"/>
+          <path d="M0,60 Q130,90 260,50 T480,80" stroke="#cfa667" stroke-width="12" fill="none" opacity="0.5"/>
+          <path d="M0,120 Q160,160 300,110 T480,140" stroke="#7a5523" stroke-width="14" fill="none" opacity="0.55"/>
+          <path d="M0,190 Q120,230 250,180 T480,210" stroke="#cfa667" stroke-width="10" fill="none" opacity="0.45"/>
+          <rect x="50" y="80" width="70" height="45" fill="#8c6530" rx="4" opacity="0.7"/>
+          <rect x="280" y="140" width="90" height="55" fill="#785322" rx="4" opacity="0.7"/>
+          <rect x="10" y="10" width="460" height="42" rx="6" fill="rgba(60,40,15,0.9)" stroke="#eab308" stroke-width="1"/>
+          <text x="22" y="27" fill="#facc15" font-family="sans-serif" font-size="11" font-weight="bold">🥜 Sentinel-2 Arid Land Surface (10m Res)</text>
+          <text x="22" y="43" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.9">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | Barren Rocky Plateau | CBR 14% (Safe for Buildings)</text>
+          <rect x="360" y="17" width="100" height="18" rx="4" fill="#eab308" fill-opacity="0.2" stroke="#eab308"/>
+          <text x="368" y="30" fill="#facc15" font-family="sans-serif" font-size="9" font-weight="bold">ARID PLATEAU</text>
+        </svg>
+      `);
+    }
+
+    if (isFlood) {
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
+          <defs>
+            <linearGradient id="floodGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1b4938"/>
+              <stop offset="50%" stop-color="#235c47"/>
+              <stop offset="100%" stop-color="#143629"/>
+            </linearGradient>
+          </defs>
+          <rect width="480" height="260" fill="url(#floodGrad)"/>
+          <path d="M0,40 Q100,80 200,60 T480,90" stroke="#1d6b99" stroke-width="16" fill="none" opacity="0.75"/>
+          <path d="M60,0 Q120,130 90,260" stroke="#1d6b99" stroke-width="10" fill="none" opacity="0.7"/>
+          <path d="M220,50 Q310,140 280,260" stroke="#1d6b99" stroke-width="8" fill="none" opacity="0.7"/>
+          <rect x="130" y="90" width="80" height="60" fill="#348553" rx="3" opacity="0.8"/>
+          <rect x="320" y="110" width="90" height="70" fill="#2d7348" rx="3" opacity="0.8"/>
+          <rect x="10" y="10" width="460" height="42" rx="6" fill="rgba(20,50,35,0.92)" stroke="#ff3366" stroke-width="1"/>
+          <text x="22" y="27" fill="#ff3366" font-family="sans-serif" font-size="11" font-weight="bold">⚠️ Sentinel-1 SAR Flood Inundation & Wetland Basin</text>
+          <text x="22" y="43" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.9">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | Shallow Aquifer &lt;2m | Severe Inundation Hazard</text>
+          <rect x="345" y="17" width="115" height="18" rx="4" fill="#ff3366" fill-opacity="0.2" stroke="#ff3366"/>
+          <text x="352" y="30" fill="#ff3366" font-family="sans-serif" font-size="9" font-weight="bold">NO BUILDINGS</text>
+        </svg>
+      `);
+    }
+
+    // Default: Prime Agricultural Landscape with Mosaic Fields & Pivot Irrigators
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
-        <rect width="480" height="260" fill="${baseFill}"/>
-        <g opacity="0.65">
-          <rect x="10" y="15" width="140" height="90" fill="${gridColor1}" rx="4"/>
-          <rect x="160" y="10" width="130" height="110" fill="${gridColor2}" rx="4"/>
-          <rect x="300" y="25" width="165" height="85" fill="${gridColor1}" rx="4"/>
-          <rect x="20" y="120" width="120" height="120" fill="${gridColor2}" rx="4"/>
-          <rect x="155" y="130" width="180" height="115" fill="${gridColor1}" rx="4"/>
-          <rect x="345" y="125" width="120" height="115" fill="${gridColor2}" rx="4"/>
-        </g>
-        <path d="M0,140 Q150,110 240,160 T480,120" stroke="${isWater ? '#2a6cb5' : '#8899aa'}" stroke-width="4" fill="none" opacity="0.5"/>
-        <path d="M120,0 Q180,120 140,260" stroke="#ffffff" stroke-dasharray="3,3" stroke-width="1.5" opacity="0.4"/>
-        <text x="14" y="24" fill="#00f0ff" font-family="sans-serif" font-size="11" font-weight="bold">🛰️ Sentinel-2 MSI RGB High-Res</text>
-        <text x="14" y="42" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.85">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | 10m Ground Res</text>
+        <defs>
+          <linearGradient id="soilBase" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1f3d1f"/>
+            <stop offset="50%" stop-color="#2c4d22"/>
+            <stop offset="100%" stop-color="#1a3317"/>
+          </linearGradient>
+        </defs>
+        <rect width="480" height="260" fill="url(#soilBase)"/>
+        <rect x="12" y="15" width="105" height="75" fill="#3d6b2c" rx="3" opacity="0.85"/>
+        <rect x="125" y="12" width="115" height="85" fill="#4f8236" rx="3" opacity="0.9"/>
+        <rect x="250" y="18" width="125" height="80" fill="#6d8a37" rx="3" opacity="0.85"/>
+        <rect x="385" y="15" width="85" height="85" fill="#355e24" rx="3" opacity="0.85"/>
+        <rect x="15" y="100" width="120" height="75" fill="#587d31" rx="3" opacity="0.85"/>
+        <rect x="145" y="105" width="110" height="75" fill="#44732b" rx="3" opacity="0.9"/>
+        <rect x="265" y="105" width="100" height="80" fill="#668239" rx="3" opacity="0.85"/>
+        <rect x="375" y="110" width="95" height="75" fill="#386326" rx="3" opacity="0.85"/>
+        <rect x="15" y="185" width="135" height="65" fill="#48732e" rx="3" opacity="0.85"/>
+        <rect x="160" y="190" width="125" height="60" fill="#5c8538" rx="3" opacity="0.9"/>
+        <rect x="295" y="195" width="90" height="55" fill="#436b28" rx="3" opacity="0.85"/>
+        <rect x="395" y="195" width="75" height="55" fill="#507830" rx="3" opacity="0.85"/>
+        <circle cx="70" cy="52" r="30" fill="#529938" opacity="0.75" stroke="#3d7529" stroke-width="1.5"/>
+        <circle cx="312" cy="58" r="34" fill="#68a83d" opacity="0.75" stroke="#487d27" stroke-width="1.5"/>
+        <circle cx="200" cy="142" r="32" fill="#5aa13b" opacity="0.75" stroke="#3f7526" stroke-width="1.5"/>
+        <path d="M0,175 Q150,140 270,185 T480,150" stroke="#1f71a3" stroke-width="5" fill="none" opacity="0.85"/>
+        <path d="M0,175 Q150,140 270,185 T480,150" stroke="#4da8db" stroke-width="2" fill="none" opacity="0.6"/>
+        <path d="M120,0 L120,260 M245,0 L245,260 M370,0 L370,260" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.35"/>
+        <path d="M0,95 L480,95 M0,185 L480,185" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.35"/>
+        <rect x="10" y="8" width="460" height="38" rx="5" fill="rgba(10,25,12,0.92)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+        <text x="20" y="24" fill="#00f0ff" font-family="sans-serif" font-size="11" font-weight="bold">🛰️ Sentinel-2 MSI RGB High-Res (10m Ground Res)</text>
+        <text x="20" y="38" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.9">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | B4-Red, B3-Green, B2-Blue | Cloud: 0%</text>
+        <rect x="365" y="14" width="95" height="17" rx="3" fill="#32cd32" fill-opacity="0.25" stroke="#32cd32"/>
+        <text x="375" y="26" fill="#32cd32" font-family="sans-serif" font-size="9" font-weight="bold">AGRI FERTILE</text>
       </svg>
     `);
   }
@@ -2394,34 +2842,36 @@
     const lt = (landType || '').toLowerCase();
     const isWater = lt.includes('water') || lt.includes('ocean');
     const isBarren = lt.includes('barren') || lt.includes('desert');
+    const isForest = lt.includes('forest') || lt.includes('canopy');
     const isPolar = lt.includes('polar') || lt.includes('ice');
 
-    // Light green: Agriculture (#50cd32)
-    // Dark green: Forestry (#006400)
-    // Light brown: Barren land (#c8a060)
-    // Blue: Ocean/Water (#1e90ff)
-    // White: Ice/Snow (#ffffff)
     const primary = isWater ? '#1e90ff' : isBarren ? '#c8a060' : isPolar ? '#ffffff' : '#50cd32';
-    const secondary = isWater ? '#004080' : isBarren ? '#8b5a2b' : isPolar ? '#d0e0f0' : '#006400';
+    const secondary = isWater ? '#004080' : isBarren ? '#8b5a2b' : isPolar ? '#d0e0f0' : isForest ? '#004d20' : '#1b5e20';
 
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
         <rect width="480" height="260" fill="${secondary}"/>
-        <rect x="25" y="20" width="180" height="100" fill="${primary}" rx="4"/>
-        <rect x="220" y="15" width="235" height="110" fill="${isBarren ? '#c8a060' : '#50cd32'}" rx="4"/>
-        <rect x="15" y="135" width="200" height="110" fill="${isWater ? '#1e90ff' : '#006400'}" rx="4"/>
-        <rect x="230" y="140" width="230" height="105" fill="${primary}" rx="4"/>
-        <path d="M0,90 Q200,60 320,130 T480,80" stroke="#1e90ff" stroke-width="8" fill="none" opacity="0.9"/>
-        <text x="14" y="24" fill="#00f0ff" font-family="sans-serif" font-size="11" font-weight="bold">🗺️ Sentinel Land Cover Mask (AI)</text>
-        <g transform="translate(14, 235)" font-family="sans-serif" font-size="9" fill="#ffffff" font-weight="bold">
-          <rect x="0" y="-8" width="10" height="10" fill="#50cd32"/>
-          <text x="14" y="0">Agri</text>
-          <rect x="50" y="-8" width="10" height="10" fill="#006400"/>
-          <text x="64" y="0">Forest</text>
-          <rect x="110" y="-8" width="10" height="10" fill="#c8a060"/>
-          <text x="124" y="0">Barren</text>
-          <rect x="175" y="-8" width="10" height="10" fill="#1e90ff"/>
-          <text x="189" y="0">Water</text>
+        <rect x="18" y="15" width="165" height="95" fill="${primary}" rx="4"/>
+        <rect x="195" y="12" width="145" height="100" fill="${isBarren ? '#c8a060' : '#50cd32'}" rx="4"/>
+        <rect x="350" y="15" width="115" height="95" fill="${isForest ? '#004d20' : '#50cd32'}" rx="4"/>
+        <rect x="15" y="120" width="180" height="95" fill="${isWater ? '#1e90ff' : '#004d20'}" rx="4"/>
+        <rect x="205" y="125" width="150" height="90" fill="${primary}" rx="4"/>
+        <rect x="365" y="120" width="100" height="95" fill="${isBarren ? '#c8a060' : '#50cd32'}" rx="4"/>
+        <path d="M0,85 Q160,50 280,110 T480,75" stroke="#1e90ff" stroke-width="7" fill="none" opacity="0.95"/>
+        <rect x="10" y="8" width="460" height="34" rx="4" fill="rgba(8,16,32,0.92)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+        <text x="20" y="24" fill="#00f0ff" font-family="sans-serif" font-size="11" font-weight="bold">🗺️ Deep Learning Land Cover Classification (U-Net AI)</text>
+        <text x="20" y="36" fill="#ffffff" font-family="sans-serif" font-size="8.5" opacity="0.9">${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | 10m Pixel Classification</text>
+        <g transform="translate(14, 238)" font-family="sans-serif" font-size="9" fill="#ffffff" font-weight="bold">
+          <rect x="0" y="-8" width="12" height="12" fill="#50cd32" rx="2"/>
+          <text x="17" y="2">Agri (68%)</text>
+          <rect x="85" y="-8" width="12" height="12" fill="#004d20" rx="2"/>
+          <text x="102" y="2">Forest (15%)</text>
+          <rect x="180" y="-8" width="12" height="12" fill="#c8a060" rx="2"/>
+          <text x="197" y="2">Barren (12%)</text>
+          <rect x="275" y="-8" width="12" height="12" fill="#1e90ff" rx="2"/>
+          <text x="292" y="2">Water (5%)</text>
+          <rect x="355" y="-8" width="12" height="12" fill="#ff3366" rx="2"/>
+          <text x="372" y="2">Urban</text>
         </g>
       </svg>
     `);
@@ -2429,36 +2879,45 @@
 
   function generateClientNdviSVG(lat, lon, score) {
     const s = Math.max(0.05, Math.min(0.95, score || 0.65));
+    const label = s > 0.6 ? 'HIGH (Dense Chlorophyll Canopy)' : (s > 0.35 ? 'MODERATE (Cultivated Farmland)' : 'LOW (Arid/Barren/Water)');
+    const barX = Math.round(15 + s * 450);
+
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260">
         <defs>
-          <linearGradient id="ndviGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id="ndviMapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#051c38"/>
+            <stop offset="25%" stop-color="#a67c45"/>
+            <stop offset="50%" stop-color="#e6db43"/>
+            <stop offset="75%" stop-color="#46b82a"/>
+            <stop offset="100%" stop-color="#0d4d1e"/>
+          </linearGradient>
+          <linearGradient id="barGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stop-color="#000080"/>
-            <stop offset="25%" stop-color="#c8a060"/>
-            <stop offset="55%" stop-color="#ffff00"/>
-            <stop offset="80%" stop-color="#50cd32"/>
-            <stop offset="100%" stop-color="#006400"/>
+            <stop offset="20%" stop-color="#a67c45"/>
+            <stop offset="45%" stop-color="#ffff00"/>
+            <stop offset="75%" stop-color="#50cd32"/>
+            <stop offset="100%" stop-color="#004d20"/>
           </linearGradient>
         </defs>
-        <rect width="480" height="260" fill="url(#ndviGrad)"/>
-        <circle cx="240" cy="130" r="90" fill="#006400" opacity="${s}"/>
-        <circle cx="120" cy="80" r="50" fill="#50cd32" opacity="${s * 0.8}"/>
-        <circle cx="360" cy="180" r="60" fill="#c8a060" opacity="0.6"/>
-        <text x="14" y="24" fill="#ffffff" font-family="sans-serif" font-size="11" font-weight="bold">🌿 NDVI Multispectral Heatmap</text>
-        <text x="14" y="42" fill="#ffff00" font-family="sans-serif" font-size="10" font-weight="bold">Score: ${s.toFixed(2)} (${s > 0.6 ? 'High Vigor' : s > 0.35 ? 'Moderate Vigor' : 'Low / Arid'})</text>
+        <rect width="480" height="260" fill="url(#ndviMapGrad)"/>
+        <circle cx="240" cy="120" r="95" fill="#0d4d1e" opacity="${s * 0.95}"/>
+        <circle cx="130" cy="85" r="60" fill="#46b82a" opacity="${s * 0.9}"/>
+        <circle cx="360" cy="155" r="75" fill="#46b82a" opacity="${s * 0.85}"/>
+        <circle cx="210" cy="180" r="45" fill="#e6db43" opacity="0.75"/>
+        <circle cx="80" cy="170" r="40" fill="#a67c45" opacity="0.6"/>
+        <rect x="10" y="8" width="460" height="38" rx="5" fill="rgba(5,20,10,0.92)" stroke="#50cd32" stroke-width="1"/>
+        <text x="20" y="24" fill="#39ff14" font-family="sans-serif" font-size="11" font-weight="bold">🌿 NDVI Multispectral Vegetation Vigor Heatmap</text>
+        <text x="20" y="38" fill="#ffffff" font-family="sans-serif" font-size="9" opacity="0.9">Score: ${s.toFixed(2)} | Status: ${label}</text>
+        <rect x="15" y="232" width="450" height="10" fill="url(#barGrad)" rx="3"/>
+        <polygon points="${barX},224 ${barX-5},216 ${barX+5},216" fill="#ffffff"/>
+        <text x="15" y="222" fill="#aaaaaa" font-family="sans-serif" font-size="8">-0.2 (Water)</text>
+        <text x="210" y="222" fill="#ffff00" font-family="sans-serif" font-size="8">0.4 (Cultivated)</text>
+        <text x="390" y="222" fill="#39ff14" font-family="sans-serif" font-size="8">+0.9 (Dense Canopy)</text>
       </svg>
     `);
   }
 
-  // ============================================================
-  // CLIENT-SIDE LOCATION ANALYSIS ENGINE (Zero failure fallback)
-  // ============================================================
-    // ============================================================
-  // CLIENT-SIDE LOCATION ANALYSIS ENGINE (Zero failure fallback)
-  // ============================================================
-    // ============================================================
-  // CLIENT-SIDE REAL ATTRACTIVE CROP EMOJI RESOLVER
-  // ============================================================
   function getClientCropEmoji(cropName, locType) {
     const c = (cropName || '').toLowerCase();
     const lt = (locType || '').toLowerCase();
@@ -3157,7 +3616,20 @@
     const factoryDist = ctx?.factory_dist_km != null ? ctx.factory_dist_km : 12.5;
     const yieldVal = ctx?.predicted_yield_tons_ha || '5.8';
     const yieldAcc = ctx?.yield_accuracy || '98';
-    const lang = (currentChatLangCode || 'en').toLowerCase();
+    
+    // Auto-detect language from script or current context
+    let lang = (currentChatLangCode || 'en').toLowerCase().split('-')[0];
+    if (/[\u0B80-\u0BFF]/.test(prompt)) lang = 'ta';
+    else if (/[\u0D00-\u0D7F]/.test(prompt)) lang = 'ml';
+    else if (/[\u0C00-\u0C7F]/.test(prompt)) lang = 'te';
+    else if (/[\u0C80-\u0CFF]/.test(prompt)) lang = 'kn';
+    else if (/[\u0980-\u09FF]/.test(prompt)) lang = 'bn';
+    else if (/[\u0A80-\u0AFF]/.test(prompt)) lang = 'gu';
+    else if (/[\u0A00-\u0A7F]/.test(prompt)) lang = 'pa';
+    else if (/[\u0600-\u06FF]/.test(prompt)) lang = 'ur';
+    else if (/[\u0900-\u097F]/.test(prompt)) {
+      if (lang !== 'mr') lang = 'hi';
+    }
 
     // Water telemetry determination
     const isWater = locType.toLowerCase().includes('ocean') || locType.toLowerCase().includes('water') || 
@@ -3200,7 +3672,7 @@
     // ------------------------------------------------------------
     const isWaterQuery = ['salinity', 'salt', 'psu', 'tds', 'river', 'lake', 'ocean', 'sea', 'water quality', 'water ph', 'potable', 'freshwater'].some(w => p.includes(w));
     if (isWaterQuery) {
-      if (lang.startsWith('ta')) {
+      if (lang === 'ta') {
         return `🌊 **நேரலை நீர் உவர்ப்புத்தன்மை (Salinity) மற்றும் pH அறிக்கை — ${locName}**:\n\n` +
           `• **நீர் நிலை வகை**: **${waterTypeName}**\n` +
           `• **உவர்ப்புத்தன்மை (Salinity)**: **${waterSalinityPSU} PSU** (Practical Salinity Units)\n` +
@@ -3212,7 +3684,7 @@
           `2. **ஆறுகள் / ஏரிகள் (River/Lake)**: 0.25–0.4 PSU (180–280 ppm TDS) — மிகச் சிறந்த நன்னீர்.\n` +
           `3. **நிலத்தடி நீர் (Aquifer)**: 0.55 PSU (480 ppm TDS) — ஆழ்குழாய் பாசனத்திற்கு பாதுகாப்பானது.`;
       }
-      if (lang.startsWith('hi')) {
+      if (lang === 'hi') {
         return `🌊 **जल लवणता (Salinity) और pH स्तर लाइव रिपोर्ट — ${locName}**:\n\n` +
           `• **जल निकाय का प्रकार**: **${waterTypeName}**\n` +
           `• **जल लवणता (Salinity)**: **${waterSalinityPSU} PSU**\n` +
@@ -3224,7 +3696,34 @@
           `2. **नदियां और झीलें**: 0.25–0.35 PSU (180–240 ppm TDS) — मीठा प्राकृतिक जल, कृषि के लिए सर्वश्रेष्ठ।\n` +
           `3. **भूजल (Borewell)**: 0.55 PSU (480 ppm TDS) — ड्रिप सिंचाई के लिए सुरक्षित।`;
       }
-      if (lang.startsWith('ml')) {
+      if (lang === 'te') {
+        return `🌊 **నీటి లవణీయత (Salinity) మరియు pH స్థాయి ప్రత్యక్ష నివేదిక — ${locName}**:\n\n` +
+          `• **జలాశయం రకం**: **${waterTypeName}**\n` +
+          `• **లవణీయత (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS మొత్తం**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **నీటి pH స్థాయి**: **${waterPhVal}**\n` +
+          `• **నాణ్యత**: ${waterPotability}\n\n` +
+          `నదులు మరియు సరస్సులలో లవణీయత 0.3 PSU (మంచినీరు), సముద్రంలో 35 PSU ఉంటుంది.`;
+      }
+      if (lang === 'kn') {
+        return `🌊 **ನೀರಿನ ಲವಣಾಂಶ (Salinity) ಮತ್ತು pH ಮಟ್ಟದ ಲೈವ್ ವರದಿ — ${locName}**:\n\n` +
+          `• **ಜಲಮೂಲದ ಪ್ರಕಾರ**: **${waterTypeName}**\n` +
+          `• **ಲವಣಾಂಶ (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS ಪ್ರಮಾಣ**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **ನೀರಿನ pH ಮಟ್ಟ**: **${waterPhVal}**\n` +
+          `• **ಬಳಕೆ ಯೋಗ್ಯತೆ**: ${waterPotability}\n\n` +
+          `ನದಿ ಮತ್ತು ಸರೋವರಗಳಲ್ಲಿ ಲವಣಾಂಶ 0.3 PSU ಗಿಂತ ಕಡಿಮೆ (ಸಿಹಿನೀರು), ಆದರೆ ಸಮುದ್ರದಲ್ಲಿ 35 PSU ಇರುತ್ತದೆ.`;
+      }
+      if (lang === 'bn') {
+        return `🌊 **পানির লবণাক্ততা (Salinity) এবং pH স্তরের লাইভ রিপোর্ট — ${locName}**:\n\n` +
+          `• **জলাশয়ের ধরন**: **${waterTypeName}**\n` +
+          `• **লবণাক্ততা (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS মাত্রা**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **পানির pH মান**: **${waterPhVal}**\n` +
+          `• **গুণমান**: ${waterPotability}\n\n` +
+          `নদী এবং হ্রদে লবণাক্ততা ০.৩ PSU এর নিচে থাকে (মিষ্টি পানি), তবে সমুদ্রে ৩৫ PSU থাকে।`;
+      }
+      if (lang === 'ml') {
         return `🌊 **ജല ലവണാംശവും (Salinity) pH ലെവലും — ${locName}**:\n\n` +
           `• **ജലാശയ തരം**: **${waterTypeName}**\n` +
           `• **ലവണാംശം (Salinity)**: **${waterSalinityPSU} PSU**\n` +
@@ -3233,7 +3732,31 @@
           `• **ഗുണനിലവാരം**: ${waterPotability}\n\n` +
           `നദികളിലും കായലുകളിലും ലവണാംശം 0.3 PSU-ൽ താഴെയാണ് (ശുദ്ധജലം), എന്നാൽ സമുദ്രത്തിൽ 35 PSU ആണ്.`;
       }
-      if (lang.startsWith('ur')) {
+      if (lang === 'mr') {
+        return `🌊 **पाण्याची क्षारता (Salinity) आणि pH पातळी थेट अहवाल — ${locName}**:\n\n` +
+          `• **जलसाठ्याचा प्रकार**: **${waterTypeName}**\n` +
+          `• **क्षारता (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **टीडीएस (TDS)**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **पाण्याची pH पातळी**: **${waterPhVal}**\n` +
+          `• **वापर योग्यता**: ${waterPotability}`;
+      }
+      if (lang === 'gu') {
+        return `🌊 **પાણીની ક્ષારતા (Salinity) અને pH સ્તરનો લાઈવ રિપોર્ટ — ${locName}**:\n\n` +
+          `• **જળાશયનો પ્રકાર**: **${waterTypeName}**\n` +
+          `• **ક્ષારતા (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS સ્તર**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **પાણીનું pH સ્તર**: **${waterPhVal}**\n` +
+          `• **ગુણવત્તા**: ${waterPotability}`;
+      }
+      if (lang === 'pa') {
+        return `🌊 **ਪਾਣੀ ਦਾ ਖਾਰਾਪਣ (Salinity) ਅਤੇ pH ਪੱਧਰ ਲਾਈਵ ਰਿਪੋਰਟ — ${locName}**:\n\n` +
+          `• **ਪਾਣੀ ਦੀ ਕਿਸਮ**: **${waterTypeName}**\n` +
+          `• **ਖਾਰਾਪਣ (Salinity)**: **${waterSalinityPSU} PSU**\n` +
+          `• **TDS ਮਾਤਰਾ**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
+          `• **ਪਾਣੀ ਦਾ pH ਪੱਧਰ**: **${waterPhVal}**\n` +
+          `• **ਵਰਤੋਂ ਯੋਗਤਾ**: ${waterPotability}`;
+      }
+      if (lang === 'ur') {
         return `🌊 **پانی کی نمکیات (Salinity) اور pH کی لائیو رپورٹ — ${locName}**:\n\n` +
           `• **پانی کی قسم**: **${waterTypeName}**\n` +
           `• **نمکیات (Salinity)**: **${waterSalinityPSU} PSU**\n` +
@@ -3242,16 +3765,6 @@
           `• **حیثیت**: ${waterPotability}\n\n` +
           `دریاؤں اور جھیلوں میں نمکیات 0.3 PSU ہوتی ہے جبکہ سمندر میں 35 PSU ہوتی ہے۔`;
       }
-      if (lang.startsWith('es')) {
-        return `🌊 **Informe de Salinidad y pH del Agua en Vivo — ${locName}**:\n\n` +
-          `• **Tipo de Masa de Agua**: **${waterTypeName}**\n` +
-          `• **Salinidad**: **${waterSalinityPSU} PSU**\n` +
-          `• **TDS (Sólidos Disueltos)**: **${waterTdsPPM.toLocaleString()} ppm**\n` +
-          `• **Nivel de pH**: **${waterPhVal}** (${waterPhVal > 7.5 ? 'Alcalino marino' : 'Agua dulce neutra'})\n` +
-          `• **Calidad**: ${waterPotability}\n\n` +
-          `Océanos tienen salinidad promedio de 35 PSU; ríos y lagos contienen agua dulce potable (<0.5 PSU).`;
-      }
-
       return `🌊 **Live Water Salinity & pH Environmental Analysis — ${locName}**:\n\n` +
         `• **Water Body Classification**: **${waterTypeName}**\n` +
         `• **Salinity Level**: **${waterSalinityPSU} PSU** (Practical Salinity Units)\n` +
@@ -3315,7 +3828,7 @@
         wastewaterDesc = `Nearby factory poses severe risk of untreated chemical wastewater leaching into shallow aquifers, elevating heavy metals and causing sulfate attack that weakens subterranean concrete foundations.`;
       }
 
-      if (lang.startsWith('ta')) {
+      if (lang === 'ta') {
         return `🏗️ **கட்டட ஸ்திரத்தன்மை, வெள்ள அபாயம் மற்றும் தொழிற்சாலை மாசு அறிக்கை — ${locName}**:\n\n` +
           `• **கட்டடம் கட்டலாமா?**: ${factoryDist >= 3.0 && waterDepthNum >= 5.0 ? '✅ ஆம், பாதுகாப்புடன் கட்டலாம் (பாதுகாப்பானது).' : '⚠️ சில கட்டுப்பாடுகளுடன் சிறப்பு அடித்தளம் அமைத்து மட்டுமே கட்ட முடியும்.'}\n\n` +
           `🌊 **1. வெள்ள அபாய பகுப்பாய்வு (Flood Risk):**\n` +
@@ -3332,7 +3845,7 @@
           `• நிலை: **${wastewaterHazard}** — ${wastewaterDesc}`;
       }
 
-      if (lang.startsWith('hi')) {
+      if (lang === 'hi') {
         return `🏗️ **भवन निर्माण स्थिरता, बाढ़ जोखिम और प्रदूषण विश्लेषण — ${locName}**:\n\n` +
           `• **क्या निर्माण संभव है?**: ${factoryDist >= 3.0 && waterDepthNum >= 5.0 ? '✅ हाँ, निर्माण के लिए अनुकूल एवं सुरक्षित भूमि।' : '⚠️ सावधानियों और विशेष फाउंडेशन के साथ निर्माण संभव।'}\n\n` +
           `🌊 **1. बाढ़ का खतरा (Flood Hazard):**\n` +
@@ -3346,6 +3859,78 @@
           `• स्तर: **${factoryAirHazard}** — ${factoryAirDesc}\n\n` +
           `🧪 **4. फैक्ट्री अपशिष्ट जल और भूजल संदूषण:**\n` +
           `• स्तर: **${wastewaterHazard}** — ${wastewaterDesc}`;
+      }
+
+      if (lang === 'te') {
+        return `🏗️ **భవన నిర్మాణం మరియు పర్యావరణ ముప్పు విశ్లేషణ — ${locName}**:\n\n` +
+          `🌊 **1. వరద ముప్పు**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. నేల స్థిరత్వం & కూలే ప్రమాదం**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• పునాది: **${foundationRec}**\n` +
+          `🏭 **3. పరిశ్రమల కాలుష్యం**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. వ్యర్థ నీరు & భూగర్భ జలాలు**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'kn') {
+        return `🏗️ **ಕಟ್ಟಡ ನಿರ್ಮಾಣ ಮತ್ತು ಪರಿಸರ ಅಪಾಯ ವಿಶ್ಲೇಷಣೆ — ${locName}**:\n\n` +
+          `🌊 **1. ಪ್ರವಾಹದ ಅಪಾಯ**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. ಮಣ್ಣಿನ ಸ್ಥಿರತೆ & ಕುಸಿಯುವ ಅಪಾಯ**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• ಅಡಿಪಾಯ: **${foundationRec}**\n` +
+          `🏭 **3. ಕಾರ್ಖಾನೆ ವಾಯು ಮಾಲಿನ್ಯ**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. ತ್ಯಾಜ್ಯ ನೀರು ಮತ್ತು ಅಂತರ್ಜಲ**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'bn') {
+        return `🏗️ **ভবন নির্মাণ এবং পরিবেশগত ঝুঁকি বিশ্লেষণ — ${locName}**:\n\n` +
+          `🌊 **১. বন্যার ঝুঁকি**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **২. মাটির স্থায়িত্ব ও ধসের ঝুঁকি**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• ভিত্তি (Foundation): **${foundationRec}**\n` +
+          `🏭 **৩. কারখানার বায়ু দূষণ**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **৪. বর্জ্য পানি ও ভূগর্ভস্থ দূষণ**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'ml') {
+        return `🏗️ **കെട്ടിട നിർമ്മാണ സുരക്ഷാ വിലയിരുത്തൽ — ${locName}**:\n\n` +
+          `🌊 **1. പ്രളയ സാധ്യത**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. മണ്ണുറപ്പും വീഴാനുള്ള സാധ്യതയും**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• ഫൗണ്ടേഷൻ: **${foundationRec}**\n` +
+          `🏭 **3. ഫാക്ടറി മലിനീകരണം**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. വ്യാവസായിക മലിനജലം**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'mr') {
+        return `🏗️ **इमारत बांधकाम आणि पर्यावरण धोका विश्लेषण — ${locName}**:\n\n` +
+          `🌊 **1. पूर धोका**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. मातीची स्थिरता & कोसळण्याचा धोका**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• पाया: **${foundationRec}**\n` +
+          `🏭 **3. कारखान्याचे प्रदूषण**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. सांडपाणी आणि भूजल**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'gu') {
+        return `🏗️ **મકાન બાંધકામ અને પર્યાવરણીય જોખમ વિશ્લેષણ — ${locName}**:\n\n` +
+          `🌊 **1. પૂરનું જોખમ**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. માટીની સ્થિરતા & પડવાનું જોખમ**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• પાયો: **${foundationRec}**\n` +
+          `🏭 **3. કારખાનાનું પ્રદૂષણ**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. ગંદુ પાણી અને ભૂગર્ભ જળ**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'pa') {
+        return `🏗️ **ਇਮਾਰਤ ਉਸਾਰੀ ਅਤੇ ਵਾਤਾਵਰਣ ਜੋਖਮ ਵਿਸ਼ਲੇਸ਼ਣ — ${locName}**:\n\n` +
+          `🌊 **1. ਹੜ੍ਹ ਦਾ ਖ਼ਤਰਾ**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. ਮਿੱਟੀ ਦੀ ਸਥਿਰਤਾ & ਡਿੱਗਣ ਦਾ ਖ਼ਤਰਾ**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• ਨੀਂਹ: **${foundationRec}**\n` +
+          `🏭 **3. ਫੈਕਟਰੀ ਪ੍ਰਦੂਸ਼ਣ**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. ਗੰਦਾ ਪਾਣੀ ਤੇ ਜ਼ਮੀਨ ਹੇਠਲਾ ਪਾਣੀ**: ${wastewaterHazard}`;
+      }
+
+      if (lang === 'ur') {
+        return `🏗️ **تعمیراتی اور ماحولیاتی خطرات کا جائزہ — ${locName}**:\n\n` +
+          `🌊 **1. سیلاب کا خطرہ**: ${floodLevel} — ${floodDesc}\n` +
+          `🏢 **2. مٹی کا استحکام اور عمارت گرنے کا خطرہ**: ${soilStabilityLevel} — ${willFallVerdict}\n` +
+          `• بنیاد: **${foundationRec}**\n` +
+          `🏭 **3. فیکٹری کی فضائی آلودگی**: ${factoryDist} km — ${factoryAirHazard}\n` +
+          `🚰 **4. گندا پانی اور زیر زمین آلودگی**: ${wastewaterHazard}`;
       }
 
       const isBarrenLoc = locType.toLowerCase().includes('barren') || locType.toLowerCase().includes('arid') || locType.toLowerCase().includes('plateau');
@@ -3420,7 +4005,7 @@
           `💡 **Controlled Alternative**: Indoor heated CEA hydroponic Polyhouse Strawberries, Microgreens & Lettuce.`;
       }
 
-      if (lang.startsWith('ta')) {
+      if (lang === 'ta') {
         return `🌾 **பயிர் பரிந்துரை மற்றும் உச்ச மகசூல் பகுப்பாய்வு — ${locName}**:\n\n` +
           `🥇 **அதிக மகசூல் தரும் பரிந்துரைக்கப்பட்ட பயிர்**: **${crop}**\n` +
           `📈 **எதிர்பார்க்கப்படும் உச்ச மகசூல்**: **${yieldVal} டன் / ஹெக்டேர்** (துல்லியம்: **${yieldAcc}%**)\n` +
@@ -3433,7 +4018,7 @@
           `• சென்ற ஆண்டை விட நடப்பு பருவத்தில் பயிர் மேலாண்மை காரணமாக **+12.4% கூடுதல் மகசூல்** பதிவு செய்யப்பட்டுள்ளது.`;
       }
 
-      if (lang.startsWith('hi')) {
+      if (lang === 'hi') {
         return `🌾 **फसल सिफारिश और अधिकतम उपज विश्लेषण — ${locName}**:\n\n` +
           `🥇 **सर्वोच्च उपज वाली अनुशंसित फसल**: **${crop}**\n` +
           `📈 **अपेक्षित उपज**: **${yieldVal} टन प्रति हेक्टेयर** (सटीकता: **${yieldAcc}%**)\n` +
@@ -3444,6 +4029,62 @@
           `• **मिट्टी की नमी**: **${soilMoist}** | **NDVI सूचकांक**: **${ndvi}**.\n\n` +
           `📊 **ऐतिहासिक तुलना (पिछला बनाम वर्तमान सीजन):**\n` +
           `• बेहतर मृदा स्वास्थ्य और सटीक ड्रिप सिंचाई से इस वर्ष उपज में **+12.4% की वृद्धि** हुई है।`;
+      }
+
+      if (lang === 'te') {
+        return `🌾 **పంట సిఫార్సు మరియు దిగుబడి విశ్లేషణ — ${locName}**:\n\n` +
+          `🥇 **సిఫార్సు చేయబడిన పంట**: **${crop}**\n` +
+          `📈 **అత్యధిక దిగుబడి**: **${yieldVal} టన్నులు / హెక్టారు** (ఖచ్చితత్వం: **${yieldAcc}%**)\n` +
+          `• **నేల pH**: **${soilPh}** | **భూగర్భ జలాలు**: **${waterDepth}** | **తేమ**: **${soilMoist}**`;
+      }
+
+      if (lang === 'kn') {
+        return `🌾 **ಬೆಳೆ ಶಿಫಾರಸು ಮತ್ತು ಇಳುವರಿ ವಿಶ್ಲೇಷಣೆ — ${locName}**:\n\n` +
+          `🥇 **ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆ**: **${crop}**\n` +
+          `📈 **ಗರಿಷ್ಠ ಇಳುವರಿ**: **${yieldVal} ಟನ್ / ಹೆಕ್ಟೇರ್** (ನಿಖರತೆ: **${yieldAcc}%**)\n` +
+          `• **ಮಣ್ಣಿನ pH**: **${soilPh}** | **ಅಂತರ್ಜಲ**: **${waterDepth}** | **ತೇವಾಂಶ**: **${soilMoist}**`;
+      }
+
+      if (lang === 'bn') {
+        return `🌾 **ফসল সুপারিশ ও ফলন বিশ্লেষণ — ${locName}**:\n\n` +
+          `🥇 **প্রস্তাবিত ফসল**: **${crop}**\n` +
+          `📈 **সর্বোচ্চ ফলন**: **${yieldVal} টন / হেক্টর** (নির্ভুলতা: **${yieldAcc}%**)\n` +
+          `• **মাটির pH**: **${soilPh}** | **ভূগর্ভস্থ পানি**: **${waterDepth}** | **আর্দ্রতা**: **${soilMoist}**`;
+      }
+
+      if (lang === 'ml') {
+        return `🌾 **വിള ശുപാർശയും വിളവ് വിവരങ്ങളും — ${locName}**:\n\n` +
+          `🥇 **ശുപാർശ ചെയ്യുന്ന വിള**: **${crop}**\n` +
+          `📈 **പ്രതീಕ್ಷിക്കുന്ന വിളവ്**: **${yieldVal} ടൺ / ഹെക്ടർ**\n` +
+          `• **മണ്ണ് pH**: **${soilPh}** | **ജലനിരപ്പ്**: **${waterDepth}** | **ഈർപ്പം**: **${soilMoist}**`;
+      }
+
+      if (lang === 'mr') {
+        return `🌾 **पीक शिफारस आणि उत्पादन विश्लेषण — ${locName}**:\n\n` +
+          `🥇 **सर्वोत्तम शिफारस केलेले पीक**: **${crop}**\n` +
+          `📈 **अपेक्षित उत्पादन**: **${yieldVal} टन / हेक्टर**\n` +
+          `• **जमिनीचा pH**: **${soilPh}** | **भूजल पातळी**: **${waterDepth}**`;
+      }
+
+      if (lang === 'gu') {
+        return `🌾 **પાક ભલામણ અને ઉપજ વિશ્લેષણ — ${locName}**:\n\n` +
+          `🥇 **શ્રેષ્ઠ ભલામણ કરેલ પાક**: **${crop}**\n` +
+          `📈 **અંદાજિત ઉપજ**: **${yieldVal} ટન / હેક્ટર**\n` +
+          `• **જમીન pH**: **${soilPh}** | **પાણીનું સ્તર**: **${waterDepth}**`;
+      }
+
+      if (lang === 'pa') {
+        return `🌾 **ਫ਼ਸਲ ਸਿਫ਼ਾਰਸ਼ ਅਤੇ ਝਾੜ ਵਿਸ਼ਲੇਸ਼ਣ — ${locName}**:\n\n` +
+          `🥇 **ਸਭ ਤੋਂ ਵਧੀਆ ਫ਼ਸਲ**: **${crop}**\n` +
+          `📈 **ਸੰਭਾਵਿਤ ਝਾੜ**: **${yieldVal} ਟਨ / ਹੈਕਟੇਅਰ**\n` +
+          `• **ਮਿੱਟੀ pH**: **${soilPh}** | **ਪਾਣੀ ਦਾ ਪੱਧਰ**: **${waterDepth}**`;
+      }
+
+      if (lang === 'ur') {
+        return `🌾 **فصل کی سفارش اور پیداوار — ${locName}**:\n\n` +
+          `🥇 **سب سے بہترین فصل**: **${crop}**\n` +
+          `📈 **متوقع پیداوار**: **${yieldVal} ٹن فی ہیکٹر**\n` +
+          `• **مٹی کا pH**: **${soilPh}** | **پانی کی سطح**: **${waterDepth}**`;
       }
 
       const phEvaluation = (soilPh >= 6.0 && soilPh <= 7.8) 
@@ -3483,11 +4124,35 @@
     // Default Greetings / General
     const isGreeting = /\b(hello|hi|hey|help|who are you|advisor|greet)\b/i.test(p);
     if (isGreeting) {
-      if (lang.startsWith('ta')) {
+      if (lang === 'ta') {
         return `👋 **வணக்கம்! நான் உங்கள் சென்டினல்-எர்த் AI ஆலோசகர்.**\n\nநான் செயற்கைக்கோள் தரவு மற்றும் கணினி பார்வை (Computer Vision) மூலம் **${locName}** பகுதியை கண்காணிக்கிறேன்.\n\n📍 **பகுதி விவரம்:**\n• வகை: ${locType}\n• பரிந்துரைக்கப்படும் பயிர்: **${crop}** (மகசூல்: **${yieldVal} T/Ha**)\n• நீர் உவர்ப்பு: **${waterSalinityPSU} PSU** | TDS: **${waterTdsPPM} ppm**\n• மண் pH: **${soilPh}** | நிலத்தடி நீர்: **${waterDepth}**\n\n💡 பயிர் மகசூல், நீர் தரம், மற்றும் கட்டட பாதுகாப்பு பற்றி எதையும் கேட்கலாம்!`;
       }
-      if (lang.startsWith('hi')) {
+      if (lang === 'hi') {
         return `👋 **नमस्ते! मैं आपका सेंटिनल-अर्थ AI सलाहकार हूँ।**\n\nमैं उपग्रह डेटा और कंप्यूटर विज़न के माध्यम से **${locName}** की निगरानी कर रहा हूँ।\n\n📍 **क्षेत्रीय विवरण:**\n• वर्गीकरण: ${locType}\n• अनुशंसित फसल: **${crop}** (उपज: **${yieldVal} T/Ha**)\n• जल लवणता: **${waterSalinityPSU} PSU** | TDS: **${waterTdsPPM} ppm**\n• मिट्टी का pH: **${soilPh}** | भूजल स्तर: **${waterDepth}**\n\n💡 आप फसल उपज, जल गुणवत्ता और भवन निर्माण सुरक्षा के बारे में पूछ सकते हैं!`;
+      }
+      if (lang === 'te') {
+        return `👋 **నమస్కారం! నేను మీ సెంటినెల్-ఎర్త్ AI సలహాదారుని.**\n\nనేను **${locName}** ఉపగ్రహ డేటాను విశ్లేషిస్తున్నాను.\n• **పంట**: **${crop}** (${yieldVal} T/Ha)\n• **నేల pH**: **${soilPh}** | **లవణీయత**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'kn') {
+        return `👋 **ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ ಸೆಂಟಿನೆಲ್-ಅರ್ಥ್ AI ಸಲಹೆಗಾರ.**\n\nನಾನು **${locName}** ಉಪಗ್ರಹ ಡೇಟಾವನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದ್ದೇನೆ.\n• **ಬೆಳೆ**: **${crop}** (${yieldVal} T/Ha)\n• **ಮಣ್ಣಿನ pH**: **${soilPh}** | **ಲವಣಾಂಶ**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'bn') {
+        return `👋 **নমস্কার! আমি আপনার সেন্টিনেল-আর্থ এআই উপদেষ্টা।**\n\nআমি **${locName}** অঞ্চলের স্যাটেলাইট ডেটা বিশ্লেষণ করছি।\n• **ফসল**: **${crop}** (${yieldVal} T/Ha)\n• **মাটির pH**: **${soilPh}** | **লবণাক্ততা**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'ml') {
+        return `👋 **നമസ്കാരം! ഞാൻ നിങ്ങളുടെ സെന്റിനൽ-എർത്ത് AI അഡ്വൈസർ ആണ്.**\n\n**${locName}** പ്രദേശത്തെ ഉപഗ്രഹ വിവരങ്ങൾ ഞാൻ പരിശോധിക്കുന്നു.\n• **വിള**: **${crop}** (${yieldVal} T/Ha)\n• **മണ്ണ് pH**: **${soilPh}** | **ലവണാംശം**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'mr') {
+        return `👋 **नमस्कार! मी आपला सेंटिनेल-अर्थ AI सल्लागार आहे.**\n\nमी **${locName}** उपग्रह डेटाचे विश्लेषण करत आहे.\n• **पीक**: **${crop}** (${yieldVal} T/Ha)\n• **माती pH**: **${soilPh}** | **क्षारता**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'gu') {
+        return `👋 **નમસ્તે! હું તમારો સેન્ટિનેલ-અર્થ AI સલાહકાર છું.**\n\nહું **${locName}** સેટેલાઇટ ડેટાનું વિશ્લેષણ કરી રહ્યો છું.\n• **પાક**: **${crop}** (${yieldVal} T/Ha)\n• **જમીન pH**: **${soilPh}** | **ક્ષારતા**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'pa') {
+        return `👋 **ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡਾ ਸੈਂਟੀਨਲ-ਅਰਥ AI ਸਲਾਹਕਾਰ ਹਾਂ।**\n\nਮੈਂ **${locName}** ਸੈਟੇਲਾਈਟ ਡੇਟਾ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰ ਰਿਹਾ ਹਾਂ।\n• **ਫ਼ਸਲ**: **${crop}** ({yieldVal} T/Ha)\n• **ਮਿੱਟੀ pH**: **${soilPh}** | **ਖਾਰਾਪਣ**: **${waterSalinityPSU} PSU**`;
+      }
+      if (lang === 'ur') {
+        return `👋 **ہیلو! میں آپ کا سینٹی نیل ارتھ AI مشیر ہوں۔**\n\nمیں **${locName}** کے سیٹلائٹ ڈیٹا کی نگرانی کر رہا ہوں۔\n• **فصل**: **${crop}** (${yieldVal} T/Ha)\n• **مٹی کا pH**: **${soilPh}** | **نمکیات**: **${waterSalinityPSU} PSU**`;
       }
       return `👋 **Hello! I'm your Sentinel-Earth AI Advisor.**\n\nI am actively monitoring **${locName}** using Sentinel-1/2/3/5P satellite telemetry and Computer Vision.\n\n📍 **Region Overview:**\n• **Classification**: ${locType}\n• **Crop Status**: **${crop}**\n• **Yield & Profit**: Expected Yield: **${yieldVal} Tons/Ha** (Confidence: **${yieldAcc}%**)\n• **NDVI Vegetation Health**: Score **${ndvi}**\n• **Water Salinity & TDS**: **${waterSalinityPSU} PSU** | **${waterTdsPPM.toLocaleString()} ppm**\n• **Soil pH**: **${soilPh}** | **Water Table**: **${waterDepth}** | **Soil Moisture**: **${soilMoist}**\n\n💡 **You can ask me:**\n1. 🌾 Which crop produces the highest yield and profit here?\n2. ⚠️ Will building houses cause flood damage, soil collapse, or factory pollution?\n3. 🌊 What is the live water salinity in PSU and pH of river/lake/ocean?\n4. 🧪 What is the soil pH and how to improve fertility?\n5. 💧 What is the underground water table depth?`;
     }
@@ -3500,9 +4165,6 @@
       `💡 Ask me about crop yields & profits, building hazards, water salinity PSU, or soil quality.`;
   }
 
-  // ============================================================
-  // CV SATELLITE IMAGE PANEL TABS
-  // ============================================================
   function switchCVTab(tab, el) {
     activeCVTab = tab;
     document.querySelectorAll('.cv-tab').forEach(t => t.classList.remove('active'));
@@ -3737,7 +4399,7 @@
     };
 
     const chatAbortCtrl = new AbortController();
-    const chatTimeoutId = setTimeout(() => chatAbortCtrl.abort(), 2500);
+    const chatTimeoutId = setTimeout(() => chatAbortCtrl.abort(), 6000);
 
     fetch(`${API_BASE}/hf-chat`, {
       method: 'POST',
@@ -4012,7 +4674,7 @@
 
     // Background server sync & SQLite DB persistence
     const abortCtrl = new AbortController();
-    const timeoutId = setTimeout(() => abortCtrl.abort(), 2000);
+    const timeoutId = setTimeout(() => abortCtrl.abort(), 8000);
 
     fetch(`${API_BASE}/analyze-location`, {
       method: 'POST',
@@ -4095,18 +4757,14 @@
 
     // ---- Update 2D Leaflet marker with actual land type & NDVI overlay ----
     if (leafletMarker) {
-      leafletMarker.setIcon(createLocMarker(ml.location_type));
+      leafletMarker.setIcon(createLocMarker(ml.location_type, heroEmoji));
       leafletMarker.setPopupContent(buildMarkerPopup(currentLocationContext.name, ml.location_type, ndvi.score));
       if (activeMapMode === '2d') leafletMarker.openPopup();
     }
     // Show NDVI land cover overlay on 2D map (same color scheme as 3D cv_engine)
     showNdviOverlayOn2DMap(currentLocationContext.lat, currentLocationContext.lon, cv);
 
-    // ---- Voice announcement of land type (the real location land type) ----
-    if (document.getElementById('voice-toggle').checked) {
-      const landMsg = _getLandTypeVoice(ml.location_type, currentLocationContext.name);
-      setTimeout(() => speakText(landMsg), 600);
-    }
+    // Note: Unified native voice announcement is played smoothly via speakCurrentLocation()
 
     // ---- Location type badge ----
     const ltBadge = document.getElementById('loc-type-badge');

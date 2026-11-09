@@ -13,24 +13,27 @@ class HuggingFaceLLMService:
         
         # Determine language code & Auto-Detect script from user prompt
         target_lang = lang or (location_context.get("lang") if isinstance(location_context, dict) else None) or "en"
-        target_lang = str(target_lang).lower()
+        target_lang = str(target_lang).lower().split("-")[0]
 
-        if re.search(r"[\u0B80-\u0BFF]", prompt):
+        if re.search(r"[஀-௿]", prompt):
             target_lang = "ta"
-        elif re.search(r"[\u0900-\u097F]", prompt):
-            target_lang = "hi"
-        elif re.search(r"[\u0D00-\u0D7F]", prompt):
+        elif re.search(r"[ഀ-ൿ]", prompt):
             target_lang = "ml"
-        elif re.search(r"[\u0C00-\u0C7F]", prompt):
+        elif re.search(r"[ఀ-౿]", prompt):
             target_lang = "te"
-        elif re.search(r"[\u0C80-\u0CFF]", prompt):
+        elif re.search(r"[ಀ-೿]", prompt):
             target_lang = "kn"
-        elif re.search(r"[\u0A00-\u0A7F]", prompt):
+        elif re.search(r"[઀-૿]", prompt):
+            target_lang = "gu"
+        elif re.search(r"[਀-੿]", prompt):
             target_lang = "pa"
-        elif re.search(r"[\u0980-\u09FF]", prompt):
+        elif re.search(r"[ঀ-৿]", prompt):
             target_lang = "bn"
-        elif re.search(r"[\u0600-\u06FF]", prompt):
-            target_lang = "ur" 
+        elif re.search(r"[؀-ۿ]", prompt):
+            target_lang = "ur"
+        elif re.search(r"[ऀ-ॿ]", prompt):
+            if target_lang not in ["mr", "hi"]:
+                target_lang = "hi"
 
         system_instruction = (
             "You are an expert Geo-Agricultural AI Advisor, Civil Geotechnical Engineer, and Environmental Hydrologist. "
@@ -197,6 +200,66 @@ class HuggingFaceLLMService:
                     f"• **ഗുണനിലവാരം**: {water_potability}\n\n"
                     f"നദികളിലും കായലുകളിലും ലവണാംശം 0.3 PSU-ൽ താഴെയാണ് (ശുദ്ധജലം), എന്നാൽ സമുദ്രത്തിൽ 35 PSU ആണ്."
                 )
+            elif lang.startswith("te"):
+                reply = (
+                    f"🌊 **నీటి లవణీయత (Salinity) మరియు pH స్థాయి ప్రత్యక్ష నివేదిక — {loc_name}**:\n\n"
+                    f"• **జలాశయం రకం**: **{water_type_name}**\n"
+                    f"• **లవణీయత (Salinity)**: **{water_salinity_psu} PSU**\n"
+                    f"• **TDS మొత్తం**: **{water_tds_ppm:,} ppm**\n"
+                    f"• **నీటి pH స్థాయి**: **{water_ph}**\n"
+                    f"• **నాణ్యత**: {water_potability}\n\n"
+                    f"నదులు మరియు సరస్సులలో లవణీయత 0.3 PSU (మంచినీరు), సముద్రంలో 35 PSU ఉంటుంది."
+                )
+            elif lang.startswith("kn"):
+                reply = (
+                    f"🌊 **ನೀರಿನ ಲವಣಾಂಶ (Salinity) ಮತ್ತು pH ಮಟ್ಟದ ಲೈವ್ ವರದಿ — {loc_name}**:\n\n"
+                    f"• **ಜಲಮೂಲದ ಪ್ರಕಾರ**: **{water_type_name}**\n"
+                    f"• **ಲವಣಾಂಶ (Salinity)**: **{water_salinity_psu} PSU**\n"
+                    f"• **TDS ಪ್ರಮಾಣ**: **{water_tds_ppm:,} ppm**\n"
+                    f"• **ನೀರಿನ pH ಮಟ್ಟ**: **{water_ph}**\n"
+                    f"• **ಬಳಕೆ ಯೋಗ್ಯತೆ**: {water_potability}\n\n"
+                    f"ನದಿ ಮತ್ತು ಸರೋವರಗಳಲ್ಲಿ ಲವಣಾಂಶ 0.3 PSU ಗಿಂತ ಕಡಿಮೆ (ಸಿಹಿನೀರು), ಆದರೆ ಸಮುದ್ರದಲ್ಲಿ 35 PSU ಇರುತ್ತದೆ."
+                )
+            elif lang.startswith("bn"):
+                reply = (
+                    f"🌊 **পানির লবণাক্ততা (Salinity) এবং pH স্তরের লাইভ রিপোর্ট — {loc_name}**:\n\n"
+                    f"• **জলাশয়ের ধরন**: **{water_type_name}**\n"
+                    f"• **লবণাক্ততা (Salinity)**: **{water_salinity_psu} PSU**\n"
+                    f"• **TDS মাত্রা**: **{water_tds_ppm:,} ppm**\n"
+                    f"• **পানির pH মান**: **{water_ph}**\n"
+                    f"• **গুণমান**: {water_potability}\n\n"
+                    f"নদী এবং হ্রদে লবণাক্ততা ০.৩ PSU এর নিচে থাকে (মিষ্টি পানি), তবে সমুদ্রে ৩৫ PSU থাকে।"
+                )
+            elif lang.startswith("mr"):
+                reply = (
+                    f"🌊 **पाण्याची क्षारता (Salinity) आणि pH पातळी थेट अहवाल — {loc_name}**:\n\n"
+                    f"• **जलसाठ्याचा प्रकार**: **{water_type_name}**\n"
+                    f"• **क्षारता (Salinity)**: **{water_salinity_psu} PSU**\n"
+                    f"• **टीडीएस (TDS)**: **{water_tds_ppm:,} ppm**\n"
+                    f"• **पाण्याची pH पातळी**: **{water_ph}**\n"
+                    f"• **वापर योग्यता**: {water_potability}\n\n"
+                    f"नद्या आणि तलावांमध्ये क्षारता 0.3 PSU पेक्षा कमी (गोडे पाणी) असते, तर समुद्रात 35 PSU असते."
+                )
+            elif lang.startswith("gu"):
+                reply = (
+                    f"🌊 **પાણીની ક્ષારતા (Salinity) અને pH સ્તરનો લાઈવ રિપોર્ટ — {loc_name}**:\n\n"
+                    f"• **જળાશયનો પ્રકાર**: **{water_type_name}**\n"
+                    f"• **ક્ષારતા (Salinity)**: **{water_salinity_psu} PSU**\n"
+                    f"• **TDS સ્તર**: **{water_tds_ppm:,} ppm**\n"
+                    f"• **પાણીનું pH સ્તર**: **{water_ph}**\n"
+                    f"• **ગુણવત્તા**: {water_potability}\n\n"
+                    f"નદીઓ અને સરોવરોમાં ક્ષારતા 0.3 PSU (મીઠું પાણી) હોય છે, જ્યારે સમુદ્રમાં 35 PSU હોય છે."
+                )
+            elif lang.startswith("pa"):
+                reply = (
+                    f"🌊 **ਪਾਣੀ ਦਾ ਖਾਰਾਪਣ (Salinity) ਅਤੇ pH ਪੱਧਰ ਲਾਈਵ ਰਿਪੋਰਟ — {loc_name}**:\n\n"
+                    f"• **ਪਾਣੀ ਦੀ ਕਿਸਮ**: **{water_type_name}**\n"
+                    f"• **ਖਾਰਾਪਣ (Salinity)**: **{water_salinity_psu} PSU**\n"
+                    f"• **TDS ਮਾਤਰਾ**: **{water_tds_ppm:,} ppm**\n"
+                    f"• **ਪਾਣੀ ਦਾ pH ਪੱਧਰ**: **{water_ph}**\n"
+                    f"• **ਵਰਤੋਂ ਯੋਗਤਾ**: {water_potability}\n\n"
+                    f"ਦਰਿਆਵਾਂ ਅਤੇ ਝੀਲਾਂ ਵਿੱਚ ਖਾਰਾਪਣ 0.3 PSU ਹੁੰਦਾ ਹੈ (ਮਿੱਠਾ ਪਾਣੀ), ਜਦਕਿ ਸਮੁੰਦਰ ਵਿੱਚ 35 PSU ਹੁੰਦਾ ਹੈ।"
+                )
             elif lang.startswith("ur"):
                 reply = (
                     f"🌊 **پانی کی نمکیات (Salinity) اور pH کی لائیو رپورٹ — {loc_name}**:\n\n"
@@ -335,7 +398,61 @@ class HuggingFaceLLMService:
                     f"• **विवरण**: {wastewater_desc}\n\n"
                     f"💡 **इंजीनियरिंग सिफारिशें:**\n"
                     f"1. गहरी पाइल फाउंडेशन का उपयोग करें ताकि मिट्टी धंसने से बचा जा सके।\n"
-                    f"2. सल्फेट प्रतिरोधी सीमेंट (SRPC) और वॉटरप्रूफिंग अनिवार्य रूप से करें。"
+                    f"2. सल्फेट प्रतिरोधी सीमेंट (SRPC) और वॉटरप्रूफिंग अनिवार्य रूप से करें।"
+                )
+            elif lang.startswith("te"):
+                reply = (
+                    f"🏗️ **భవన నిర్మాణం మరియు పర్యావరణ ముప్పు విశ్లేషణ — {loc_name}**:\n\n"
+                    f"🌊 **1. వరద ముప్పు (Flood Hazard)**: {flood_level} — {flood_desc}\n"
+                    f"🏢 **2. నేల స్థిరత్వం మరియు భవనం కూలే ప్రమాదం**: {soil_stability_level} — {will_fall_verdict}\n"
+                    f"• **సిఫార్సు చేయబడిన పునాది**: **{found_rec}**\n"
+                    f"🏭 **3. పరిశ్రమల కాలుష్యం**: {round(factory_dist, 1)} కి.మీ దూరం — {factory_air_desc}\n"
+                    f"🚰 **4. వ్యర్థ నీరు మరియు భూగర్భ జలాల కాలుష్యం**: {wastewater_level} — {wastewater_desc}"
+                )
+            elif lang.startswith("kn"):
+                reply = (
+                    f"🏗️ **ಕಟ್ಟಡ ನಿರ್ಮಾಣ ಮತ್ತು ಪರಿಸರ ಅಪಾಯ ವಿಶ್ಲೇಷಣೆ — {loc_name}**:\n\n"
+                    f"🌊 **1. ಪ್ರವಾಹದ ಅಪಾಯ (Flood Hazard)**: {flood_level} — {flood_desc}\n"
+                    f"🏢 **2. ಮಣ್ಣಿನ ಸ್ಥಿರತೆ ಮತ್ತು ಕಟ್ಟಡ ಕುಸಿಯುವ ಅಪಾಯ**: {soil_stability_level} — {will_fall_verdict}\n"
+                    f"• **ಶಿಫಾರಸು ಮಾಡಿದ ಅಡಿಪಾಯ**: **{found_rec}**\n"
+                    f"🏭 **3. ಕಾರ್ಖಾನೆ ವಾಯು ಮಾಲಿನ್ಯ**: {round(factory_dist, 1)} ಕಿ.ಮೀ ದೂರ — {factory_air_desc}\n"
+                    f"🚰 **4. ತ್ಯಾಜ್ಯ ನೀರು ಮತ್ತು ಅಂತರ್ಜಲ ಮಾಲಿನ್ಯ**: {wastewater_level} — {wastewater_desc}"
+                )
+            elif lang.startswith("bn"):
+                reply = (
+                    f"🏗️ **ভবন নির্মাণ এবং পরিবেশগত ঝুঁকি বিশ্লেষণ — {loc_name}**:\n\n"
+                    f"🌊 **১. বন্যার ঝুঁকি (Flood Hazard)**: {flood_level} — {flood_desc}\n"
+                    f"🏢 **২. মাটির স্থায়িত্ব এবং ভবন ধসের ঝুঁকি**: {soil_stability_level} — {will_fall_verdict}\n"
+                    f"• **সুপারিশকৃত ভিত্তি (Foundation)**: **{found_rec}**\n"
+                    f"🏭 **৩. কারখানার বায়ু দূষণ**: {round(factory_dist, 1)} কিমি দূরে — {factory_air_desc}\n"
+                    f"🚰 **৪. কারখানার বর্জ্য পানি ও ভূগর্ভস্থ দূষণ**: {wastewater_level} — {wastewater_desc}"
+                )
+            elif lang.startswith("mr"):
+                reply = (
+                    f"🏗️ **इमारत बांधकाम आणि पर्यावरण धोका विश्लेषण — {loc_name}**:\n\n"
+                    f"🌊 **1. पूर धोका (Flood Hazard)**: {flood_level} — {flood_desc}\n"
+                    f"🏢 **2. मातीची स्थिरता आणि इमारत कोसळण्याचा धोका**: {soil_stability_level} — {will_fall_verdict}\n"
+                    f"• **शिफारस केलेला पाया**: **{found_rec}**\n"
+                    f"🏭 **3. कारखान्याचे वायू प्रदूषण**: {round(factory_dist, 1)} किमी अंतर — {factory_air_desc}\n"
+                    f"🚰 **4. रासायनिक सांडपाणी आणि भूजल प्रदूषण**: {wastewater_level} — {wastewater_desc}"
+                )
+            elif lang.startswith("gu"):
+                reply = (
+                    f"🏗️ **મકાન બાંધકામ અને પર્યાવરણીય જોખમ વિશ્લેષણ — {loc_name}**:\n\n"
+                    f"🌊 **1. પૂરનું જોખમ (Flood Hazard)**: {flood_level} — {flood_desc}\n"
+                    f"🏢 **2. માટીની સ્થિરતા અને ઇમારત પડવાનું જોખમ**: {soil_stability_level} — {will_fall_verdict}\n"
+                    f"• **ભલામણ કરેલ પાયો**: **{found_rec}**\n"
+                    f"🏭 **3. કારખાનાનું વાયુ પ્રદૂષણ**: {round(factory_dist, 1)} કિમી દૂર — {factory_air_desc}\n"
+                    f"🚰 **4. ઔદ્યોગિક ગંદુ પાણી અને ભૂગર્ભ જળ પ્રદૂષણ**: {wastewater_level} — {wastewater_desc}"
+                )
+            elif lang.startswith("pa"):
+                reply = (
+                    f"🏗️ **ਇਮਾਰਤ ਉਸਾਰੀ ਅਤੇ ਵਾਤਾਵਰਣ ਜੋਖਮ ਵਿਸ਼ਲੇਸ਼ਣ — {loc_name}**:\n\n"
+                    f"🌊 **1. ਹੜ੍ਹ ਦਾ ਖ਼ਤਰਾ (Flood Hazard)**: {flood_level} — {flood_desc}\n"
+                    f"🏢 **2. ਮਿੱਟੀ ਦੀ ਸਥਿਰਤਾ ਅਤੇ ਇਮਾਰਤ ਡਿੱਗਣ ਦਾ ਖ਼ਤਰਾ**: {soil_stability_level} — {will_fall_verdict}\n"
+                    f"• **ਸਿਫਾਰਸ਼ ਕੀਤੀ ਨੀਂਹ**: **{found_rec}**\n"
+                    f"🏭 **3. ਫੈਕਟਰੀ ਪ੍ਰਦੂਸ਼ਣ**: {round(factory_dist, 1)} ਕਿਲੋਮੀਟਰ ਦੂਰ — {factory_air_desc}\n"
+                    f"🚰 **4. ਗੰਦਾ ਪਾਣੀ ਅਤੇ ਜ਼ਮੀਨ ਹੇਠਲਾ ਪਾਣੀ ਪ੍ਰਦੂਸ਼ਣ**: {wastewater_level} — {wastewater_desc}"
                 )
             elif lang.startswith("ml"):
                 reply = (
@@ -436,6 +553,60 @@ class HuggingFaceLLMService:
                         f"• **स्पष्ट निर्णय**: **यहाँ कोई भी व्यावसायिक फसल नहीं उगाई जा सकती (NO CROPS CAN BE GROWN)**।\n"
                         f"• **कारण**: यह {forest_display} पर्यावरण संरक्षण कानूनों द्वारा संरक्षित क्षेत्र है। व्यावसायिक खेती और पेड़ों की कटाई यहाँ कानूनी रूप से पूर्णतः प्रतिबंधित है।"
                     )
+                elif lang.startswith("te"):
+                    reply = (
+                        f"🌲 **రక్షిత అటవీ ప్రాంతం — {forest_display}**:\n\n"
+                        f"• **అటవీ స్థితి**: సహజ దట్టమైన అడవి (NDVI: {round(ndvi, 2)}).\n"
+                        f"• **స్పష్టమైన తీర్పు**: **ఇక్కడ ఏ పంటనూ పండించలేరు (NO CROPS CAN BE GROWN)**.\n"
+                        f"• **కారణం**: పర్యావరణ పరిరక్షణ చట్టాల ప్రకారం అడవుల నరికివేత మరియు వ్యవసాయం పూర్తిగా నిషేధించబడింది."
+                    )
+                elif lang.startswith("kn"):
+                    reply = (
+                        f"🌲 **ರಕ್ಷಿತ ಅರಣ್ಯ ಪ್ರದೇಶ — {forest_display}**:\n\n"
+                        f"• **ಅರಣ್ಯ ಸ್ಥಿತಿ**: ದಟ್ಟವಾದ ನೈಸರ್ಗಿಕ ಅರಣ್ಯ (NDVI: {round(ndvi, 2)}).\n"
+                        f"• **ಸ್ಪಷ್ಟ ತೀರ್ಪು**: **ಇಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಬೆಳೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ (NO CROPS CAN BE GROWN)**.\n"
+                        f"• **ಕಾರಣ**: ಪರಿಸರ ಸಂರಕ್ಷಣಾ ಕಾನೂನುಗಳ ಅಡಿಯಲ್ಲಿ ವಾಣಿಜ್ಯ ಕೃಷಿಯನ್ನು ಕಟ್ಟುನಿಟ್ಟಾಗಿ ನಿಷೇಧಿಸಲಾಗಿದೆ."
+                    )
+                elif lang.startswith("bn"):
+                    reply = (
+                        f"🌲 **সংরক্ষিত বনভূমি — {forest_display}**:\n\n"
+                        f"• **বনভূমির অবস্থা**: ঘন প্রাকৃতিক বনানী (NDVI: {round(ndvi, 2)})।\n"
+                        f"• **চূড়ান্ত সিদ্ধান্ত**: **এখানে কোনো বাণিজ্যিক ফসল চাষ করা যাবে না (NO CROPS CAN BE GROWN)**।\n"
+                        f"• **কারণ**: পরিবেশ সংরক্ষণ আইনের আওতায় এখানে বন উজাড় ও কৃষিকাজ সম্পূর্ণ নিষিদ্ধ।"
+                    )
+                elif lang.startswith("mr"):
+                    reply = (
+                        f"🌲 **संरक्षित वनक्षेत्र — {forest_display}**:\n\n"
+                        f"• **वनस्पती स्थिती**: घनदाट नैसर्गिक जंगल (NDVI: {round(ndvi, 2)})।\n"
+                        f"• **स्पष्ट निर्णय**: **येथे कोणतेही पीक घेता येत नाही (NO CROPS CAN BE GROWN)**।\n"
+                        f"• **कारण**: पर्यावरण संवर्धन कायद्यान्वये वृक्षतोड आणि व्यावसायिक शेतीस सक्त मनाई आहे."
+                    )
+                elif lang.startswith("gu"):
+                    reply = (
+                        f"🌲 **સંરક્ષિત વન વિસ્તાર — {forest_display}**:\n\n"
+                        f"• **વનસ્પતિ સ્થિતિ**: ગાઢ કુદરતી જંગલ (NDVI: {round(ndvi, 2)}).\n"
+                        f"• **ચોખ્ખો નિર્ણય**: **અહીં કોઈપણ પાક ઉગાડી શકાતો નથી (NO CROPS CAN BE GROWN)**.\n"
+                        f"• **કારણ**: પર્યાવરણ સંરક્ષણ કાયદા હેઠળ જંગલ કાપવું અને ખેતી કરવી સખત પ્રતિબંધિત છે."
+                    )
+                elif lang.startswith("pa"):
+                    reply = (
+                        f"🌲 **ਸੁਰੱਖਿਅਤ ਜੰਗਲ ਖੇਤਰ — {forest_display}**:\n\n"
+                        f"• **ਜੰਗਲ ਸਥਿਤੀ**: ਸੰਘਣਾ ਕੁਦਰਤੀ ਜੰਗਲ (NDVI: {round(ndvi, 2)})।\n"
+                        f"• **ਸਪਸ਼ਟ ਫੈਸਲਾ**: **ਇੱਥੇ ਕੋਈ ਫ਼ਸਲ ਨਹੀਂ ਉਗਾਈ ਜਾ ਸਕਦੀ (NO CROPS CAN BE GROWN)**।\n"
+                        f"• **ਕਾਰਨ**: ਵਾਤਾਵਰਣ ਸੁਰੱਖਿਆ ਕਾਨੂੰਨਾਂ ਤਹਿਤ ਖੇਤੀ ਲਈ ਜੰਗਲ ਕੱਟਣਾ ਸਖ਼ਤ ਮਨ੍ਹਾ ਹੈ।"
+                    )
+                elif lang.startswith("ml"):
+                    reply = (
+                        f"🌲 **സംരക്ഷിത വനമേഖല — {forest_display}**:\n\n"
+                        f"• **വനസ്ഥിതി**: നിത്യഹരിത പ്രകൃതിദത്ത വനം (NDVI: {round(ndvi, 2)}).\n"
+                        f"• **തീരുമാനം**: **ഇവിടെ ഒരു വിളയും കൃഷി ചെയ്യാൻ കഴിയില്ല (NO CROPS CAN BE GROWN)**."
+                    )
+                elif lang.startswith("ur"):
+                    reply = (
+                        f"🌲 **محفوظ جنگلاتی علاقہ — {forest_display}**:\n\n"
+                        f"• **حیثیت**: گھنا قدرتی جنگل (NDVI: {round(ndvi, 2)})۔\n"
+                        f"• **حتمی فیصلہ**: **یہاں کوئی فصل کاشت نہیں کی جا سکتی (NO CROPS CAN BE GROWN)**۔"
+                    )
                 else:
                     reply = (
                         f"🌲 **PROTECTED FORESTRY AREA — {forest_display}**:\n\n"
@@ -468,6 +639,54 @@ class HuggingFaceLLMService:
                     f"• **मृदा pH**: **{soil_ph}** | **जल स्तर**: **{water_depth} मीटर**\n"
                     f"• **एनडीवीआई (NDVI)**: **{dominant_ndvi}** ({ndvi})\n\n"
                     f"💡 **कृषि सलाह**: उच्च गुणवत्ता वाले बीजों और ड्रिप सिंचाई से सर्वाधिक पैदावार हासिल की जा सकती है।"
+                )
+            elif lang.startswith("te"):
+                reply = (
+                    f"🌾 **పంట సిఫార్సు మరియు దిగుబడి విశ్లేషణ — {loc_name}**:\n\n"
+                    f"• **సిఫార్సు చేయబడిన పంట**: **{crop}**\n"
+                    f"• **అత్యధిక దిగుబడి (Peak Yield)**: **{yield_val} టన్నులు / హెక్టారు** (ఖచ్చితత్వం: {yield_acc}%)\n"
+                    f"• **నికర లాభం**: **{net_profit}**\n"
+                    f"• **నేల pH**: **{soil_ph}** | **భూగర్భ జలాలు**: **{water_depth} మీటర్లు**"
+                )
+            elif lang.startswith("kn"):
+                reply = (
+                    f"🌾 **ಬೆಳೆ ಶಿಫಾರಸು ಮತ್ತು ಇಳುವರಿ ವಿಶ್ಲೇಷಣೆ — {loc_name}**:\n\n"
+                    f"• **ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆ**: **{crop}**\n"
+                    f"• **ಗರಿಷ್ಠ ಇಳುವರಿ (Peak Yield)**: **{yield_val} ಟನ್ / ಹೆಕ್ಟೇರ್** (ನಿಖರತೆ: {yield_acc}%)\n"
+                    f"• **ನಿವ್ವಳ ಲಾಭ**: **{net_profit}**\n"
+                    f"• **ಮಣ್ಣಿನ pH**: **{soil_ph}** | **ಅಂತರ್ಜಲ ಮಟ್ಟ**: **{water_depth} ಮೀಟರ್**"
+                )
+            elif lang.startswith("bn"):
+                reply = (
+                    f"🌾 **ফসল সুপারিশ ও ফলন বিশ্লেষণ — {loc_name}**:\n\n"
+                    f"• **প্রস্তাবিত ফসল**: **{crop}**\n"
+                    f"• **সর্বোচ্চ ফলন (Peak Yield)**: **{yield_val} টন / হেক্টর** (নির্ভুলতা: {yield_acc}%)\n"
+                    f"• **নিট লাভ**: **{net_profit}**\n"
+                    f"• **মাটির pH**: **{soil_ph}** | **ভূগর্ভস্থ পানির গভীরতা**: **{water_depth} মিটার**"
+                )
+            elif lang.startswith("mr"):
+                reply = (
+                    f"🌾 **पीक शिफारस आणि उत्पादन विश्लेषण — {loc_name}**:\n\n"
+                    f"• **सर्वोत्तम शिफारस केलेले पीक**: **{crop}**\n"
+                    f"• **अपेक्षित उत्पादन (Peak Yield)**: **{yield_val} टन / हेक्टर** (अचूकता: {yield_acc}%)\n"
+                    f"• **अंदाजे नफा**: **{net_profit}**\n"
+                    f"• **जमिनीचा pH**: **{soil_ph}** | **भूजल पातळी**: **{water_depth} मीटर**"
+                )
+            elif lang.startswith("gu"):
+                reply = (
+                    f"🌾 **પાક ભલામણ અને ઉપજ વિશ્લેષણ — {loc_name}**:\n\n"
+                    f"• **શ્રેષ્ઠ ભલામણ કરેલ પાક**: **{crop}**\n"
+                    f"• **અંદાજિત ઉપજ (Peak Yield)**: **{yield_val} ટન / હેક્ટર** (ચોકસાઈ: {yield_acc}%)\n"
+                    f"• **ચોખ્ખો નફો**: **{net_profit}**\n"
+                    f"• **જમીનનું pH**: **{soil_ph}** | **પાણીનું સ્તર**: **{water_depth} મીટર**"
+                )
+            elif lang.startswith("pa"):
+                reply = (
+                    f"🌾 **ਫ਼ਸਲ ਸਿਫ਼ਾਰਸ਼ ਅਤੇ ਝਾੜ ਵਿਸ਼ਲੇਸ਼ਣ — {loc_name}**:\n\n"
+                    f"• **ਸਭ ਤੋਂ ਵਧੀਆ ਫ਼ਸਲ**: **{crop}**\n"
+                    f"• **ਸੰਭਾਵਿਤ ਝਾੜ (Peak Yield)**: **{yield_val} ਟਨ / ਹੈਕਟੇਅਰ** (ਸ਼ੁੱਧਤਾ: {yield_acc}%)\n"
+                    f"• **ਸ਼ੁੱਧ ਮੁਨਾਫ਼ਾ**: **{net_profit}**\n"
+                    f"• **ਮਿੱਟੀ ਦਾ pH**: **{soil_ph}** | **ਪਾਣੀ ਦਾ ਪੱਧਰ**: **{water_depth} ਮੀਟਰ**"
                 )
             elif lang.startswith("ml"):
                 reply = (
@@ -535,24 +754,66 @@ class HuggingFaceLLMService:
                 f"• **मृदा pH**: **{soil_ph}** | **जल स्तर**: **{water_depth}m** | **लवणता**: **{water_salinity_psu} PSU**\n\n"
                 f"आप फसल उपज, भवन निर्माण, बाढ़ या कारखाने के प्रदूषण के बारे में कोई भी प्रश्न पूछ सकते हैं!"
             )
+        elif lang.startswith("te"):
+            reply = (
+                f"👋 **నమస్కారం! నేను మీ సెంటినెల్-ఎర్త్ AI సలహాదారుని.**\n\n"
+                f"నేను **{loc_name}** ఉపగ్రహ డేటాను విశ్లేషిస్తున్నాను.\n\n"
+                f"• **పంట**: **{crop}** ({yield_val} T/Ha)\n"
+                f"• **నేల pH**: **{soil_ph}** | **లవణీయత**: **{water_salinity_psu} PSU**"
+            )
+        elif lang.startswith("kn"):
+            reply = (
+                f"👋 **ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ ಸೆಂಟಿನೆಲ್-ಅರ್ಥ್ AI ಸಲಹೆಗಾರ.**\n\n"
+                f"ನಾನು **{loc_name}** ಉಪಗ್ರಹ ಡೇಟಾವನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದ್ದೇನೆ.\n\n"
+                f"• **ಬೆಳೆ**: **{crop}** ({yield_val} T/Ha)\n"
+                f"• **ಮಣ್ಣಿನ pH**: **{soil_ph}** | **ಲವಣಾಂಶ**: **{water_salinity_psu} PSU**"
+            )
+        elif lang.startswith("bn"):
+            reply = (
+                f"👋 **নমস্কার! আমি আপনার সেন্টিনেল-আর্থ এআই উপদেষ্টা।**\n\n"
+                f"আমি **{loc_name}** অঞ্চলের স্যাটেলাইট ডেটা বিশ্লেষণ করছি।\n\n"
+                f"• **ফসল**: **{crop}** ({yield_val} T/Ha)\n"
+                f"• **মাটির pH**: **{soil_ph}** | **লবণাক্ততা**: **{water_salinity_psu} PSU**"
+            )
+        elif lang.startswith("mr"):
+            reply = (
+                f"👋 **नमस्कार! मी आपला सेंटिनेल-अर्थ AI सल्लागार आहे.**\n\n"
+                f"मी **{loc_name}** उपग्रह डेटाचे विश्लेषण करत आहे.\n\n"
+                f"• **पीक**: **{crop}** ({yield_val} T/Ha)\n"
+                f"• **माती pH**: **{soil_ph}** | **क्षारता**: **{water_salinity_psu} PSU**"
+            )
+        elif lang.startswith("gu"):
+            reply = (
+                f"👋 **નમસ્તે! હું તમારો સેન્ટિનેલ-અર્થ AI સલાહકાર છું.**\n\n"
+                f"હું **{loc_name}** સેટેલાઇટ ડેટાનું વિશ્લેષણ કરી રહ્યો છું.\n\n"
+                f"• **પાક**: **{crop}** ({yield_val} T/Ha)\n"
+                f"• **જમીન pH**: **{soil_ph}** | **ક્ષારતા**: **{water_salinity_psu} PSU**"
+            )
+        elif lang.startswith("pa"):
+            reply = (
+                f"👋 **ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡਾ ਸੈਂਟੀਨਲ-ਅਰਥ AI ਸਲਾਹਕਾਰ ਹਾਂ।**\n\n"
+                f"ਮੈਂ **{loc_name}** ਸੈਟੇਲਾਈਟ ਡੇਟਾ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰ ਰਿਹਾ ਹਾਂ।\n\n"
+                f"• **ਫ਼ਸਲ**: **{crop}** ({yield_val} T/Ha)\n"
+                f"• **ਮਿੱਟੀ pH**: **{soil_ph}** | **ਖਾਰਾਪਣ**: **{water_salinity_psu} PSU**"
+            )
         elif lang.startswith("ml"):
             reply = (
                 f"👋 **നമസ്കാരം! ഞാൻ നിങ്ങളുടെ സെന്റിനൽ-എർത്ത് AI അഡ്വൈസർ ആണ്.**\n\n"
-                f"**{loc_name}** പ്രദേശത്തെ ഉപഗ്രഹ വിവരങ്ങൾ ഞാൻ പരിശോധിക്കുന്നു.\n"
+                f"**{loc_name}** പ്രദേശത്തെ ഉപഗ്രഹ വിവരങ്ങൾ ഞാൻ പരിശോധിക്കുന്നു.\n\n"
                 f"• **വിള**: **{crop}** ({yield_val} T/Ha)\n"
                 f"• **മണ്ണ് pH**: **{soil_ph}** | **ജലനിരപ്പ്**: **{water_depth}m** | **ലവണാംശം**: **{water_salinity_psu} PSU**"
             )
         elif lang.startswith("ur"):
             reply = (
                 f"👋 **ہیلو! میں آپ کا سینٹی نیل ارتھ AI مشیر ہوں۔**\n\n"
-                f"میں **{loc_name}** کے سیٹلائٹ ڈیٹا کی نگرانی کر رہا ہوں۔\n"
+                f"میں **{loc_name}** کے سیٹلائٹ ڈیٹا کی نگرانی کر رہا ہوں۔\n\n"
                 f"• **فصل**: **{crop}** ({yield_val} T/Ha)\n"
                 f"• **مٹی کا pH**: **{soil_ph}** | **پانی کی سطح**: **{water_depth}m** | **نمکیات**: **{water_salinity_psu} PSU**"
             )
         elif lang.startswith("es"):
             reply = (
                 f"👋 **¡Hola! Soy tu Asesor de Inteligencia Artificial Sentinel-Earth.**\n\n"
-                f"Estoy monitoreando **{loc_name}** con telemetría satelital en vivo.\n"
+                f"Estoy monitoreando **{loc_name}** con telemetría satelital en vivo.\n\n"
                 f"• **Cultivo**: **{crop}** ({yield_val} T/Ha)\n"
                 f"• **pH del suelo**: **{soil_ph}** | **Nivel freático**: **{water_depth}m** | **Salinidad**: **{water_salinity_psu} PSU**"
             )
