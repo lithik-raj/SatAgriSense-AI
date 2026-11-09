@@ -124,7 +124,7 @@
       position: absolute; top: 16px; left: 16px;
       background: var(--bg-panel); border: 1px solid var(--border-panel);
       padding: 10px 12px; border-radius: 14px; backdrop-filter: blur(14px);
-      width: 395px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
+      width: 425px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
       box-shadow: 0 10px 30px rgba(0,0,0,0.75);
       transition: width 0.3s ease, padding 0.3s ease;
       overflow: hidden;
@@ -207,7 +207,7 @@
 
     /* ====== CV SATELLITE IMAGE PANEL ====== */
     .satellite-cv-panel {
-      position: absolute; bottom: 50px; right: 10px; width: 275px;
+      position: absolute; top: 72px; right: 20px; width: 340px;
       background: var(--bg-panel); border: 1px solid var(--border-panel);
       border-radius: 12px; backdrop-filter: blur(12px); z-index: 50; overflow: hidden;
       transition: width 0.3s ease, height 0.3s ease;
@@ -218,7 +218,7 @@
     .satellite-cv-panel.minimized .cv-panel-body { display: none; }
     .satellite-cv-panel.closed { display: none; }
     .reopen-float-btn {
-      position: absolute; bottom: 50px; right: 12px; z-index: 49;
+      position: absolute; top: 72px; right: 20px; z-index: 49;
       background: rgba(8,16,32,0.92); border: 1px solid var(--cyan-glow);
       color: var(--cyan-glow); padding: 6px 12px; border-radius: 20px;
       font-size: 11px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
@@ -1067,7 +1067,7 @@
     </div>
   </div>
     <!-- Quick Suggestion Action Chips -->
-  <div style="display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:rgba(5,15,30,0.7);border-top:1px solid rgba(0,240,255,0.15);">
+  <div id="chat-quick-chips" style="display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:rgba(5,15,30,0.7);border-top:1px solid rgba(0,240,255,0.15);">
     <button type="button" onclick="askQuickQuestion('Which crop produces the highest yield in this region?')" style="background:rgba(50,205,50,0.15);border:1px solid #32cd32;color:#50cd32;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">🌾 Best Crop & Yield</button>
     <button type="button" onclick="askQuickQuestion('Will building houses or buildings here cause flood damage, soil collapse, or suffer from nearby factory air and water pollution?')" style="background:rgba(255,100,50,0.18);border:1px solid #ff6432;color:#ff9070;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">⚠️ Building Collapse & Pollution Hazards</button>
     <button type="button" onclick="askQuickQuestion('What is the live water salinity in PSU/TDS and pH level of the river, lake, or ocean here?')" style="background:rgba(0,180,255,0.18);border:1px solid #00b4ff;color:#70d0ff;padding:4px 9px;border-radius:12px;font-size:10px;cursor:pointer;white-space:nowrap;font-weight:700;">🌊 Water Salinity & pH</button>
@@ -1377,10 +1377,8 @@
     regionalLangCode = reg.code;
     regionalLangName = reg.name;
 
-    // Automatically switch AI communication to the native regional language
-    if (reg.code !== 'en-US') {
-      setChatLanguage(reg.code, reg.name);
-    }
+    // Automatically switch AI communication to the native regional language (or English for Ocean)
+    setChatLanguage(reg.code, reg.name);
 
     const btn = document.getElementById('lang-btn-regional');
     const label = document.getElementById('regional-lang-label');
@@ -1513,6 +1511,37 @@
     const input = document.getElementById('chat-input');
     if (input) {
       input.placeholder = `Ask question in ${currentChatLangName}... (Type or Mic)`;
+    }
+
+    // Dynamically update quick chips
+    updateQuickChipsForLanguage(code);
+
+    // Update initial greeting if chat has only the default welcome greeting
+    const chatBody = document.getElementById('chat-body');
+    if (chatBody && chatBody.children.length <= 1) {
+      let greeting = '👋 Hello! I\'m your <strong>Sentinel-Earth AI Advisor</strong>.<br/>Ask me about crops, soil pH, factory proximity, NDVI, water levels, or any agricultural question!';
+      if (code.startsWith('ta')) {
+        greeting = '👋 வணக்கம்! நான் உங்கள் <strong>சென்டினல்-பூமி AI ஆலோசகர்</strong>.<br/>பயிர் பரிந்துரை, மண்ணின் pH, தொழிற்சாலை மாசுபாடு, NDVI செயற்கைக்கோள் தரவு அல்லது எந்தவொரு விவசாய கேள்வியையும் கேளுங்கள்!';
+      } else if (code.startsWith('hi')) {
+        greeting = '👋 नमस्ते! मैं आपका <strong>सेंटिनल-अर्थ AI सलाहकार</strong> हूँ।<br/>फसल सिफारिश, मिट्टी का pH, फैक्ट्री प्रदूषण, NDVI उपग्रह डेटा या किसी भी कृषि प्रश्न के बारे में पूछें!';
+      } else if (code.startsWith('te')) {
+        greeting = '👋 నమస్కారం! నేను మీ <strong>సెంటినెల్-ఎర్త్ AI సలహాదారుని</strong>.<br/>పంట సిఫార్సులు, నేల pH, ఫ్యాక్టరీ కాలుష్యం, NDVI శాటిలైట్ డేటా లేదా వ్యవసాయ ప్రశ్నలను అడగండి!';
+      } else if (code.startsWith('kn')) {
+        greeting = '👋 ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ <strong>ಸೆಂಟಿನೆಲ್-ಅರ್ಥ್ AI ಸಲಹೆಗಾರ</strong>.<br/>ಬೆಳೆ ಶಿಫಾರಸು, ಮಣ್ಣಿನ pH, ಕಾರ್ಖಾನೆ ಮಾಲಿನ್ಯ, NDVI ಉಪಗ್ರಹ ಮಾಹಿತಿ ಅಥವಾ ಕೃಷಿ ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳಿ!';
+      } else if (code.startsWith('ml')) {
+        greeting = '👋 നമസ്കാരം! ഞാൻ നിങ്ങളുടെ <strong>സെന്റിനൽ-എർത്ത് AI ഉപദേശകൻ</strong> ആണ്.<br/>വിള ശുപാർശകൾ, മണ്ണിന്റെ pH, ഫാക്ടറി മലിനീകരണം, NDVI ഉപഗ്രഹ വിവരങ്ങൾ അല്ലെങ്കിൽ കാർഷിക സംശയങ്ങൾ ചോദിക്കൂ!';
+      } else if (code.startsWith('bn')) {
+        greeting = '👋 নমস্কার! আমি আপনার <strong>সেন্টিনেল-আর্থ AI উপদেষ্টা</strong>।<br/>ফসলের সুপারিশ, মাটির pH, কারখানা দূষণ, NDVI স্যাটেলাইট তথ্য বা যেকোনো কৃষি প্রশ্ন জিজ্ঞাসা করুন!';
+      } else if (code.startsWith('mr')) {
+        greeting = '👋 नमस्कार! मी तुमचा <strong>सेंटिनेल-अर्थ AI सल्लागार</strong> आहे.<br/>पिकांची शिफारस, मातीचा pH, फॅक्टरी प्रदूषण, NDVI उपग्रह डेटा किंवा शेतीविषयक प्रश्न विचारा!';
+      } else if (code.startsWith('gu')) {
+        greeting = '👋 નમસ્તે! હું તમારો <strong>સેન્ટીનેલ-અર્થ AI સલાહકાર</strong> છું.<br/>પાકની ભલામણ, જમીનનું pH, ફેક્ટરી પ્રદૂષણ, NDVI સેટેલાઇટ ડેટા અથવા કૃષિ સંબંધિત પ્રશ્નો પૂછો!';
+      } else if (code.startsWith('pa')) {
+        greeting = '👋 ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡਾ <strong>ਸੈਂਟੀਨਲ-ਅਰਥ AI ਸਲਾਹਕਾਰ</strong> ਹਾਂ।<br/>ਫ਼ਸਲ ਸਿਫ਼ਾਰਸ਼ਾਂ, ਮਿੱਟੀ ਦਾ pH, ਫੈਕਟਰੀ ਪ੍ਰਦੂਸ਼ਣ, NDVI ਸੈਟੇਲਾਈਟ ਡੇਟਾ ਜਾਂ ਕੋਈ ਵੀ ਖੇਤੀਬਾੜੀ ਸਵਾਲ ਪੁੱਛੋ!';
+      } else if (code.startsWith('ur')) {
+        greeting = '👋 ہیلو! میں آپ کا <strong>سینٹینل ارتھ AI مشیر</strong> ہوں۔<br/>فصل کی سفارش، مٹی کی پی ایچ، فیکٹری آلودگی، این ڈی وی آئی سیٹلائٹ ڈیٹا یا کوئی بھی زرعی سوال پوچھیں!';
+      }
+      chatBody.innerHTML = `<div class="chat-msg bot">${greeting}</div>`;
     }
   }
 
@@ -1663,8 +1692,10 @@
       let matchedVoice = voices.find(v => {
         const vl = v.lang.toLowerCase();
         const vn = v.name.toLowerCase();
+        const isEnglish = vl.startsWith('en') || vn.includes('english');
+        if (langCode !== 'en' && isEnglish) return false;
         return vl.startsWith(langCode) || 
-               (langCode === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana') || vn.includes('india'))) ||
+               (langCode === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana'))) ||
                (langCode === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha'))) ||
                (langCode === 'te' && (vn.includes('telugu') || vn.includes('mohan'))) ||
                (langCode === 'kn' && (vn.includes('kannada') || vn.includes('gagan'))) ||
@@ -1791,17 +1822,13 @@
     const voiceStatus = document.getElementById('voice-status');
     const input = document.getElementById('location-input');
 
-    // Pre-unlock audio element & request mic permissions
+    // Pre-unlock audio element
     try {
       if (window._ttsAudioPlayer) {
         window._ttsAudioPlayer.play().then(() => window._ttsAudioPlayer.pause()).catch(() => {});
       }
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop());
-      }
     } catch(e) {
-      console.log('Mic unlock notice:', e);
+      console.log('Audio pre-unlock notice:', e);
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2176,8 +2203,10 @@
       const matched = voices.find(v => {
         const vl = v.lang.toLowerCase();
         const vn = v.name.toLowerCase();
+        const isEnglish = vl.startsWith('en') || vn.includes('english');
+        if (prefix !== 'en' && isEnglish) return false;
         return vl.startsWith(prefix) || 
-               (prefix === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana') || vn.includes('india'))) ||
+               (prefix === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana'))) ||
                (prefix === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha'))) ||
                (prefix === 'te' && (vn.includes('telugu') || vn.includes('mohan'))) ||
                (prefix === 'kn' && (vn.includes('kannada') || vn.includes('gagan'))) ||
@@ -3216,7 +3245,7 @@
 
     } else if (locLower.includes('coimbatore') || locLower.includes('pollachi') || locLower.includes('tiruppur')) {
 
-      crop = 'Sugarcane (Saccharum officinarum - Co-0238 / Co-86032) & Coconut';
+      crop = 'Coconut (Cocos nucifera - West Coast Tall) & Sugarcane (Co-86032)';
 
       yieldTons = 88.5;
 
@@ -4361,13 +4390,6 @@
     input.value = '';
     chatBody.scrollTop = chatBody.scrollHeight;
 
-    // Bot typing indicator
-    const botDiv = document.createElement('div');
-    botDiv.className = 'chat-msg bot';
-    botDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing your question...';
-    chatBody.appendChild(botDiv);
-    chatBody.scrollTop = chatBody.scrollHeight;
-
     // Build rich context
     const ctx = {
       ...currentLocationContext,
@@ -4387,6 +4409,14 @@
       arenas: lastMLData?.arenas ?? null
     };
 
+    // 0ms SUDDEN RESPONSE (5G Ultra-Fast Execution): Render immediate high-accuracy AI analysis
+    const botDiv = document.createElement('div');
+    botDiv.className = 'chat-msg bot';
+    chatBody.appendChild(botDiv);
+    const instantReply = generateClientSideAIResponse(text, ctx);
+    renderBotMessageWithVoice(botDiv, instantReply, chatBody);
+
+    // Background serverless sync to HuggingFace LLM
     const chatAbortCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const chatTimeoutId = chatAbortCtrl ? setTimeout(() => chatAbortCtrl.abort(), 6000) : null;
 
@@ -4406,13 +4436,13 @@
       return r.json();
     })
     .then(data => {
-      const reply = data.response || 'No response received.';
-      renderBotMessageWithVoice(botDiv, reply, chatBody);
+      if (data && data.response && data.response.length > 50 && data.response !== instantReply) {
+        // Refine bot answer if background LLM returned a richer response
+        renderBotMessageWithVoice(botDiv, data.response, chatBody);
+      }
     })
     .catch(() => {
       clearTimeout(chatTimeoutId);
-      const localReply = generateClientSideAIResponse(text, ctx);
-      renderBotMessageWithVoice(botDiv, localReply, chatBody);
     });
   }
 
@@ -4468,6 +4498,51 @@
     const query = document.getElementById('location-input').value.trim();
     if (!query) return;
     document.getElementById('voice-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
+
+    const qLower = query.toLowerCase();
+    // Instant Zero-Latency Global Geographic Dictionary
+    const quickLocs = {
+      'coimbatore': { lat: 11.0168, lon: 76.9558, name: 'Coimbatore, Tamil Nadu, India', country: 'India' },
+      'erode': { lat: 11.3410, lon: 77.7172, name: 'Erode (Turmeric GI Basin), Tamil Nadu', country: 'India' },
+      'kashmir': { lat: 34.0837, lon: 74.7973, name: 'Kashmir Apple Orchard Valley, J&K', country: 'India' },
+      'srinagar': { lat: 34.0837, lon: 74.7973, name: 'Srinagar, Kashmir, India', country: 'India' },
+      'salinas': { lat: 36.6777, lon: -121.6555, name: 'Salinas Valley (Strawberry Heartland), California', country: 'United States' },
+      'amazon': { lat: -3.4653, lon: -62.2159, name: 'Amazon Tropical Rainforest, Brazil', country: 'Brazil' },
+      'sundarban': { lat: 21.9497, lon: 89.1833, name: 'Sundarbans Mangrove Forest Reserve, West Bengal', country: 'India' },
+      'congo': { lat: 0.2280, lon: 21.7587, name: 'Congo Basin Rainforest, Central Africa', country: 'DR Congo' },
+      'boreal': { lat: 60.0000, lon: 100.0000, name: 'Boreal Forest (Taiga Biome), Siberia', country: 'Russia' },
+      'valdivian': { lat: -39.8142, lon: -73.2459, name: 'Valdivian Temperate Rainforest', country: 'Chile' },
+      'thar': { lat: 26.9157, lon: 70.9083, name: 'Thar Desert Arid Wasteland & Barren Land, Rajasthan', country: 'India' },
+      'sahara': { lat: 23.4162, lon: 25.6628, name: 'Sahara Desert Arid Barren Territory', country: 'Africa' },
+      'punjab': { lat: 30.9010, lon: 75.8573, name: 'Punjab Fertile Wheat & Basmati Plain', country: 'India' },
+      'ludhiana': { lat: 30.9010, lon: 75.8573, name: 'Ludhiana, Punjab, India', country: 'India' },
+      'thanjavur': { lat: 10.7870, lon: 79.1378, name: 'Cauvery Delta Low-Lying Floodplain Wetland, Tamil Nadu', country: 'India' },
+      'nagpur': { lat: 21.1458, lon: 79.0882, name: 'Nagpur (Mandarin Orange Belt), Maharashtra', country: 'India' },
+      'guntur': { lat: 16.3067, lon: 80.4365, name: 'Guntur (Chilli & Spice Basin), Andhra Pradesh', country: 'India' },
+      'ocean': { lat: 0.0, lon: -160.0, name: 'Pacific Ocean (Deep Sea Marine Waters)', country: 'International Waters' },
+      'pacific': { lat: 0.0, lon: -160.0, name: 'Pacific Ocean (Deep Sea Marine Waters)', country: 'International Waters' },
+      'atlantic': { lat: 25.0, lon: -40.0, name: 'North Atlantic Ocean (Deep Sea)', country: 'International Waters' },
+      'indian ocean': { lat: -10.0, lon: 75.0, name: 'Indian Ocean (Deep Sea Marine Zone)', country: 'International Waters' },
+      'bay of bengal': { lat: 15.0, lon: 88.0, name: 'Bay of Bengal (Deep Marine Water Body)', country: 'International Waters' },
+      'arabian sea': { lat: 15.0, lon: 65.0, name: 'Arabian Sea (Marine Waters)', country: 'International Waters' },
+      'chennai': { lat: 13.0827, lon: 80.2707, name: 'Chennai Metropolitan Region, Tamil Nadu', country: 'India' },
+      'madurai': { lat: 9.9252, lon: 78.1198, name: 'Madurai, Tamil Nadu, India', country: 'India' },
+      'trichy': { lat: 10.7905, lon: 78.7047, name: 'Tiruchirappalli, Tamil Nadu', country: 'India' },
+      'tiruchirappalli': { lat: 10.7905, lon: 78.7047, name: 'Tiruchirappalli, Tamil Nadu', country: 'India' },
+      'delhi': { lat: 28.6139, lon: 77.2090, name: 'New Delhi, India', country: 'India' },
+      'mumbai': { lat: 19.0760, lon: 72.8777, name: 'Mumbai, Maharashtra, India', country: 'India' },
+      'bangalore': { lat: 12.9716, lon: 77.5946, name: 'Bengaluru, Karnataka, India', country: 'India' },
+      'bengaluru': { lat: 12.9716, lon: 77.5946, name: 'Bengaluru, Karnataka, India', country: 'India' },
+      'hyderabad': { lat: 17.3850, lon: 78.4867, name: 'Hyderabad, Telangana, India', country: 'India' },
+      'kolkata': { lat: 22.5726, lon: 88.3639, name: 'Kolkata, West Bengal, India', country: 'India' }
+    };
+
+    for (const [k, v] of Object.entries(quickLocs)) {
+      if (qLower.includes(k)) {
+        triggerLocationAnalysis(v.lat, v.lon, v.name, v.country);
+        return;
+      }
+    }
 
     fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`)
       .then(r => r.json())
