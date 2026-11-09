@@ -30,6 +30,43 @@ FRONTEND_DIR = os.path.join(ROOT_DIR, 'frontend')
 app = Flask(__name__, static_folder=FRONTEND_DIR)
 CORS(app)
 
+# ==============================================================
+# VERCEL SERVERLESS PATH FIX MIDDLEWARE
+# ==============================================================
+import urllib.parse
+
+class VercelPathFixMiddleware:
+    """
+    WSGI middleware ensuring proper routing on Vercel Serverless deployments.
+    Restores original API subpaths rewritten by Vercel (__path__ parameter or headers).
+    """
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        qs = environ.get("QUERY_STRING", "")
+        path = environ.get("PATH_INFO", "")
+
+        if "__path__=" in qs:
+            parsed = urllib.parse.parse_qs(qs, keep_blank_values=True)
+            if "__path__" in parsed:
+                subpath = parsed.pop("__path__")[0].lstrip("/")
+                environ["PATH_INFO"] = "/api/" + subpath
+                environ["QUERY_STRING"] = urllib.parse.urlencode(parsed, doseq=True)
+        elif path in ["/api/index.py", "/index.py", "/api/", "/api"]:
+            real_path = (
+                environ.get("HTTP_X_MATCHED_PATH")
+                or environ.get("HTTP_X_VERCEL_PATH")
+                or environ.get("HTTP_X_FORWARDED_URI")
+            )
+            if real_path and real_path not in ["/api/index.py", "/index.py"]:
+                environ["PATH_INFO"] = real_path.split("?")[0]
+
+        return self.wsgi_app(environ, start_response)
+
+app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)
+
+
 # Initialize SQLite database safely
 try:
     init_db()
