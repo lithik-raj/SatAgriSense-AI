@@ -117,7 +117,7 @@ def init_db():
                 # 3. Coimbatore, Tamil Nadu (Kongu Agro Hub)
                 (
                     "Coimbatore", "India", 11.0168, 76.9558,
-                    "Sugarcane", "Saccharum officinarum", "Co-0238 / Co-86032 High Biomass",
+                    "Coconut & Sugarcane", "Cocos nucifera & Saccharum officinarum", "Co-0238 / Co-86032 High Biomass",
                     "Deep red-clay loam with Siruvani river perennial irrigation",
                     6.5, 7.8, 88.5, 44.0, 1700.0,
                     "Sucrose Recovery 11.5% / High Fiber",
@@ -256,7 +256,7 @@ def init_db():
             seed_locations = [
                 (11.3410, 77.7172, "Erode Yellow Basin, Tamil Nadu", "India", 29.2, 72.0, 6.8, 16.2, 0.73, 99.4, "Turmeric (Curcuma longa - Erode Local / BSR-2)"),
                 (34.0837, 74.7973, "Kashmir Valley Orchard Basin, J&K", "India", 18.5, 58.0, 6.4, 21.0, 0.72, 99.3, "Apples (Malus domestica - Kashmiri Ambri / Red Delicious)"),
-                (11.0168, 76.9558, "Coimbatore Agricultural Basin, Tamil Nadu", "India", 28.5, 75.0, 6.8, 14.5, 0.70, 98.7, "Sugarcane (Saccharum officinarum - Co-0238)"),
+                (11.0168, 76.9558, "Coimbatore Agricultural Basin, Tamil Nadu", "India", 28.5, 75.0, 6.8, 14.5, 0.70, 98.7, "Coconut (Cocos nucifera - West Coast Tall) & Sugarcane (Co-86032)"),
                 (36.6777, -121.6555, "Salinas Valley, California", "United States", 20.5, 62.0, 6.2, 22.0, 0.71, 99.5, "Strawberries (Fragaria × ananassa - Sweet Charlie / Albion)"),
                 (21.1458, 79.0882, "Nagpur Citrus Tract, Maharashtra", "India", 28.0, 60.0, 7.1, 18.0, 0.69, 99.1, "Mandarin Orange (Citrus reticulata - Nagpur Santra GI)"),
                 (16.3067, 80.4365, "Guntur Spice Belt, Andhra Pradesh", "India", 31.0, 68.0, 6.9, 15.0, 0.64, 99.2, "Red Chilli (Capsicum annuum - Guntur Sannam S4)"),

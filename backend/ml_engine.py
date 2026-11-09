@@ -281,22 +281,7 @@ class RegionalCropYieldPredictor:
     def _select_crop_for_zone(self, lat, lon, temp_c, soil_ph, rainfall_mm, ndvi_avg, loc_name):
         loc_lower = (loc_name or "").lower()
 
-        # 1. Check SQLite Crop Knowledge Database first
-        if get_crop_knowledge_by_location:
-            db_match = get_crop_knowledge_by_location(lat, lon, loc_name)
-            if db_match and db_match["base_yield_tons_ha"] > 0:
-                crop_label = f"{db_match['crop_name']} ({db_match['botanical_species']} - {db_match['variety'].split('/')[0].strip()})"
-                return (
-                    crop_label,
-                    db_match["optimal_ph_min"],
-                    db_match["optimal_ph_max"],
-                    db_match["base_yield_tons_ha"],
-                    db_match["market_price_per_ton"],
-                    db_match["cost_per_ha"],
-                    f"{db_match['specialty_desc']} Variety: {db_match['variety']}. Quality: {db_match.get('curcumin_or_brix_quality', 'High Grade')}."
-                )
-
-        # 2. Targeted Region Overrides
+        # 1. Targeted Region Overrides (High-Precision Regional Agronomy)
         if "erode" in loc_lower:
             return (
                 "Turmeric (Curcuma longa - Erode Local / BSR-2 / Salem Golden)",
@@ -315,6 +300,24 @@ class RegionalCropYieldPredictor:
                 5.8, 6.8, 28.4, 2400, 14500,
                 "Pacific maritime fog, mild cool sunny climate, and automated drip-fertigated raised beds produce peak 28.4 T/Ha yields."
             )
+        elif any(kw in loc_lower for kw in ["coimbatore", "tiruppur", "pollachi"]):
+            return (
+                "Coconut (Cocos nucifera - West Coast Tall) & Sugarcane (Co-86032)",
+                6.5, 7.8, 88.5, 44, 1700,
+                "Kongu basin red-clay loam and perennial Siruvani/Bhavani canal irrigation achieve peak 88.5 T/Ha biomass sugarcane and world-leading West Coast Tall coconut plantations."
+            )
+        elif any(kw in loc_lower for kw in ["thanjavur", "cauvery", "kumbakonam", "nagapattinam"]):
+            return (
+                "Rice / Paddy (Oryza sativa - CR-1009 / BPT-5204 Ponni Rice)",
+                6.0, 7.5, 7.2, 440, 1200,
+                "Cauvery delta low-lying fertile wetland floodplain with shallow groundwater and canal irrigation sustains record paddy yields of 7.2 T/Ha."
+            )
+        elif any(kw in loc_lower for kw in ["theni", "trichy", "tiruchirappalli"]):
+            return (
+                "Plantation Banana (Musa acuminata - Grand Naine / Poovan)",
+                6.0, 7.5, 48.0, 320, 4800,
+                "Perennial riparian alluvial belt with high tropical sunshine and humidity supporting heavy-yielding commercial banana bunches at 48.0 T/Ha."
+            )
         elif any(kw in loc_lower for kw in ["nagpur", "vidarbha"]):
             return (
                 "Mandarin Orange (Citrus reticulata - Nagpur Santra GI)",
@@ -327,11 +330,11 @@ class RegionalCropYieldPredictor:
                 6.2, 7.5, 5.2, 2800, 2600,
                 "Krishna river delta black cotton soil and high tropical sun deliver intense capsaicin pungency (35,000+ SHU) and 5.2 T/Ha dry pods."
             )
-        elif any(kw in loc_lower for kw in ["coimbatore", "tiruppur", "pollachi"]):
+        elif any(kw in loc_lower for kw in ["punjab", "haryana", "ludhiana", "amritsar", "jalandhar", "patiala"]):
             return (
-                "Sugarcane (Saccharum officinarum - Co-0238 / Co-86032) & Coconut",
-                6.5, 7.8, 88.5, 44, 1700,
-                "Coimbatore prime red-clay loam with perennial Siruvani/Bhavani irrigation delivers record biomass sugarcane reaching 88.5 T/Ha."
+                "Wheat (Triticum aestivum - PBW 550 / HD-2967) & Basmati Rice (Pusa 1121)",
+                6.5, 7.6, 6.8, 320, 680,
+                "Indo-Gangetic alluvial granary, optimal cool winter rabi season, and extensive canal networks support bumper wheat (6.8 T/Ha) and export Basmati rice."
             )
         elif any(kw in loc_lower for kw in ["nilgiri", "ooty", "kodaikanal", "munnar", "darjeeling", "assam", "coorg"]):
             return (
@@ -345,12 +348,6 @@ class RegionalCropYieldPredictor:
                 5.2, 6.4, 3.2, 6200, 3500,
                 "Western Ghats humid laterite rainforest mulch with southwest monsoon rains yields premium black pepper and green cardamom."
             )
-        elif any(kw in loc_lower for kw in ["punjab", "haryana", "uttar pradesh"]):
-            return (
-                "Wheat (Triticum aestivum - HD-2967) / Basmati Paddy (Pusa 1121)",
-                6.5, 7.6, 5.8, 320, 680,
-                "Indo-Gangetic alluvial plain, fertile silt, optimal cool winter season produces bumper grain harvests."
-            )
         elif any(kw in loc_lower for kw in ["iowa", "illinois", "nebraska", "corn belt"]):
             return (
                 "Field Corn (Zea mays - Pioneer Hi-Bred) & Soybean (Glycine max)",
@@ -363,6 +360,21 @@ class RegionalCropYieldPredictor:
                 6.8, 8.4, 6.2, 1600, 2100,
                 "Mediterranean limestone rocky hills, dry summers, and deep taproots maximize olive oil polyphenols."
             )
+
+        # 2. Check SQLite Crop Knowledge Database
+        if get_crop_knowledge_by_location:
+            db_match = get_crop_knowledge_by_location(lat, lon, loc_name)
+            if db_match and db_match["base_yield_tons_ha"] > 0:
+                crop_label = f"{db_match['crop_name']} ({db_match['botanical_species']} - {db_match['variety'].split('/')[0].strip()})"
+                return (
+                    crop_label,
+                    db_match["optimal_ph_min"],
+                    db_match["optimal_ph_max"],
+                    db_match["base_yield_tons_ha"],
+                    db_match["market_price_per_ton"],
+                    db_match["cost_per_ha"],
+                    f"{db_match['specialty_desc']} Variety: {db_match['variety']}. Quality: {db_match.get('curcumin_or_brix_quality', 'High Grade')}."
+                )
 
         # Fallback to general database candidates
         candidates = self.CROP_DATABASE["cereals_grains"] + self.CROP_DATABASE["horticulture_high_value"]
@@ -665,12 +677,22 @@ class RegionalCropYieldPredictor:
             }
 
         # ======================================================
-        # 6. BARREN LAND / ARID ROCKY PLATEAU DETECTION
+        # 6. REGIONAL AGRICULTURAL CROPS CHECK (PREVENT GROUNDNUT OVERRIDE)
         # ======================================================
-        barren_keywords = ["barren", "arid", "wasteland", "desert", "plateau", "rocky", "dryland", "scrub", "thar", "sahara", "mojave", "atacama", "kutch", "ladakh", "deccan"]
-        is_barren_land = (ndvi_avg is not None and float(ndvi_avg) < 0.32) or any(kw in loc_lower for kw in barren_keywords)
+        agri_named_keywords = [
+            "coimbatore", "pollachi", "tiruppur", "erode", "kashmir", "srinagar", "salinas",
+            "nagpur", "guntur", "punjab", "ludhiana", "thanjavur", "cauvery", "delta",
+            "theni", "trichy", "tiruchirappalli", "ooty", "nilgiri", "wayanad", "bengal",
+            "kerala", "iowa", "andalusia", "spain", "italy", "france", "farm", "agro"
+        ]
+        is_agri_named = any(kw in loc_lower for kw in agri_named_keywords)
 
-        if is_barren_land and not is_deep_ocean and not is_dense_forest:
+        # Explicit desert/barren wasteland keywords ONLY
+        explicit_desert_keywords = ["desert", "thar", "sahara", "mojave", "atacama", "barren land", "arid wasteland", "rocky wasteland", "ladakh desert"]
+        is_explicit_desert = any(kw in loc_lower for kw in explicit_desert_keywords)
+        is_barren_land = (is_explicit_desert or ((ndvi_avg is not None and float(ndvi_avg) < 0.20) and not is_agri_named))
+
+        if is_barren_land and not is_deep_ocean and not is_dense_forest and not is_agri_named:
             w_depth_val = float(water_depth) if water_depth is not None else 14.0
             can_build = w_depth_val >= 5.0
             ph_val = float(soil_ph) if soil_ph is not None else 6.8
