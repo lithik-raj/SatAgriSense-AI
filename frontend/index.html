@@ -124,7 +124,7 @@
       position: absolute; top: 16px; left: 16px;
       background: var(--bg-panel); border: 1px solid var(--border-panel);
       padding: 10px 12px; border-radius: 14px; backdrop-filter: blur(14px);
-      width: 425px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
+      width: 450px; max-width: calc(100vw - 32px); box-sizing: border-box; z-index: 100;
       box-shadow: 0 10px 30px rgba(0,0,0,0.75);
       transition: width 0.3s ease, padding 0.3s ease;
       overflow: hidden;
@@ -599,6 +599,20 @@
         </div>
       </div>
       <div class="search-box-body" id="search-box-body">
+        <!-- Target Location Voice Language Selector -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:5px 0 6px 0;padding:3px 8px;background:rgba(0,240,255,0.06);border-radius:8px;border:1px solid rgba(0,240,255,0.18);font-size:10px;">
+          <span style="color:#cbd5e1;font-weight:700;display:flex;align-items:center;gap:4px;">
+            <i class="fa-solid fa-language" style="color:var(--cyan-glow);"></i> Voice Language:
+          </span>
+          <div style="display:flex;gap:4px;">
+            <button id="target-lang-mode-auto" type="button" onclick="setTargetVoiceLanguageMode('auto')" style="background:rgba(0,240,255,0.3);border:1px solid #00f0ff;color:#fff;border-radius:10px;font-size:9px;font-weight:700;padding:2px 8px;cursor:pointer;" title="Automatically detect and speak in native regional language">
+              🌐 Auto Regional
+            </button>
+            <button id="target-lang-mode-en" type="button" onclick="setTargetVoiceLanguageMode('en')" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#ccc;border-radius:10px;font-size:9px;font-weight:700;padding:2px 8px;cursor:pointer;" title="Permanently speak in English only for all locations">
+              🇬🇧 English Always
+            </button>
+          </div>
+        </div>
         <div class="search-bar-row" style="position:relative;">
           <input type="text" id="location-input" class="search-input"
             value="Coimbatore, Tamil Nadu, India"
@@ -610,8 +624,11 @@
           <button class="btn-icon" onclick="searchLocationByName()" title="Search">
             <i class="fa-solid fa-magnifying-glass"></i>
           </button>
-          <button class="btn-icon" onclick="speakCurrentLocation()" title="Speak Location" style="background:rgba(0,240,255,0.3);color:#00f0ff;border:1px solid var(--cyan-glow);">
-            <i class="fa-solid fa-volume-high"></i>
+          <button id="target-voice-play-btn" class="btn-icon" onclick="speakCurrentLocation()" title="Speak Location Telemetry" style="background:rgba(0,240,255,0.3);color:#00f0ff;border:1px solid var(--cyan-glow);">
+            <i class="fa-solid fa-play"></i>
+          </button>
+          <button id="target-voice-mute-btn" class="btn-icon" onclick="toggleTargetVoiceMute()" title="Stop Voice / Mute Audio" style="background:rgba(0,240,255,0.2);color:#00f0ff;border:1px solid var(--cyan-glow);">
+            <i class="fa-solid fa-volume-high" id="target-voice-mute-icon"></i>
           </button>
           <!-- In-Page Voice & Location Fallback Banner -->
           <div id="voice-fallback-banner" style="display:none;position:absolute;top:44px;left:0;right:0;background:rgba(8,16,32,0.97);border:1px solid var(--cyan-glow);border-radius:10px;padding:10px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.85);backdrop-filter:blur(10px);">
@@ -1593,6 +1610,107 @@
     openVoiceBanner();
   }
 
+  // Global Unified Voice State & Single-Voice Pipeline
+  let voiceLanguageMode = 'auto'; // 'auto' (regional detection) or 'en' (permanent English)
+  let isVoiceMuted = false;
+
+  function stopAllAudioAndSpeech() {
+    if ('speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch(e) {}
+    }
+    if (window.currentTTSAudio) {
+      try {
+        window.currentTTSAudio.pause();
+        window.currentTTSAudio.currentTime = 0;
+      } catch(e) {}
+      window.currentTTSAudio = null;
+    }
+    if (window.activeTTSAudio) {
+      try {
+        window.activeTTSAudio.pause();
+        window.activeTTSAudio.currentTime = 0;
+      } catch(e) {}
+      window.activeTTSAudio = null;
+    }
+    if (window._ttsAudioPlayer) {
+      try {
+        window._ttsAudioPlayer.pause();
+        window._ttsAudioPlayer.currentTime = 0;
+      } catch(e) {}
+    }
+    const muteIcon = document.getElementById('target-voice-mute-icon');
+    if (muteIcon && !isVoiceMuted) {
+      muteIcon.className = 'fa-solid fa-volume-high';
+    }
+  }
+
+  function toggleTargetVoiceMute() {
+    stopAllAudioAndSpeech();
+    isVoiceMuted = !isVoiceMuted;
+    const topVoiceCheck = document.getElementById('voice-toggle');
+    if (topVoiceCheck) topVoiceCheck.checked = !isVoiceMuted;
+    updateVoiceMuteUI();
+  }
+
+  function updateVoiceMuteUI() {
+    const btn = document.getElementById('target-voice-mute-btn');
+    const icon = document.getElementById('target-voice-mute-icon');
+    const status = document.getElementById('voice-status');
+    if (!btn || !icon) return;
+
+    if (isVoiceMuted) {
+      btn.style.background = 'rgba(255,51,102,0.25)';
+      btn.style.borderColor = '#ff3366';
+      btn.style.color = '#ff3366';
+      btn.title = 'Voice Muted (Click to Unmute)';
+      icon.className = 'fa-solid fa-volume-xmark';
+      if (status) status.innerHTML = '<i class="fa-solid fa-volume-xmark" style="color:#ff3366;"></i> Voice Muted. Audio silenced.';
+    } else {
+      btn.style.background = 'rgba(0,240,255,0.25)';
+      btn.style.borderColor = 'var(--cyan-glow)';
+      btn.style.color = '#00f0ff';
+      btn.title = 'Voice Active (Click to Stop & Mute)';
+      icon.className = 'fa-solid fa-volume-high';
+      if (status) status.innerHTML = '<i class="fa-solid fa-volume-high" style="color:var(--cyan-glow);"></i> Voice Active. Fast 5G telemetry ready.';
+    }
+  }
+
+  function setTargetVoiceLanguageMode(mode) {
+    voiceLanguageMode = mode;
+    const btnAuto = document.getElementById('target-lang-mode-auto');
+    const btnEn = document.getElementById('target-lang-mode-en');
+    const status = document.getElementById('voice-status');
+
+    if (mode === 'en') {
+      if (btnEn) {
+        btnEn.style.background = 'rgba(0,240,255,0.3)';
+        btnEn.style.borderColor = '#00f0ff';
+        btnEn.style.color = '#fff';
+      }
+      if (btnAuto) {
+        btnAuto.style.background = 'rgba(255,255,255,0.06)';
+        btnAuto.style.borderColor = 'rgba(255,255,255,0.2)';
+        btnAuto.style.color = '#ccc';
+      }
+      setChatLanguage('en-US', 'English (Always)');
+      if (status) status.innerHTML = '<i class="fa-solid fa-check" style="color:var(--cyan-glow);"></i> Voice Language: Permanent English locked.';
+    } else {
+      if (btnAuto) {
+        btnAuto.style.background = 'rgba(0,240,255,0.3)';
+        btnAuto.style.borderColor = '#00f0ff';
+        btnAuto.style.color = '#fff';
+      }
+      if (btnEn) {
+        btnEn.style.background = 'rgba(255,255,255,0.06)';
+        btnEn.style.borderColor = 'rgba(255,255,255,0.2)';
+        btnEn.style.color = '#ccc';
+      }
+      const detected = detectRegionalLanguage(currentLocationContext.name, currentLocationContext.country, currentLocationContext.lat, currentLocationContext.lon);
+      setChatLanguage(detected.code, detected.name);
+      if (status) status.innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> Voice Language: Auto Regional (${detected.name}).`;
+    }
+  }
+
   // Cached Speech Voices for instant responsiveness
   let cachedSystemVoices = [];
   function loadSystemVoices() {
@@ -1609,12 +1727,7 @@
   window._ttsAudioPlayer = window._ttsAudioPlayer || (typeof Audio !== 'undefined' ? new Audio() : null);
 
   function stopAllVoiceOutput() {
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    if (activeTTSAudio) {
-      activeTTSAudio.pause();
-      activeTTSAudio.currentTime = 0;
-      activeTTSAudio = null;
-    }
+    stopAllAudioAndSpeech();
   }
 
   function playChatMessageVoice(btnEl) {
@@ -1994,7 +2107,14 @@
   // TEXT-TO-SPEECH OUTPUT
   // ============================================================
   function speakCurrentLocation() {
-    if (!document.getElementById('voice-toggle').checked) return;
+    const topCheck = document.getElementById('voice-toggle');
+    if (isVoiceMuted || (topCheck && !topCheck.checked)) {
+      stopAllAudioAndSpeech();
+      return;
+    }
+    // Single Voice Pipeline: Stop any existing speech before starting
+    stopAllAudioAndSpeech();
+
     const loc = document.getElementById('location-input')?.value || currentLocationContext?.name || '';
     if (!loc) return;
     const crop = lastMLData ? (lastMLData.recommended_crop || lastMLData.crop || '') : '';
@@ -2009,7 +2129,7 @@
 
     let announcement = '';
     let phoneticFallback = '';
-    const lang = (currentChatLangCode || 'en').toLowerCase();
+    let lang = (voiceLanguageMode === 'en') ? 'en' : (currentChatLangCode || 'en').toLowerCase();
 
     if (lang.startsWith('ta')) {
       if (isForest) {
@@ -2666,19 +2786,21 @@
       if (closeBar) closeBar.style.display = 'flex';
       init2DSatelliteMap();
       setTimeout(() => {
+        if (!leafletMapInstance) return;
         leafletMapInstance.invalidateSize();
         // Navigate to current location at city-level zoom so buildings/roads are visible
         leafletMapInstance.setView([currentLocationContext.lat, currentLocationContext.lon], 14);
         // Restore marker icon & popup with known land type
         if (leafletMarker && lastMLData) {
-          leafletMarker.setIcon(createLocMarker(lastMLData.location_type, heroEmoji));
+          const curEmoji = lastMLData.crop_visual_emoji || getClientCropEmoji(lastMLData.recommended_crop, lastMLData.location_type) || '🌾';
+          leafletMarker.setIcon(createLocMarker(lastMLData.location_type, curEmoji));
           leafletMarker.setPopupContent(buildMarkerPopup(currentLocationContext.name, lastMLData.location_type, lastCVData ? lastCVData.dominant_ndvi?.score : null));
         }
         // Restore NDVI overlay
         if (lastCVData) showNdviOverlayOn2DMap(currentLocationContext.lat, currentLocationContext.lon, lastCVData);
         // Fetch nearby places for current location
         fetchNearbyPlaces(currentLocationContext.lat, currentLocationContext.lon);
-      }, 300);
+      }, 50);
     }
   }
 
@@ -4681,15 +4803,22 @@
           const city = a.city || a.town || a.village || a.suburb || a.county || a.state_district;
           const state = a.state || a.province || a.region;
           const country = a.country || geo.country;
-          const fullName = city ? `${city}, ${state ? state + ', ' : ''}${country}` : data.display_name || geo.name;
-          triggerLocationAnalysis(lat, lon, fullName, country);
-        } else {
-          triggerLocationAnalysis(lat, lon, geo.name, geo.country);
+          const fullName = city ? `${city}, ${state ? state + ', ' : ''}${country}` : (data.display_name || geo.name);
+          
+          // Silently refine location text without triggering duplicate voice or re-running analysis!
+          currentLocationContext.name = fullName;
+          currentLocationContext.country = country;
+          const locInput = document.getElementById('location-input');
+          if (locInput) locInput.value = fullName;
+          const cvInput = document.getElementById('cv-search-input');
+          if (cvInput) cvInput.value = fullName;
+          if (leafletMarker) {
+            leafletMarker.setPopupContent(buildMarkerPopup(fullName, lastMLData?.location_type || 'Agricultural Zone', lastCVData?.dominant_ndvi?.score));
+          }
         }
       })
       .catch(() => {
         clearTimeout(timeoutId);
-        triggerLocationAnalysis(lat, lon, geo.name, geo.country);
       });
   }
 
@@ -4698,9 +4827,13 @@
   // ============================================================
   function triggerLocationAnalysis(lat, lon, name, country) {
     currentLocationContext = { lat, lon, name, country };
-    const detectedLang = detectRegionalLanguage(name, country, lat, lon);
-    setChatLanguage(detectedLang.code, detectedLang.name);
-    updateRegionalLanguageUI(name, country, lat, lon);
+    if (voiceLanguageMode === 'en') {
+      setChatLanguage('en-US', 'English (Always)');
+    } else {
+      const detectedLang = detectRegionalLanguage(name, country, lat, lon);
+      setChatLanguage(detectedLang.code, detectedLang.name);
+      updateRegionalLanguageUI(name, country, lat, lon);
+    }
 
     document.getElementById('coord-display').textContent = `Lat: ${lat.toFixed(3)}°, Lon: ${lon.toFixed(3)}°`;
     document.getElementById('location-input').value = name;
@@ -5040,9 +5173,10 @@
     document.getElementById('pdf-climate').textContent = ml.climate_change_suggestion || '';
     document.getElementById('pdf-hist-shift').textContent = hist ? hist.land_cover_shift : '';
 
-    // Announce via voice
-    if (document.getElementById('voice-toggle').checked && accNum < 50) {
-      speakText(`Warning: Low crop yield accuracy of ${ml.yield_accuracy} percent for ${currentLocationContext.name.split(',')[0]}. ${ml.reason}`);
+    // Note: Unified single voice announcement is handled cleanly via speakCurrentLocation()
+    if (accNum < 50) {
+      const vStatus = document.getElementById('voice-status');
+      if (vStatus) vStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#ffa500;"></i> Notice: Yield accuracy is ${ml.yield_accuracy}% for ${currentLocationContext.name.split(',')[0]}.`;
     }
   }
 
