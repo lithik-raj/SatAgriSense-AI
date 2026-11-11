@@ -39,10 +39,35 @@ def generate_satellite_imagery(lat, lon, width=500, height=350):
     terrain = noise1 + noise2 + noise3
     terrain = (terrain - terrain.min()) / (terrain.max() - terrain.min() + 1e-6)
 
-    # Geographic characteristics
-    is_polar = abs(lat) > 62
-    is_coastal_or_water = (abs(lat * 3 + lon * 5) % 10) < 3.2
-    
+    # Geographic characteristics & biomes
+    abs_lat = abs(lat)
+    is_polar = abs_lat >= 66.5
+    is_deep_ocean = (
+        (abs_lat < 55 and (lon > 155 or lon < -130)) or
+        (6.0 <= lat <= 20.5 and 84.5 <= lon <= 93.5) or  # Bay of Bengal deep waters
+        (8.0 <= lat <= 22.0 and 55.0 <= lon <= 71.0) or  # Arabian Sea
+        (-45.0 <= lat <= 4.0 and 55.0 <= lon <= 95.0) or # Indian Ocean
+        (10.0 <= lat <= 55.0 and -55.0 <= lon <= -20.0)  # North Atlantic
+    )
+    is_forest = (
+        (-15.0 <= lat <= 6.0 and -79.0 <= lon <= -45.0) or  # Amazon
+        (21.4 <= lat <= 22.8 and 88.0 <= lon <= 90.5) or   # Sundarbans
+        (-6.0 <= lat <= 6.0 and 11.0 <= lon <= 31.0) or    # Congo Basin
+        (52.0 <= lat <= 70.0 and (lon <= -55.0 or lon >= 10.0)) or # Boreal / Taiga
+        (-46.0 <= lat <= -35.0 and -75.0 <= lon <= -70.0) or # Valdivian
+        (47.5 <= lat <= 49.0 and 7.5 <= lon <= 8.8) or      # Black Forest
+        (-17.0 <= lat <= -15.0 and 145.0 <= lon <= 145.8) or # Daintree
+        (40.5 <= lat <= 42.0 and -124.5 <= lon <= -123.8)    # Redwood
+    )
+    is_desert = (
+        (24.5 <= lat <= 29.5 and 69.5 <= lon <= 73.5) or   # Thar
+        (18.0 <= lat <= 30.0 and -10.0 <= lon <= 30.0) or  # Sahara
+        (18.0 <= lat <= 28.0 and 42.0 <= lon <= 55.0) or   # Arabian Desert
+        (34.5 <= lat <= 37.0 and -117.5 <= lon <= -114.5) or # Mojave
+        (-26.0 <= lat <= -19.0 and -70.5 <= lon <= -68.0) or # Atacama
+        (32.5 <= lat <= 36.0 and 76.0 <= lon <= 80.0)      # Ladakh
+    )
+
     # Masks
     if is_polar:
         ice_mask = terrain > 0.35
@@ -50,17 +75,30 @@ def generate_satellite_imagery(lat, lon, width=500, height=350):
         forest_mask = np.zeros((height, width), dtype=bool)
         ag_mask = np.zeros((height, width), dtype=bool)
         soil_mask = terrain <= 0.2
-    elif is_coastal_or_water:
-        water_mask = terrain < 0.45
-        ag_mask = (terrain >= 0.45) & (terrain < 0.70)
-        forest_mask = (terrain >= 0.70) & (terrain < 0.88)
-        soil_mask = terrain >= 0.88
+    elif is_deep_ocean:
+        water_mask = np.ones((height, width), dtype=bool)
+        ice_mask = np.zeros((height, width), dtype=bool)
+        forest_mask = np.zeros((height, width), dtype=bool)
+        ag_mask = np.zeros((height, width), dtype=bool)
+        soil_mask = np.zeros((height, width), dtype=bool)
+    elif is_forest:
+        water_mask = terrain < 0.10
+        forest_mask = terrain >= 0.10
+        ag_mask = np.zeros((height, width), dtype=bool)
+        soil_mask = np.zeros((height, width), dtype=bool)
+        ice_mask = np.zeros((height, width), dtype=bool)
+    elif is_desert:
+        water_mask = terrain < 0.05
+        soil_mask = terrain >= 0.05
+        forest_mask = np.zeros((height, width), dtype=bool)
+        ag_mask = np.zeros((height, width), dtype=bool)
         ice_mask = np.zeros((height, width), dtype=bool)
     else:
-        water_mask = terrain < 0.18
-        soil_mask = (terrain >= 0.18) & (terrain < 0.38)
-        ag_mask = (terrain >= 0.38) & (terrain < 0.72)
-        forest_mask = terrain >= 0.72
+        # Prime Fertile Agricultural Farmland: Healthy crops, canal water, minimal bare soil
+        water_mask = terrain < 0.10
+        soil_mask = (terrain >= 0.10) & (terrain < 0.22)
+        ag_mask = (terrain >= 0.22) & (terrain < 0.88)
+        forest_mask = terrain >= 0.88
         ice_mask = np.zeros((height, width), dtype=bool)
 
     # 1. Google Satellite Aerial RGB Composite Image
@@ -162,7 +200,7 @@ def generate_satellite_imagery(lat, lon, width=500, height=350):
 
     # Water Body pH & Salinity Level Estimation (Real Marine & Freshwater Metrics)
     if water_pct > 0.5:
-        is_marine = (abs(lat) < 55 and (lon > 150 or lon < -120)) or (8.0 < lat < 22.0 and 81.5 < lon < 93.0) or (water_pct > 30 and abs(lat) < 40)
+        is_marine = is_deep_ocean or (abs_lat < 55 and (lon > 155 or lon < -130)) or (6.0 <= lat <= 20.5 and 84.5 <= lon <= 93.5)
         if is_marine:
             water_ph = 8.15
             water_type = "Ocean / Coastal Marine Waters"

@@ -71,18 +71,22 @@ def get_crop_visual_emoji(crop_name, loc_type=''):
     lt = (loc_type or '').lower()
     if any(k in c or k in lt for k in ['ocean', 'marine', 'sea', 'water body', 'saline water', 'bay of bengal', 'arabian']):
         return '🌊'
-    if any(k in c or k in lt for k in ['forest', 'canopy', 'reserve', 'rainforest', 'taiga', 'jungle', 'woods']):
+    if any(k in c or k in lt for k in ['forest', 'canopy', 'reserve', 'rainforest', 'taiga', 'jungle', 'woods']) and not any(k in c or k in lt for k in ['agroforestry', 'pepper', 'cardamom', 'tea', 'coffee']):
         return '🌲'
     if any(k in c or k in lt for k in ['polar', 'permafrost', 'arctic', 'antarctica']):
         return '❄️'
+    if any(k in c for k in ['black pepper', 'cardamom', 'turmeric', 'curcuma', 'bsr-2', 'piper']):
+        return '🌿'
+    if any(k in c for k in ['tea', 'camellia', 'ooty', 'nilgiri orthodox']):
+        return '🍵'
+    if any(k in c for k in ['coffee', 'arabica', 'robusta']):
+        return '☕'
     if any(k in c for k in ['strawberry', 'strawberries', 'fragaria']):
         return '🍓'
     if any(k in c for k in ['coconut', 'palm', 'tall local']):
         return '🌴'
     if any(k in c for k in ['banana', 'plantain', 'musa']):
         return '🍌'
-    if any(k in c for k in ['turmeric', 'curcuma', 'bsr-2']):
-        return '🌿'
     if any(k in c for k in ['apple', 'malus', 'ambri']):
         return '🍎'
     if any(k in c for k in ['groundnut', 'peanut', 'kadalai', 'arachis', 'tmv-7', 'tag-24']):
@@ -91,14 +95,10 @@ def get_crop_visual_emoji(crop_name, loc_type=''):
         return '🍚'
     if any(k in c for k in ['wheat', 'durum', 'rabi hd', 'triticum']):
         return '🌾'
+    if any(k in c for k in ['chilli', 'capsicum', 'guntur', 's4', 'sannam']):
+        return '🌶️'
     if any(k in c for k in ['cotton', 'gossypium']):
         return '☁️'
-    if any(k in c for k in ['chilli', 'pepper', 'capsicum', 'guntur', 's4']):
-        return '🌶️'
-    if any(k in c for k in ['coffee', 'arabica', 'robusta']):
-        return '☕'
-    if any(k in c for k in ['tea', 'camellia', 'ooty', 'nilgiri orthodox']):
-        return '🍵'
     if any(k in c for k in ['orange', 'citrus', 'mandarin', 'santra']):
         return '🍊'
     if any(k in c for k in ['corn', 'maize', 'sweet corn', 'zea']):
@@ -281,80 +281,80 @@ class RegionalCropYieldPredictor:
     def _select_crop_for_zone(self, lat, lon, temp_c, soil_ph, rainfall_mm, ndvi_avg, loc_name):
         loc_lower = (loc_name or "").lower()
 
-        # 1. Targeted Region Overrides (High-Precision Regional Agronomy)
-        if "erode" in loc_lower:
+        # 1. Targeted Region Overrides (High-Precision Regional Agronomy & Coordinates)
+        if "erode" in loc_lower or (11.1 <= lat <= 11.8 and 77.2 <= lon <= 78.1):
             return (
                 "Turmeric (Curcuma longa - Erode Local / BSR-2 / Salem Golden)",
                 6.5, 7.5, 28.5, 1850, 3400,
                 "Erode Yellow City Bhavani river basin: 4.5%+ Curcumin density, well-drained red-clay loam with peak 28.5 T/Ha rhizome yield."
             )
-        elif any(kw in loc_lower for kw in ["kashmir", "srinagar", "sopore", "shopian", "baramulla", "anantnag"]):
+        elif any(kw in loc_lower for kw in ["kashmir", "srinagar", "sopore", "shopian", "baramulla", "anantnag"]) or (33.2 <= lat <= 35.0 and 74.0 <= lon <= 75.8):
             return (
                 "Apples (Malus domestica - Kashmiri Ambri / Red Delicious / Royal Gala)",
                 6.0, 6.8, 26.0, 1100, 4200,
                 "J&K alpine chilling hours (>1200 hrs <7°C) and fertile glacial Karewa silt-loam ensure crisp high-sugar apples at 26.0 T/Ha."
             )
-        elif any(kw in loc_lower for kw in ["salinas", "watsonville", "monterey", "california"]):
+        elif any(kw in loc_lower for kw in ["salinas", "watsonville", "monterey", "california"]) or (36.0 <= lat <= 37.2 and -122.0 <= lon <= -121.0):
             return (
                 "Strawberries (Fragaria × ananassa - Sweet Charlie / Albion / Camarosa)",
                 5.8, 6.8, 28.4, 2400, 14500,
                 "Pacific maritime fog, mild cool sunny climate, and automated drip-fertigated raised beds produce peak 28.4 T/Ha yields."
             )
-        elif any(kw in loc_lower for kw in ["coimbatore", "tiruppur", "pollachi"]):
-            return (
-                "Coconut (Cocos nucifera - West Coast Tall) & Sugarcane (Co-86032)",
-                6.5, 7.8, 88.5, 44, 1700,
-                "Kongu basin red-clay loam and perennial Siruvani/Bhavani canal irrigation achieve peak 88.5 T/Ha biomass sugarcane and world-leading West Coast Tall coconut plantations."
-            )
-        elif any(kw in loc_lower for kw in ["thanjavur", "cauvery", "kumbakonam", "nagapattinam"]):
-            return (
-                "Rice / Paddy (Oryza sativa - CR-1009 / BPT-5204 Ponni Rice)",
-                6.0, 7.5, 7.2, 440, 1200,
-                "Cauvery delta low-lying fertile wetland floodplain with shallow groundwater and canal irrigation sustains record paddy yields of 7.2 T/Ha."
-            )
-        elif any(kw in loc_lower for kw in ["theni", "trichy", "tiruchirappalli"]):
-            return (
-                "Plantation Banana (Musa acuminata - Grand Naine / Poovan)",
-                6.0, 7.5, 48.0, 320, 4800,
-                "Perennial riparian alluvial belt with high tropical sunshine and humidity supporting heavy-yielding commercial banana bunches at 48.0 T/Ha."
-            )
-        elif any(kw in loc_lower for kw in ["nagpur", "vidarbha"]):
-            return (
-                "Mandarin Orange (Citrus reticulata - Nagpur Santra GI)",
-                6.5, 7.8, 24.0, 650, 3200,
-                "Vidarbha black soils and dry subtropical winters deliver sweet-tart Nagpur Santra mandarins with abundant juice content at 24.0 T/Ha."
-            )
-        elif any(kw in loc_lower for kw in ["guntur", "prakasam"]):
-            return (
-                "Red Chilli (Capsicum annuum - Guntur Sannam S4 GI)",
-                6.2, 7.5, 5.2, 2800, 2600,
-                "Krishna river delta black cotton soil and high tropical sun deliver intense capsaicin pungency (35,000+ SHU) and 5.2 T/Ha dry pods."
-            )
-        elif any(kw in loc_lower for kw in ["punjab", "haryana", "ludhiana", "amritsar", "jalandhar", "patiala"]):
-            return (
-                "Wheat (Triticum aestivum - PBW 550 / HD-2967) & Basmati Rice (Pusa 1121)",
-                6.5, 7.6, 6.8, 320, 680,
-                "Indo-Gangetic alluvial granary, optimal cool winter rabi season, and extensive canal networks support bumper wheat (6.8 T/Ha) and export Basmati rice."
-            )
-        elif any(kw in loc_lower for kw in ["nilgiri", "ooty", "kodaikanal", "munnar", "darjeeling", "assam", "coorg"]):
+        elif any(kw in loc_lower for kw in ["nilgiri", "ooty", "kodaikanal", "munnar", "darjeeling", "assam", "coorg"]) or (11.2 <= lat <= 11.8 and 76.4 <= lon <= 77.1):
             return (
                 "Tea (Camellia sinensis - Nilgiri Orthodox) & Arabica Coffee",
                 4.5, 5.5, 3.6, 3400, 2900,
                 "High-altitude acidic hill slopes (1200–2200m) with dense mist and frost protection deliver exquisite orthodox golden liquor."
             )
-        elif any(kw in loc_lower for kw in ["wayanad", "idukki"]):
+        elif any(kw in loc_lower for kw in ["coimbatore", "tiruppur", "pollachi", "kongu"]) or (10.4 <= lat <= 11.5 and 76.5 <= lon <= 77.4):
+            return (
+                "Coconut (Cocos nucifera - West Coast Tall) & Sugarcane (Co-86032)",
+                6.5, 7.8, 88.5, 44, 1700,
+                "Kongu basin red-clay loam and perennial Siruvani/Bhavani canal irrigation achieve peak 88.5 T/Ha biomass sugarcane and world-leading West Coast Tall coconut plantations."
+            )
+        elif any(kw in loc_lower for kw in ["thanjavur", "cauvery", "kumbakonam", "nagapattinam", "delta"]) or (10.2 <= lat <= 11.4 and 78.8 <= lon <= 80.0):
+            return (
+                "Rice / Paddy (Oryza sativa - CR-1009 / BPT-5204 Ponni Rice)",
+                6.0, 7.5, 7.2, 440, 1200,
+                "Cauvery delta low-lying fertile wetland floodplain with shallow groundwater and canal irrigation sustains record paddy yields of 7.2 T/Ha."
+            )
+        elif any(kw in loc_lower for kw in ["theni", "trichy", "tiruchirappalli"]) or (9.6 <= lat <= 10.4 and 77.1 <= lon <= 77.8) or (10.5 <= lat <= 11.1 and 78.4 <= lon <= 79.1):
+            return (
+                "Plantation Banana (Musa acuminata - Grand Naine / Poovan)",
+                6.0, 7.5, 48.0, 320, 4800,
+                "Perennial riparian alluvial belt with high tropical sunshine and humidity supporting heavy-yielding commercial banana bunches at 48.0 T/Ha."
+            )
+        elif any(kw in loc_lower for kw in ["nagpur", "vidarbha"]) or (20.5 <= lat <= 21.8 and 78.5 <= lon <= 79.8):
+            return (
+                "Mandarin Orange (Citrus reticulata - Nagpur Santra GI)",
+                6.5, 7.8, 24.0, 650, 3200,
+                "Vidarbha black soils and dry subtropical winters deliver sweet-tart Nagpur Santra mandarins with abundant juice content at 24.0 T/Ha."
+            )
+        elif any(kw in loc_lower for kw in ["guntur", "prakasam"]) or (15.6 <= lat <= 16.9 and 79.8 <= lon <= 80.9):
+            return (
+                "Red Chilli (Capsicum annuum - Guntur Sannam S4 GI)",
+                6.2, 7.5, 5.2, 2800, 2600,
+                "Krishna river delta black cotton soil and high tropical sun deliver intense capsaicin pungency (35,000+ SHU) and 5.2 T/Ha dry pods."
+            )
+        elif any(kw in loc_lower for kw in ["punjab", "haryana", "ludhiana", "amritsar", "jalandhar", "patiala"]) or (29.5 <= lat <= 32.5 and 73.8 <= lon <= 76.9):
+            return (
+                "Wheat (Triticum aestivum - PBW 550 / HD-2967) & Basmati Rice (Pusa 1121)",
+                6.5, 7.6, 6.8, 320, 680,
+                "Indo-Gangetic alluvial granary, optimal cool winter rabi season, and extensive canal networks support bumper wheat (6.8 T/Ha) and export Basmati rice."
+            )
+        elif any(kw in loc_lower for kw in ["wayanad", "idukki", "malabar"]) or (11.3 <= lat <= 12.1 and 75.8 <= lon <= 76.5):
             return (
                 "Black Pepper (Piper nigrum - Panniyur-1) & Cardamom (Elettaria cardamomum)",
                 5.2, 6.4, 3.2, 6200, 3500,
                 "Western Ghats humid laterite rainforest mulch with southwest monsoon rains yields premium black pepper and green cardamom."
             )
-        elif any(kw in loc_lower for kw in ["iowa", "illinois", "nebraska", "corn belt"]):
+        elif any(kw in loc_lower for kw in ["iowa", "illinois", "nebraska", "corn belt"]) or (39.0 <= lat <= 44.5 and -97.0 <= lon <= -87.0):
             return (
                 "Field Corn (Zea mays - Pioneer Hi-Bred) & Soybean (Glycine max)",
                 6.0, 7.0, 11.5, 260, 820,
                 "Mollisol prairie soils, high organic matter, warm humid summers yield world-leading 11.5 T/Ha grain corn."
             )
-        elif any(kw in loc_lower for kw in ["andalusia", "jaen", "spain", "mediterranean"]):
+        elif any(kw in loc_lower for kw in ["andalusia", "jaen", "spain", "mediterranean"]) or (36.0 <= lat <= 39.5 and -7.5 <= lon <= -2.0):
             return (
                 "Olive (Olea europaea - Picual / Arbequina Extra Virgin)",
                 6.8, 8.4, 6.2, 1600, 2100,
@@ -677,22 +677,21 @@ class RegionalCropYieldPredictor:
             }
 
         # ======================================================
-        # 6. REGIONAL AGRICULTURAL CROPS CHECK (PREVENT GROUNDNUT OVERRIDE)
+        # 6. EXPLICIT ARID DESERT WASTELANDS ONLY (NEVER MATCH FERTILE AGRI LAND)
         # ======================================================
-        agri_named_keywords = [
-            "coimbatore", "pollachi", "tiruppur", "erode", "kashmir", "srinagar", "salinas",
-            "nagpur", "guntur", "punjab", "ludhiana", "thanjavur", "cauvery", "delta",
-            "theni", "trichy", "tiruchirappalli", "ooty", "nilgiri", "wayanad", "bengal",
-            "kerala", "iowa", "andalusia", "spain", "italy", "france", "farm", "agro"
-        ]
-        is_agri_named = any(kw in loc_lower for kw in agri_named_keywords)
-
-        # Explicit desert/barren wasteland keywords ONLY
-        explicit_desert_keywords = ["desert", "thar", "sahara", "mojave", "atacama", "barren land", "arid wasteland", "rocky wasteland", "ladakh desert"]
+        explicit_desert_keywords = ["desert", "thar", "sahara", "mojave", "atacama", "barren land", "arid wasteland", "rocky wasteland", "ladakh cold desert"]
         is_explicit_desert = any(kw in loc_lower for kw in explicit_desert_keywords)
-        is_barren_land = (is_explicit_desert or ((ndvi_avg is not None and float(ndvi_avg) < 0.20) and not is_agri_named))
+        is_desert_coords = (
+            (24.5 <= lat <= 29.5 and 69.5 <= lon <= 73.5) or   # Thar Desert
+            (18.0 <= lat <= 30.0 and -10.0 <= lon <= 30.0) or  # Sahara
+            (18.0 <= lat <= 28.0 and 42.0 <= lon <= 55.0) or   # Arabian Desert
+            (34.5 <= lat <= 37.0 and -117.5 <= lon <= -114.5) or # Mojave
+            (-26.0 <= lat <= -19.0 and -70.5 <= lon <= -68.0) or # Atacama
+            (32.5 <= lat <= 36.0 and 76.0 <= lon <= 80.0)      # Ladakh Cold Desert
+        )
+        is_barren_land = (is_explicit_desert or is_desert_coords) and not is_deep_ocean and not is_dense_forest
 
-        if is_barren_land and not is_deep_ocean and not is_dense_forest and not is_agri_named:
+        if is_barren_land:
             w_depth_val = float(water_depth) if water_depth is not None else 14.0
             can_build = w_depth_val >= 5.0
             ph_val = float(soil_ph) if soil_ph is not None else 6.8
