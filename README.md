@@ -4,7 +4,7 @@
 
 **Tagline:** Observe Earth. Understand Nature. Empower Decisions.
 
-**Live Demo:** [https://hack10project.vercel.app/](https://hack10project.vercel.app/)
+**Live Demo:** [https://satagrisense-ai.vercel.app/](https://satagrisense-ai.vercel.app/)
 
 **GitHub Repository:** [https://github.com/lithik-raj/SatAgriSense-AI](https://github.com/lithik-raj/SatAgriSense-AI)
 
@@ -91,7 +91,7 @@ NIR represents near-infrared reflectance, while Red represents red-light reflect
 
 ## ▶️ Live Application
 
-[https://hack10project.vercel.app/](https://hack10project.vercel.app/)
+[https://satagrisense-ai.vercel.app/](https://satagrisense-ai.vercel.app/)
 
 ## 📌 Project Information
 
