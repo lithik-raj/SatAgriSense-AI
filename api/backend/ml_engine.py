@@ -1,19 +1,19 @@
 
 def identify_world_forest(lat, lon, loc_name):
     s = (loc_name or '').lower()
-    if any(k in s for k in ['wetland', 'flood basin', 'flood prone', 'flood hazard']):
+    if any(k in s for k in ['wetland', 'flood basin', 'flood prone', 'flood hazard', 'mato grosso', 'cerrado', 'goias', 'prairie', 'saskatchewan', 'alberta', 'manitoba']):
         return None
     # 1. Sundarbans Mangrove Forest
     if any(k in s for k in ['sundarban', 'sunderban', 'sundarbans']) or (21.4 <= lat <= 22.8 and 88.3 <= lon <= 89.9):
         return 'Sundarbans Mangrove Forest Reserve'
-    # 2. Amazon Rainforest
-    if any(k in s for k in ['amazon', 'amazonia', 'manaus']) or (-15.0 <= lat <= 6.0 and -79.0 <= lon <= -45.0):
+    # 2. Amazon Rainforest (Exclusive of Cerrado/Mato Grosso agricultural savannas)
+    if any(k in s for k in ['amazon rainforest', 'amazonia forest', 'manaus reserve']) or (-9.0 <= lat <= 5.0 and -74.0 <= lon <= -54.0 and not any(k in s for k in ['mato grosso', 'cerrado', 'farm', 'agri'])):
         return 'Amazon Tropical Rainforest'
     # 3. Congo Basin Rainforest
-    if any(k in s for k in ['congo', 'zaire', 'ituri']) or (-6.0 <= lat <= 6.0 and 11.0 <= lon <= 31.0):
+    if any(k in s for k in ['congo rainforest', 'zaire forest', 'ituri']) or (-4.0 <= lat <= 4.0 and 14.0 <= lon <= 28.0 and any(k in s for k in ['forest', 'reserve', 'rainforest', 'basin', 'congo'])):
         return 'Congo Basin Rainforest'
-    # 4. Boreal Forest (Taiga Biome)
-    if any(k in s for k in ['boreal', 'taiga', 'siberian forest']) or (52.0 <= lat <= 70.0 and ((-140.0 <= lon <= -55.0) or (10.0 <= lon <= 175.0))):
+    # 4. Boreal Forest (Taiga Biome - Excludes Canadian agricultural prairies below 54°N)
+    if any(k in s for k in ['boreal', 'taiga', 'siberian forest']) or (55.0 <= lat <= 70.0 and ((-140.0 <= lon <= -55.0) or (60.0 <= lon <= 175.0)) and not any(k in s for k in ['prairie', 'wheat', 'canola', 'farm'])):
         return 'Boreal Forest (Taiga Biome)'
     # 5. Valdivian Temperate Rainforest
     if any(k in s for k in ['valdivian', 'valdivia']) or (-46.0 <= lat <= -35.0 and -75.0 <= lon <= -70.0):
@@ -69,54 +69,102 @@ def identify_world_forest(lat, lon, loc_name):
 def get_crop_visual_emoji(crop_name, loc_type=''):
     c = (crop_name or '').lower()
     lt = (loc_type or '').lower()
-    if any(k in c or k in lt for k in ['ocean', 'marine', 'sea', 'water body', 'saline water', 'bay of bengal', 'arabian']):
+    import re
+    s_full = f"{c} {lt}"
+    if any(k in s_full for k in ['ocean', 'marine', 'saline water', 'water body', 'bay of bengal', 'arabian sea', 'atlantic ocean', 'pacific ocean', 'mediterranean sea', 'pelagic']) or bool(re.search(r'\b(sea|marine|ocean)\b', s_full)):
         return '🌊'
     if any(k in c or k in lt for k in ['forest', 'canopy', 'reserve', 'rainforest', 'taiga', 'jungle', 'woods']) and not any(k in c or k in lt for k in ['agroforestry', 'pepper', 'cardamom', 'tea', 'coffee']):
         return '🌲'
     if any(k in c or k in lt for k in ['polar', 'permafrost', 'arctic', 'antarctica']):
         return '❄️'
-    if any(k in c for k in ['black pepper', 'cardamom', 'turmeric', 'curcuma', 'bsr-2', 'piper']):
+    if any(k in c for k in ['black pepper', 'cardamom', 'turmeric', 'curcuma', 'bsr-2', 'piper', 'elettaria']):
         return '🌿'
-    if any(k in c for k in ['tea', 'camellia', 'ooty', 'nilgiri orthodox']):
+    if any(k in c for k in ['tea', 'camellia', 'ooty', 'nilgiri', 'sencha', 'oolong', 'pu-erh', 'ceylon', 'kericho']):
         return '🍵'
-    if any(k in c for k in ['coffee', 'arabica', 'robusta']):
+    if any(k in c for k in ['coffee', 'arabica', 'robusta', 'catimor', 'castillo', 'yirgacheffe']):
         return '☕'
-    if any(k in c for k in ['strawberry', 'strawberries', 'fragaria']):
+    if any(k in c for k in ['strawberry', 'strawberries', 'fragaria', 'albion']):
         return '🍓'
-    if any(k in c for k in ['coconut', 'palm', 'tall local']):
+    if any(k in c for k in ['date palm', 'dates', 'phoenix dactylifera', 'sukari', 'medjool', 'ajwa']):
         return '🌴'
-    if any(k in c for k in ['banana', 'plantain', 'musa']):
+    if any(k in c for k in ['coconut', 'tall local', 'cocos nucifera']):
+        return '🌴'
+    if any(k in c for k in ['banana', 'plantain', 'musa', 'grand naine', 'poovan', 'cavendish']):
         return '🍌'
-    if any(k in c for k in ['apple', 'malus', 'ambri']):
+    if any(k in c for k in ['apple', 'malus', 'ambri', 'honeycrisp', 'fuji', 'gala']):
         return '🍎'
+    if any(k in c for k in ['pear', 'pears', 'pyrus']):
+        return '🍐'
+    if any(k in c for k in ['peach', 'peaches', 'prunus persica']):
+        return '🍑'
+    if any(k in c for k in ['cherry', 'cherries', 'prunus avium']):
+        return '🍒'
+    if any(k in c for k in ['avocado', 'persea americana', 'hass']):
+        return '🥑'
+    if any(k in c for k in ['cacao', 'cocoa', 'chocolate', 'theobroma']):
+        return '🍫'
+    if any(k in c for k in ['vanilla', 'vanillin', 'vanilla planifolia']):
+        return '🌼'
+    if any(k in c for k in ['sunflower', 'helianthus']):
+        return '🌻'
+    if any(k in c for k in ['canola', 'rapeseed', 'mustard', 'brassica']):
+        return '🌼'
+    if any(k in c for k in ['durian', 'mangosteen', 'durio', 'garcinia']):
+        return '🍈'
+    if any(k in c for k in ['pineapple', 'ananas']):
+        return '🍍'
+    if any(k in c for k in ['kiwifruit', 'kiwi', 'actinidia', 'sungold']):
+        return '🥝'
     if any(k in c for k in ['groundnut', 'peanut', 'kadalai', 'arachis', 'tmv-7', 'tag-24']):
         return '🥜'
-    if any(k in c for k in ['rice', 'paddy', 'swarna', 'basmati', 'sub1', 'oryza']):
+    if any(k in c for k in ['almond', 'pistachio', 'hazelnut', 'macadamia', 'walnut', 'prunus dulcis', 'pistacia', 'corylus']):
+        return '🌰'
+    if any(k in c for k in ['soybean', 'soya', 'glycine max', 'edamame']):
+        return '🫘'
+    if any(k in c for k in ['rice', 'paddy', 'swarna', 'basmati', 'sub1', 'oryza', 'koshihikari', 'jasmine', 'ponni']):
         return '🍚'
-    if any(k in c for k in ['wheat', 'durum', 'rabi hd', 'triticum']):
-        return '🌾'
+    if any(k in c for k in ['hops', 'beer', 'humulus']):
+        return '🍺'
+    if any(k in c for k in ['champagne']):
+        return '🍾'
+    if any(k in c for k in ['grape', 'vineyard', 'vitis', 'wine', 'shiraz', 'merlot', 'cabernet', 'malbec', 'pinot', 'chardonnay']):
+        return '🍇'
+    if any(k in c for k in ['olive', 'olea', 'picual', 'arbequina']):
+        return '🫒'
     if any(k in c for k in ['chilli', 'capsicum', 'guntur', 's4', 'sannam']):
         return '🌶️'
-    if any(k in c for k in ['cotton', 'gossypium']):
-        return '☁️'
-    if any(k in c for k in ['orange', 'citrus', 'mandarin', 'santra']):
-        return '🍊'
+    if any(k in c for k in ['bell pepper', 'sweet pepper', 'paprika']):
+        return '🫑'
+    if any(k in c for k in ['tomato', 'tomatoes', 'solanum lycopersicum', 'san marzano']):
+        return '🍅'
+    if any(k in c for k in ['potato', 'potatoes', 'tuber', 'kufri', 'russet', 'solanum tuberosum']):
+        return '🥔'
+    if any(k in c for k in ['yam', 'cassava', 'sweet potato', 'tapioca', 'dioscorea', 'manihot']):
+        return '🍠'
+    if any(k in c for k in ['garlic', 'onion', 'allium']):
+        return '🧄'
+    if any(k in c for k in ['saffron', 'crocus sativus', 'negin']):
+        return '🌸'
+    if any(k in c for k in ['agave', 'tequila']):
+        return '🌵'
     if any(k in c for k in ['corn', 'maize', 'sweet corn', 'zea']):
         return '🌽'
-    if any(k in c for k in ['sugarcane', 'cane', 'co-0238', 'saccharum']):
+    if any(k in c for k in ['sugarcane', 'cane', 'co-0238', 'co-86032', 'saccharum']):
         return '🎋'
-    if any(k in c for k in ['potato', 'tuber', 'kufri', 'russet']):
-        return '🥔'
-    if any(k in c for k in ['tomato', 'solanum lycopersicum']):
-        return '🍅'
-    if any(k in c for k in ['grape', 'vineyard', 'vitis']):
-        return '🍇'
-    if any(k in c for k in ['olive', 'olea']):
-        return '🫒'
-    if any(k in c for k in ['mango', 'alphonso']):
+    if any(k in c for k in ['cotton', 'gossypium', 'giza']):
+        return '☁️'
+    if any(k in c for k in ['orange', 'citrus', 'mandarin', 'santra', 'clementine']):
+        return '🍊'
+    if any(k in c for k in ['mango', 'alphonso', 'mangifera', 'hapus']):
         return '🥭'
-    if any(k in c or k in lt for k in ['barren', 'arid', 'desert']):
-        return '🥜'
+    if any(k in c for k in ['wheat', 'durum', 'rabi hd', 'triticum', 'barley', 'rye', 'oats', 'quinoa', 'secale', 'hordeum', 'avena']):
+        return '🌾'
+    if any(k in c or k in lt for k in ['desert', 'barren land', 'arid']):
+        if 'groundnut' in c or 'peanut' in c:
+            return '🥜'
+        if 'palm' in c or 'date' in c:
+            return '🌴'
+        return '🏜️'
     if any(k in c or k in lt for k in ['flood', 'wetland']):
         return '🍚'
     return '🌾'
@@ -626,8 +674,8 @@ class RegionalCropYieldPredictor:
         # ======================================================
         # 5. LOW-LYING RIPARIAN / FLOOD-PRONE BASIN DETECTION
         # ======================================================
-        flood_keywords = ["flood", "delta", "wetland", "marsh", "swamp", "low-lying", "inundation", "riverbed", "floodplain"]
-        is_flood_zone = (water_depth is not None and float(water_depth) < 4.0) or any(kw in loc_lower for kw in flood_keywords)
+        flood_keywords = ["flood", "wetland", "marsh", "swamp", "inundation", "submerged riverbed", "marshland", "flood prone", "flood hazard"]
+        is_flood_zone = (water_depth is not None and float(water_depth) < 3.0 and any(kw in loc_lower for kw in ["wetland", "flood", "marsh", "swamp"])) or any(kw in loc_lower for kw in flood_keywords)
 
         if is_flood_zone and not is_deep_ocean and not is_dense_forest:
             return {
@@ -702,22 +750,34 @@ class RegionalCropYieldPredictor:
                 f"⚠️ BUILDINGS CANNOT BE BUILT OR ARE AT HIGH HAZARD: Shallow water table ({round(w_depth_val, 1)}m) creates subsoil liquefaction, foundation sinking, and seasonal flash flood risks!"
             )
 
+            is_oasis_dates = any(k in loc_lower for k in ["oasis", "date", "sukari", "medjool", "qassim"])
+            rec_crop = "Royal Date Palms (Phoenix dactylifera - Sukari / Medjool)" if is_oasis_dates else "Groundnut (Arachis hypogaea - Kadalai / Drought-Resistant Peanut - TMV-7 / TAG-24)"
+            bot_spec = "Phoenix dactylifera (Arecaceae)" if is_oasis_dates else "Arachis hypogaea (Fabaceae)"
+            c_var = "Buraidah Sukari / Medjool Oasis Royal Dates" if is_oasis_dates else "TMV-7 / TAG-24 / Kadalai"
+            c_desc = "Extreme desert heat and deep-well drip irrigation make royal date palms the premier high-value cash crop in hyper-arid oases." if is_oasis_dates else "Drought-hardy nitrogen-fixing legume with deep taproots that thrive in sandy, red-loam barren ground. Low water requirement makes groundnut superior to water-intensive sugarcane or paddy."
+            y_pred = 12.0 if is_oasis_dates else 3.2
+            m_price_val = 2400.0 if is_oasis_dates else 850.0
+            c_cost_val = 3100.0 if is_oasis_dates else 850.0
+            gross_val = y_pred * m_price_val
+            net_val = gross_val - c_cost_val
+            roi_val = round((net_val / c_cost_val) * 100, 1)
+
             return {
-                "location_type": "Barren Land / Arid Rocky Plateau (Non-Fertile Ground)",
-                "recommended_crop": "Groundnut (Arachis hypogaea - Kadalai / Drought-Resistant Peanut - TMV-7 / TAG-24)",
-                "botanical_species": "Arachis hypogaea (Fabaceae)",
-                "crop_variety": "TMV-7 / TAG-24 / Kadalai",
-                "crop_description": "Drought-hardy nitrogen-fixing legume with deep taproots that thrive in sandy, red-loam barren ground. Low water requirement makes groundnut superior to water-intensive sugarcane or paddy.",
-                "predicted_yield_tons_ha": 3.2,
+                "location_type": "Hyper-Arid Oasis Date Palm Basin" if is_oasis_dates else "Barren Land / Arid Rocky Plateau (Non-Fertile Ground)",
+                "recommended_crop": rec_crop,
+                "botanical_species": bot_spec,
+                "crop_variety": c_var,
+                "crop_description": c_desc,
+                "predicted_yield_tons_ha": y_pred,
                 "yield_accuracy": 98.4,
                 "status": "BARREN_ARID_OPTIMIZED",
                 "economic_profit": {
-                    "market_price_per_ton": "$850.00 / Ton",
-                    "gross_revenue_per_ha": "$2,720.00 / Ha",
-                    "production_cost_per_ha": "$850.00 / Ha",
-                    "net_profit_per_ha": "+$1,870.00 / Ha",
-                    "roi_percentage": "220.0%",
-                    "profit_summary": "Net Profit: +$1,870.00/Ha with 220% ROI from drought-hardy groundnut cultivation."
+                    "market_price_per_ton": f"${m_price_val:,.2f} / Ton",
+                    "gross_revenue_per_ha": f"${gross_val:,.2f} / Ha",
+                    "production_cost_per_ha": f"${c_cost_val:,.2f} / Ha",
+                    "net_profit_per_ha": f"+${net_val:,.2f} / Ha",
+                    "roi_percentage": f"{roi_val}%",
+                    "profit_summary": f"Net Profit: +${net_val:,.2f}/Ha with {roi_val}% ROI from drought-hardy cultivation."
                 },
                 "historical_yield_comparison": {
                     "historical_yield_tons_ha": 2.8,

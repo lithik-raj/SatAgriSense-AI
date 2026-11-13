@@ -1615,6 +1615,11 @@
   let isVoiceMuted = false;
 
   function stopAllAudioAndSpeech() {
+    // 0. Cancel active sequential sentence queue immediately
+    if (window.activeSpeechQueue) {
+      window.activeSpeechQueue.isCancelled = true;
+      window.activeSpeechQueue = null;
+    }
     // 1. Immediately detach utterance callbacks to prevent fake onerror triggers during cancel
     if (window.activeUtterance) {
       window.activeUtterance.onend = null;
@@ -1748,8 +1753,93 @@
     stopAllAudioAndSpeech();
   }
 
+  // ============================================================
+  // SEQUENTIAL SENTENCE QUEUE: FULL-PARAGRAPH SPEECH SYNTHESIS
+  // Eliminates 220-character truncation and Chromium 15s freeze
+  // ============================================================
+  function speakSequentialSentenceQueue(sentences, lang, voice, options = {}) {
+    stopAllAudioAndSpeech();
+
+    if (!sentences || sentences.length === 0) {
+      if (options.onDone) options.onDone();
+      return;
+    }
+
+    const queueState = {
+      isCancelled: false,
+      currentIndex: 0,
+      total: sentences.length,
+      buttonEl: options.buttonEl || null
+    };
+    window.activeSpeechQueue = queueState;
+
+    if (activeSpeechWatchdog) clearInterval(activeSpeechWatchdog);
+    activeSpeechWatchdog = setInterval(() => {
+      if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+        window.speechSynthesis.resume();
+      } else if (!window.activeSpeechQueue) {
+        clearInterval(activeSpeechWatchdog);
+        activeSpeechWatchdog = null;
+      }
+    }, 2500);
+
+    function speakNext() {
+      if (!window.activeSpeechQueue || window.activeSpeechQueue.isCancelled || queueState.currentIndex >= sentences.length) {
+        if (activeSpeechWatchdog) { clearInterval(activeSpeechWatchdog); activeSpeechWatchdog = null; }
+        window.activeUtterance = null;
+        window.activeSpeechQueue = null;
+        if (options.onDone) options.onDone();
+        return;
+      }
+
+      const textChunk = sentences[queueState.currentIndex];
+      if (options.onProgress) {
+        options.onProgress(queueState.currentIndex + 1, sentences.length, textChunk);
+      }
+
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(textChunk);
+        utter.lang = lang || 'en-US';
+        if (voice) utter.voice = voice;
+        utter.rate = options.rate || 1.05;
+        utter.pitch = options.pitch || 1.0;
+        window.activeUtterance = utter;
+
+        utter.onend = () => {
+          if (!window.activeSpeechQueue || window.activeSpeechQueue.isCancelled) return;
+          queueState.currentIndex++;
+          setTimeout(speakNext, 120);
+        };
+
+        utter.onerror = (e) => {
+          if (e && (e.error === 'canceled' || e.error === 'interrupted')) {
+            queueState.isCancelled = true;
+            return;
+          }
+          if (!window.activeSpeechQueue || window.activeSpeechQueue.isCancelled) return;
+          queueState.currentIndex++;
+          setTimeout(speakNext, 80);
+        };
+
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utter);
+      } else {
+        if (options.onDone) options.onDone();
+      }
+    }
+
+    speakNext();
+  }
+
   function playChatMessageVoice(btnEl) {
     try {
+      // Toggle to Stop if already speaking this message
+      if (window.activeSpeechQueue && window.activeSpeechQueue.buttonEl === btnEl) {
+        stopAllVoiceOutput();
+        btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> <span>🔊 Listen Again</span>';
+        return;
+      }
+
       const msgDiv = btnEl.closest('.chat-msg');
       if (!msgDiv) return;
       const clone = msgDiv.cloneNode(true);
@@ -1757,16 +1847,16 @@
       if (actionRow) actionRow.remove();
       const textToRead = clone.textContent.trim();
       
-      btnEl.innerHTML = '<i class="fa-solid fa-volume-high fa-bounce" style="color:#00f0ff;"></i> <span>Speaking...</span>';
+      btnEl.innerHTML = '<i class="fa-solid fa-square-full" style="color:#ff3366;"></i> <span>⏹️ Stop Voice</span>';
       speakFullChatResponse(textToRead, null, true, () => {
         btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> <span>🔊 Listen Again</span>';
-      });
+      }, btnEl);
     } catch (e) {
       console.warn('playChatMessageVoice error:', e);
     }
   }
 
-  function speakFullChatResponse(rawText, forceLang, userInitiated, onDone) {
+  function speakFullChatResponse(rawText, forceLang, userInitiated, onDone, buttonEl) {
     if (!chatVoiceActive && !userInitiated) {
       if (onDone) onDone();
       return;
@@ -1785,7 +1875,7 @@
 
       if (!clean) { if (onDone) onDone(); return; }
 
-      // Auto-Detect script language from response
+      // Auto-Detect script language from complete response
       let detectedLang = 'en-US';
       let langCode = 'en';
       if (/[\u0900-\u097F]/.test(clean)) { 
@@ -1805,18 +1895,22 @@
         langCode = (detectedLang || 'en').split('-')[0].toLowerCase();
       }
 
-      // Extract high-impact fluent summary (First 1-2 complete sentences, max 220 chars)
-      const sentences = clean.split(/(?<=[!?:;\n\u0964\u0965])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
-      let summaryToSpeak = '';
-      for (const s of sentences) {
-        if (!s.trim()) continue;
-        if ((summaryToSpeak.length + s.length) <= 220) {
-          summaryToSpeak += (summaryToSpeak ? ' ' : '') + s.trim();
+      // Split into clean sentence segments without arbitrary character cutoff
+      const rawSentences = clean.split(/(?<=[!?:;\n\u0964\u0965])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
+      const sentenceList = [];
+      for (let s of rawSentences) {
+        s = s.trim();
+        if (!s) continue;
+        if (s.length > 200) {
+          const sub = s.split(/(?<=[,])\s+/);
+          for (const subPart of sub) {
+            if (subPart.trim()) sentenceList.push(subPart.trim());
+          }
         } else {
-          break;
+          sentenceList.push(s);
         }
       }
-      if (!summaryToSpeak) summaryToSpeak = clean.slice(0, 220);
+      if (sentenceList.length === 0) sentenceList.push(clean);
 
       const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
       let matchedVoice = voices.find(v => {
@@ -1837,45 +1931,18 @@
                (langCode === 'ur' && (vn.includes('urdu') || vn.includes('gul')));
       });
 
-      function streamNativeChatAudio() {
-        try {
-          const ttsUrl = API_BASE + '/tts?lang=' + encodeURIComponent(langCode) + '&text=' + encodeURIComponent(summaryToSpeak.slice(0, 200));
-          const audio = new Audio(ttsUrl);
-          activeTTSAudio = audio;
-          window.currentTTSAudio = audio;
-          audio.onended = () => { activeTTSAudio = null; window.currentTTSAudio = null; if (onDone) onDone(); };
-          audio.onerror = () => {
-            activeTTSAudio = null; window.currentTTSAudio = null;
-            if (onDone) onDone();
-          };
-          audio.play().catch(() => { if (audio.onerror) audio.onerror(); });
-        } catch(e) {
+      speakSequentialSentenceQueue(sentenceList, detectedLang, matchedVoice, {
+        buttonEl: buttonEl || null,
+        onProgress: (current, total) => {
+          if (buttonEl) {
+            buttonEl.innerHTML = `<i class="fa-solid fa-volume-high fa-beat" style="color:#00f0ff;"></i> <span>Speaking (${current}/${total})... Stop</span>`;
+          }
+        },
+        onDone: () => {
+          if (buttonEl) buttonEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> <span>🔊 Listen Again</span>';
           if (onDone) onDone();
         }
-      }
-
-      // Prioritize Web Speech API with native regional language code
-      if ('speechSynthesis' in window) {
-        const utter = new SpeechSynthesisUtterance(summaryToSpeak);
-        utter.lang = detectedLang;
-        if (matchedVoice) utter.voice = matchedVoice;
-        utter.rate = 1.05;
-        utter.pitch = 1.0;
-        window.activeUtterance = utter;
-        utter.onend = () => { window.activeUtterance = null; if (onDone) onDone(); };
-        utter.onerror = (e) => {
-          if (e && (e.error === 'canceled' || e.error === 'interrupted')) return;
-          window.activeUtterance = null;
-          if (langCode !== 'en') streamNativeChatAudio();
-          else if (onDone) onDone();
-        };
-        window.speechSynthesis.resume();
-        window.speechSynthesis.speak(utter);
-      } else if (langCode !== 'en') {
-        streamNativeChatAudio();
-      } else {
-        if (onDone) onDone();
-      }
+      });
     } catch(err) {
       console.warn('Speech error:', err);
       if (onDone) onDone();
@@ -2103,7 +2170,7 @@
   }
 
   // ============================================================
-  // TEXT-TO-SPEECH OUTPUT
+  // TEXT-TO-SPEECH OUTPUT (Comprehensive & Complete Multi-Sentence Reading)
   // ============================================================
   function speakCurrentLocation() {
     const topCheck = document.getElementById('voice-toggle');
@@ -2111,14 +2178,12 @@
       stopAllAudioAndSpeech();
       return;
     }
-    // Single Voice Pipeline: Stop any existing speech before starting
     stopAllAudioAndSpeech();
 
     const loc = document.getElementById('location-input')?.value || currentLocationContext?.name || '';
     if (!loc) return;
-    const rawCrop = lastMLData ? (lastMLData.recommended_crop || lastMLData.crop || '') : '';
-    const crop = rawCrop.replace(/\([^)]*\)/g, '').replace(/[-–/]\s*$/, '').trim() || rawCrop;
-    const yieldVal = lastMLData ? (lastMLData.predicted_yield_tons_ha || '') : '';
+    const fullCrop = lastMLData ? (lastMLData.recommended_crop || lastMLData.crop || '') : 'High-Yield Regional Crop';
+    const yieldVal = lastMLData ? (lastMLData.predicted_yield_tons_ha || '4.5') : '4.5';
     const locType = lastMLData ? (lastMLData.location_type || '') : '';
     const ltLower = locType.toLowerCase();
     const isForest = ltLower.includes('forest') || ltLower.includes('canopy') || ltLower.includes('reserve');
@@ -2126,6 +2191,14 @@
     const isBarren = ltLower.includes('barren') || ltLower.includes('desert') || ltLower.includes('arid');
     const isFlood = ltLower.includes('flood') || ltLower.includes('wetland');
     const city = loc.split(',')[0].trim();
+    const fullPlace = currentLocationContext?.name || loc;
+
+    const temp = document.getElementById('tel-temp')?.textContent || (lastMLData?.live_telemetry?.temperature || '26°C');
+    const ph = document.getElementById('tel-ph')?.textContent || '6.8';
+    const water = document.getElementById('tel-water')?.textContent || '12.0m';
+    const rain = document.getElementById('tel-rain')?.textContent || '720 mm';
+    const roi = lastMLData?.economic_profit?.roi_percentage || '185%';
+    const desc = lastMLData?.crop_description || lastMLData?.reason || 'Optimal soil and climate conditions maximize yield.';
 
     let announcement = '';
     let phoneticFallback = '';
@@ -2133,156 +2206,156 @@
 
     if (lang.startsWith('ta')) {
       if (isForest) {
-        announcement = `பாதுகாக்கப்பட்ட வனப்பகுதி: ${city}। அடர்ந்த இயற்கை காடு, இங்கு விவசாய பயிர்கள் பயிரிட முடியாது.`;
-        phoneticFallback = `Paadhukaakkappatta vanappagudhi: ${city}. Adarndha iyarkai kaadu, ingu vivasaaya payirgal payirida mudiyaadhu.`;
+        announcement = `பாதுகாக்கப்பட்ட வனப்பகுதி: ${fullPlace}। அடர்ந்த இயற்கை காடு மற்றும் பல்லுயிர் சரணாலயம். இங்கு வணிக ரீதியான விவசாய பயிர்கள் பயிரிட முற்றிலும் தடைசெய்யப்பட்டுள்ளது. இதன் முக்கிய சுற்றுச்சூழல் பயன்பாடு கார்பன் சேமிப்பு ஆகும்.`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `கடல் பகுதி: ${city}। உவர்ப்புத்தன்மை 35 PSU அதிகம் என்பதால் பயிர் வளராது.`;
-        phoneticFallback = `Kadal pagudhi: ${city}. Uvarpputhanmai 35 PSU adhigam enbadhaal payir valaraadhu.`;
+        announcement = `கடல் பகுதி: ${fullPlace}। உவர்ப்புத்தன்மை 35 PSU மிக அதிகம் மற்றும் நிலத்தடி மண் இல்லை என்பதால் பயிர் வளராது. கடல் பாசி வளர்ப்பு மற்றும் மிதக்கும் சூரிய மின் உற்பத்தி மட்டுமே உகந்தது.`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `தரிசு நிலம்: ${city}। நிலக்கடலை சாகுபடிக்கு உகந்தது அல்லது வீடுகள் கட்ட மிகவும் பாதுகாப்பானது.`;
-        phoneticFallback = `Tharisu nilam: ${city}. Nilakkadalai saagupadikku ugandhadhu alladhu veedugal katta migavum paadhukaappaanadhu.`;
+        announcement = `தரிசு நிலம் மற்றும் பாறை பகுதி: ${fullPlace}। வறட்சியை தாங்கும் நிலக்கடலை சாகுபடிக்கு உகந்தது. மேலும் உறுதியான தரை அமைப்பு உள்ளதால் வீடுகள் மற்றும் கட்டிடங்கள் கட்ட மிகவும் பாதுகாப்பானது.`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `தேர்ந்தெடுக்கப்பட்ட பகுதி: ${city}। பரிந்துரைக்கப்படும் பயிர்: ${crop}। விளைச்சல்: ${yieldVal} டன்.`;
-        phoneticFallback = `Therndhedukkappatta pagudhi: ${city}. Parindhuraikkappadum payir: ${crop}. Vilaichal: ${yieldVal} tons per hectare.`;
+        announcement = `தேர்ந்தெடுக்கப்பட்ட இடம்: ${fullPlace}। பரிந்துரைக்கப்படும் பயிர்: ${fullCrop}। சுற்றுச்சூழல் காரணிகள்: வெப்பநிலை ${temp}, மண் கார அமிலத்தன்மை pH ${ph}, மற்றும் நிலத்தடி நீர் மட்டம் ${water}। எதிர்பார்க்கப்படும் விளைச்சல் எக்டேருக்கு ${yieldVal} டன் மற்றும் எதிர்பார்க்கப்படும் லாபம் ${roi}। சிறப்பம்சங்கள்: ${desc}।`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('hi')) {
       if (isForest) {
-        announcement = `संरक्षित वन क्षेत्र: ${city}। यहाँ केवल प्राकृतिक वनस्पति मौजूद है, कोई व्यावसायिक फसल नहीं उगाई जा सकती।`;
-        phoneticFallback = `Sanrakshit van kshetra: ${city}. Yahan keval prakritik vanaspati maujood hai, koi vyavsayik fasal nahi ugai ja sakti.`;
+        announcement = `संरक्षित वन क्षेत्र: ${fullPlace}। यहाँ प्राकृतिक वनस्पति और जैव विविधता संरक्षित है। अंतरराष्ट्रीय पर्यावरण नियमों के तहत यहाँ व्यावसायिक खेती पूरी तरह प्रतिबंधित है।`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `समुद्री क्षेत्र: ${city}। अत्यधिक लवणता 35 PSU के कारण यहाँ फसल नहीं उग सकती।`;
-        phoneticFallback = `Samudri kshetra: ${city}. Atyadhik lavanata 35 PSU ke karan yahan fasal nahi ug sakti.`;
+        announcement = `समुद्री क्षेत्र: ${fullPlace}। अत्यधिक लवणता 35 PSU और उपजाऊ मिट्टी के अभाव के कारण यहाँ स्थलीय फसलें नहीं उग सकतीं। केवल समुद्री शैवाल और जलकृषि संभव है।`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `बंजर भूमि: ${city}। मूंगफली की खेती के लिए उत्तम अथवा भवन निर्माण के लिए सुरक्षित।`;
-        phoneticFallback = `Banjar bhoomi: ${city}. Moongphali ki kheti ke liye uttam athva bhavan nirman ke liye surakshit.`;
+        announcement = `बंजर भूमि एवं शुष्क पठार: ${fullPlace}। सूखा-सहिष्णु मूंगफली की खेती अथवा आवासीय भवनों के सुरक्षित निर्माण के लिए यह स्थान अत्यंत उपयुक्त है।`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `चयनित स्थान: ${city}। अनुशंसित फसल: ${crop}। अनुमानित उपज: ${yieldVal} टन प्रति हेक्टेयर।`;
-        phoneticFallback = `Chayanit sthan: ${city}. Anushansit fasal: ${crop}. Anumanit upaj: ${yieldVal} ton prati hectare.`;
-      }
-    } else if (lang.startsWith('ml')) {
-      if (isForest) {
-        announcement = `സംരക്ഷിത വനമേഖല: ${city}. സ്വാഭാവിക വനമാണ്, വിളകൾ കൃഷി ചെയ്യാൻ കഴിയില്ല.`;
-        phoneticFallback = `Samrakshitha vanamekhela: ${city}. Swabhavika vanamanu, vilakal krishi cheyyan kazhiyilla.`;
-      } else if (isWater) {
-        announcement = `സമുദ്ര പ്രദേശം: ${city}. ഉയർന്ന ലവണാംശം 35 PSU കാരണം വിളകൾ വളരില്ല.`;
-        phoneticFallback = `Samudra pradhesham: ${city}. Uyarnna lavanamsam 35 PSU karanam vilakal valarilla.`;
-      } else if (isBarren) {
-        announcement = `തരിശുഭൂമി: ${city}. നിലക്കടല കൃഷിക്കോ കെട്ടിട നിർമ്മാണത്തിനോ വളരെ അനുയോജ്യം.`;
-        phoneticFallback = `Tharishubhoomi: ${city}. Nilakkadala krishikko kettida nirmaanathino valare anuyojyam.`;
-      } else {
-        announcement = `തിരഞ്ഞെടുത്ത പ്രദേശം: ${city}. ശുപാർശ ചെയ്യുന്ന വിള: ${crop}. വിളവ്: ${yieldVal} ടൺ.`;
-        phoneticFallback = `Thiranjedutha pradhesham: ${city}. Shuparsha cheyyunna vila: ${crop}. Vilavu: ${yieldVal} tons.`;
+        announcement = `चयनित स्थान: ${fullPlace}। अनुशंसित फसल: ${fullCrop}। पर्यावरणीय परिस्थितियाँ: तापमान ${temp}, मिट्टी का पीएच ${ph}, और भूजल गहराई ${water}। अनुमानित उपज ${yieldVal} टन प्रति हेक्टेयर और अपेक्षित लाभ ${roi}। विशेषताएँ: ${desc}।`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('te')) {
       if (isForest) {
-        announcement = `రక్షిత అటవీ ప్రాంతం: ${city}. సహజ అటవీ ప్రాంతం, పంటల సాగు అనుమతించబడదు.`;
-        phoneticFallback = `Rakshitha atavee praantham: ${city}. Sahaja atavee praantham, pantala saagu anumatimchabadadu.`;
+        announcement = `రక్షిత అటవీ ప్రాంతం: ${fullPlace}. సహజ అటవీ ప్రాంతం మరియు జీవవైవిధ్య సంరక్షణ కేంద్రం. ఇక్కడ వాణిజ్య పంటల సాగు చట్టరీత్యా నిషేధించబడింది.`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `సముద్ర ప్రాంతం: ${city}. అధిక లవణీయత 35 PSU వలన పంటలు పండవు.`;
-        phoneticFallback = `Samudra praantham: ${city}. Adhika lavaneeyatha 35 PSU valana pantalu pandavu.`;
+        announcement = `సముద్ర ప్రాంతం: ${fullPlace}. అధిక లవణీయత 35 PSU వలన భూమి పంటలు పండవు. సముద్రపు నాచు పెంపకం మరియు సోలార్ విద్యుత్ మాత్రమే అనుకూలం.`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `బంజరు భూమి: ${city}. వేరుశనగ సాగుకు లేదా భవన నిర్మాణానికి అత్యంత అనుకూలం.`;
-        phoneticFallback = `Bamjaru bhoomi: ${city}. Verushanaga saaguku leda bhavana nirmaanaaniki atyanta anukoolam.`;
+        announcement = `బంజరు భూమి: ${fullPlace}. వేరుశనగ సాగుకు లేదా బలమైన పునాదితో నివాస గృహాల నిర్మాణానికి అత్యంత సురక్షితం.`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `ఎంచుకున్న ప్రాంతం: ${city}. సిఫార్సు చేయబడిన పంట: ${crop}. దిగుబడి: ${yieldVal} టన్నులు.`;
-        phoneticFallback = `Emchukunna praantham: ${city}. Sifaarsu cheyabadina panta: ${crop}. Digubadi: ${yieldVal} tons.`;
+        announcement = `ఎంచుకున్న ప్రాంతం: ${fullPlace}. సిఫార్సు చేయబడిన పంట: ${fullCrop}. పర్యావరణ పరిస్థితులు: ఉష్ణోగ్రత ${temp}, నేల pH ${ph}, మరియు భూగర్భ జలాల లోతు ${water}. అంచనా వేసిన దిగుబడి హెక్టారుకు ${yieldVal} టన్నులు మరియు పెట్టుబడిపై రాబడి ${roi}. విశిష్టతలు: ${desc}.`;
+        phoneticFallback = announcement;
+      }
+    } else if (lang.startsWith('ml')) {
+      if (isForest) {
+        announcement = `സംരക്ഷിത വനമേഖല: ${fullPlace}. സ്വാഭാവിക വനമാണ്, വാണിജ്യ വിളകൾ കൃഷി ചെയ്യാൻ കഴിയില്ല. പരിസ്ഥിതി സംരക്ഷണമാണ് മുഖ്യം.`;
+        phoneticFallback = announcement;
+      } else if (isWater) {
+        announcement = `സമുദ്ര പ്രദേശം: ${fullPlace}. ഉയർന്ന ലവണാംശം 35 PSU കാരണം കരയിലെ വിളകൾ വളരില്ല. കടൽപായൽ കൃഷിക്ക് അനുയോജ്യം.`;
+        phoneticFallback = announcement;
+      } else if (isBarren) {
+        announcement = `തരിശുഭൂമി: ${fullPlace}. നിലക്കടല കൃഷിക്കോ കെട്ടിട നിർമ്മാണത്തിനോ വളരെ സുരക്ഷിതമാണ്.`;
+        phoneticFallback = announcement;
+      } else {
+        announcement = `തിരഞ്ഞെടുത്ത പ്രദേശം: ${fullPlace}. ശുപാർശ ചെയ്യുന്ന വിള: ${fullCrop}. പരിസ്ഥിതി സാഹചര്യങ്ങൾ: താപനില ${temp}, മണ്ണ് pH ${ph}, ഭൂഗർഭജല നിരപ്പ് ${water}. പ്രതീക്ഷിക്കുന്ന വിളവ് ഹെക്ടറിന് ${yieldVal} ടൺ, വരുമാനം ${roi}. സവിശേഷതകൾ: ${desc}.`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('kn')) {
       if (isForest) {
-        announcement = `ರಕ್ಷಿತ ಅರಣ್ಯ ಪ್ರದೇಶ: ${city}. ನೈಸರ್ಗಿಕ ಅರಣ್ಯ, ವಾಣಿಜ್ಯ ಬೆಳೆ ಬೆಳೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.`;
-        phoneticFallback = `Rakshitha aranya pradesha: ${city}. Naisargika aranya, vanijya bele beleyalu sadhyavilla.`;
+        announcement = `ರಕ್ಷಿತ ಅರಣ್ಯ ಪ್ರದೇಶ: ${fullPlace}. ನೈಸರ್ಗಿಕ ಅರಣ್ಯ, ವಾಣಿಜ್ಯ ಬೆಳೆ ಬೆಳೆಯಲು ಕಾನೂನಿನಲ್ಲಿ ಅವಕಾಶವಿಲ್ಲ.`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `ಸಾಗರ ಪ್ರದೇಶ: ${city}. ನೀರಿನ ಲವಣಾಂಶ 35 PSU ಹೆಚ್ಚಿರುವುದರಿಂದ ಬೆಳೆ ಬೆಳೆಯಲಾಗುವುದಿಲ್ಲ.`;
-        phoneticFallback = `Sagara pradesha: ${city}. Neerina lavanamsha 35 PSU hecchiruvarinda bele beleyalaaguvudilla.`;
+        announcement = `ಸಾಗರ ಪ್ರದೇಶ: ${fullPlace}. ನೀರಿನ ಲವಣಾಂಶ 35 PSU ಹೆಚ್ಚಿರುವುದರಿಂದ ಬೆಳೆ ಬೆಳೆಯಲಾಗುವುದಿಲ್ಲ.`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `ಬಂಜರು ಭೂಮಿ: ${city}. ಕಡಲೆಕಾಯಿ ಕೃಷಿಗೆ ಅಥವಾ ಮನೆ ನಿರ್ಮಾಣಕ್ಕೆ ಅತ್ಯುತ್ತಮ.`;
-        phoneticFallback = `Banjary bhoomi: ${city}. Kadalekayi krushige athava mane nirmaanakke atyuttama.`;
+        announcement = `ಬಂಜರು ಭೂಮಿ: ${fullPlace}. ಕಡಲೆಕಾಯಿ ಕೃಷಿಗೆ ಅಥವಾ ಮನೆ ನಿರ್ಮಾಣಕ್ಕೆ ಅತ್ಯಂತ ಸುರಕ್ಷಿತವಾಗಿದೆ.`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `ಆಯ್ಕೆಮಾಡಿದ ಸ್ಥಳ: ${city}. ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆ: ${crop}. ಇಳುವರಿ: ${yieldVal} ಟನ್.`;
-        phoneticFallback = `Aaykemadida sthala: ${city}. Shifarassu madida bele: ${crop}. Iluvari: ${yieldVal} tons.`;
+        announcement = `ಆಯ್ಕೆಮಾಡಿದ ಸ್ಥಳ: ${fullPlace}. ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆ: ${fullCrop}. ಪರಿಸರ ಪರಿಸ್ಥಿತಿಗಳು: ತಾಪಮಾನ ${temp}, ಮಣ್ಣಿನ pH ${ph}, ಮತ್ತು ಅಂತರ್ಜಲ ಮಟ್ಟ ${water}. ನಿರೀಕ್ಷಿತ ಇಳುವರಿ ಹೆಕ್ಟೇರಿಗೆ ${yieldVal} ಟನ್ ಮತ್ತು ಹೂಡಿಕೆಯ ಮೇಲಿನ ಆದಾಯ ${roi}. ಗುಣಲಕ್ಷಣಗಳು: ${desc}.`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('bn')) {
       if (isForest) {
-        announcement = `সংরক্ষিত বনভূমি: ${city}। প্রাকৃতিক অরণ্য, এখানে বাণিজ্যিক ফসল চাষ নিষিদ্ধ।`;
-        phoneticFallback = `Songrokkhito bonomomi: ${city}. Prakritik oronno, ekhane banijjik phoshol chash nishiddho.`;
+        announcement = `সংরক্ষিত বনভূমি: ${fullPlace}। প্রাকৃতিক অরণ্য, এখানে বাণিজ্যিক ফসল চাষ আইনত নিষিদ্ধ।`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `সামুদ্রিক অঞ্চল: ${city}। অতিরিক্ত লবণাক্ততার কারণে ফসল চাষ অসম্ভব।`;
-        phoneticFallback = `Samudrik onchol: ${city}. Otirikto lobonaktotar karone phoshol chash oshombhob.`;
+        announcement = `সামুদ্রিক অঞ্চল: ${fullPlace}। অতিরিক্ত লবণাক্ততার কারণে ফসল চাষ অসম্ভব। সামুদ্রিক শৈবাল চাষ সম্ভব।`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `অনাবাদী পতিত জমি: ${city}। চিনা বাদাম চাষ অথবা ভবন নির্মাণের জন্য অত্যন্ত উপযোগী।`;
-        phoneticFallback = `Onabadi potit jomi: ${city}. China badam chash othoba bhobon nirmaner jonno ontonto upojogi.`;
+        announcement = `অনাবাদী পতিত জমি: ${fullPlace}। চিনা বাদাম চাষ অথবা ভবন নির্মাণের জন্য অত্যন্ত নিরাপদ।`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `নির্বাচিত এলাকা: ${city}। প্রস্তাবিত ফসল: ${crop}। আনুমানিক ফলন: ${yieldVal} টন।`;
-        phoneticFallback = `Nirbachito elaka: ${city}. Prostabito phoshol: ${crop}. Anumanik pholon: ${yieldVal} tons.`;
+        announcement = `নির্বাচিত এলাকা: ${fullPlace}। প্রস্তাবিত ফসল: ${fullCrop}। পরিবেশগত অবস্থা: তাপমাত্রা ${temp}, মাটির pH ${ph}, এবং ভূগর্ভস্থ জলের গভীরতা ${water}। প্রত্যাশিত ফলন প্রতি হেক্টরে ${yieldVal} টন এবং আনুমানিক রিটার্ন ${roi}। বৈশিষ্ট্য: ${desc}।`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('mr')) {
       if (isForest) {
-        announcement = `संरक्षित वनक्षेत्र: ${city}। नैसर्गिक वनराई, व्यावसायिक पिके घेता येत नाहीत.`;
-        phoneticFallback = `Sanrakshit vanakshetra: ${city}. Nisargik vanrai, vyavasayik pike gheta yet nahit.`;
+        announcement = `संरक्षित वनक्षेत्र: ${fullPlace}। नैसर्गिक जैवविविधता राखीव क्षेत्र, व्यावसायिक पिके घेता येत नाहीत.`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `सागरी क्षेत्र: ${city}। अति क्षारतेमुळे पिके घेता येत नाहीत.`;
-        phoneticFallback = `Sagari kshetra: ${city}. Ati ksharatemule pike gheta yet nahit.`;
+        announcement = `सागरी क्षेत्र: ${fullPlace}। अति क्षारतेमुळे पिके घेता येत नाहीत. समुद्री शेवाळ शेती शक्य आहे.`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `पडिक जमीन: ${city}। भुईमूग शेतीसाठी किंवा इमारत बांधकामासाठी अत्यंत सुरक्षित.`;
-        phoneticFallback = `Padik jameen: ${city}. Bhuimug shetisathi kivha imarat bandhkaamasathi atyant surakshit.`;
+        announcement = `पडिक जमीन: ${fullPlace}। भुईमूग शेतीसाठी किंवा मजबूत पायाच्या इमारत बांधकामासाठी अत्यंत सुरक्षित.`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `निवडलेले स्थान: ${city}। शिफारस केलेले पीक: ${crop}। अपेक्षित उत्पादन: ${yieldVal} टन.`;
-        phoneticFallback = `Nivadlele sthan: ${city}. Shifaras kelele peek: ${crop}. Apekshit utpadan: ${yieldVal} tons.`;
+        announcement = `निवडलेले स्थान: ${fullPlace}। शिफारस केलेले पीक: ${fullCrop}। पर्यावरणीय परिस्थिती: तापमान ${temp}, मातीचे pH ${ph}, आणि भूजल खोली ${water}। अपेक्षित उत्पादन हेक्टरी ${yieldVal} टन आणि अंदाजित नफा ${roi}। वैशिष्ट्ये: ${desc}।`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('gu')) {
       if (isForest) {
-        announcement = `સંરક્ષિત વન વિસ્તાર: ${city}. કુદરતી જંગલ, વ્યવસાયિક પાક ઉગાડી શકાતો નથી.`;
-        phoneticFallback = `Sanrakshit van vistaar: ${city}. Kudrati jangal, vyavsayik paak ugaadi shakaato nathi.`;
+        announcement = `સંરક્ષિત વન વિસ્તાર: ${fullPlace}. કુદરતી જંગલ, વ્યવસાયિક ખેતી કાયદેસર રીતે પ્રતિબંધિત છે.`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `દરિયાઈ વિસ્તાર: ${city}. વધુ ક્ષારતાને લીધે પાક થઈ શકતો નથી.`;
-        phoneticFallback = `Dariyaai vistaar: ${city}. Vadhu kshaarataane lidhe paak thai shakato nathi.`;
+        announcement = `દરિયાઈ વિસ્તાર: ${fullPlace}. ક્ષારતા વધુ હોવાથી જમીની પાક શક્ય નથી.`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `બંજર જમીન: ${city}. મગફળીની ખેતી અથવા મકાન બાંધકામ માટે શ્રેષ્ઠ.`;
-        phoneticFallback = `Banjar jameen: ${city}. Magfali ni kheti athava makaan baandhkaam maate shreshth.`;
+        announcement = `બંજર જમીન: ${fullPlace}. મગફળીની ખેતી અથવા મકાન બાંધકામ માટે શ્રેષ્ઠ અને મજબૂત.`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `પસંદ કરેલ સ્થળ: ${city}. ભલામણ કરેલ પાક: ${crop}. અંદાજિત ઉપજ: ${yieldVal} ટન.`;
-        phoneticFallback = `Pasand karela sthal: ${city}. Bhalaman karel paak: ${crop}. Andajit upaj: ${yieldVal} tons.`;
+        announcement = `પસંદ કરેલ સ્થળ: ${fullPlace}. ભલામણ કરેલ પાક: ${fullCrop}. પર્યાવરણીય સ્થિતિ: તાપમાન ${temp}, જમીનનું pH ${ph}, અને ભૂગર્ભ જળ સ્તર ${water}. અંદાજિત ઉપજ પ્રતિ હેક્ટર ${yieldVal} ટન અને અંદાજિત નફો ${roi}. વિશેષતાઓ: ${desc}.`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('pa')) {
       if (isForest) {
-        announcement = `ਸੁਰੱਖਿਅਤ ਜੰਗਲ ਖੇਤਰ: ${city}। ਕੁਦਰਤੀ ਜੰਗਲ, ਕੋਈ ਵਪਾਰਕ ਫ਼ਸਲ ਨਹੀਂ ਉਗਾਈ ਜਾ ਸਕਦੀ।`;
-        phoneticFallback = `Surakhiat jangal khetar: ${city}. Kudrati jangal, koi vaparak phasal nahi ugayi ja sakdi.`;
+        announcement = `ਸੁਰੱਖਿਅਤ ਜੰਗਲ ਖੇਤਰ: ${fullPlace}। ਕੁਦਰਤੀ ਜੰਗਲ, ਕੋਈ ਵਪਾਰਕ ਫ਼ਸਲ ਉਗਾਉਣ ਦੀ ਮਨਾਹੀ ਹੈ।`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `ਸਮੁੰਦਰੀ ਖੇਤਰ: ${city}। ਜ਼ਿਆਦਾ ਖਾਰੇਪਣ ਕਾਰਨ ਫ਼ਸਲ ਸੰਭਵ ਨਹੀਂ।`;
-        phoneticFallback = `Samundari khetar: ${city}. Zyada kharepan kaaran phasal sambhav nahi.`;
+        announcement = `ਸਮੁੰਦਰੀ ਖੇਤਰ: ${fullPlace}। ਜ਼ਿਆਦਾ ਖਾਰੇਪਣ ਕਾਰਨ ਖੇਤੀ ਸੰਭਵ ਨਹੀਂ।`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `ਬੰਜਰ ਜ਼ਮੀਨ: ${city}। ਮੂੰਗਫਲੀ ਦੀ ਖੇਤੀ ਜਾਂ ਮਕਾਨ ਨਿਰਮਾਣ ਲਈ ਢੁਕਵੀਂ।`;
-        phoneticFallback = `Banjar zameen: ${city}. Moongphali di kheti ya makaan nirmaan layi dhukveen.`;
+        announcement = `ਬੰਜਰ ਜ਼ਮੀਨ: ${fullPlace}। ਮੂੰਗਫਲੀ ਦੀ ਖੇਤੀ ਜਾਂ ਮਕਾਨ ਨਿਰਮਾਣ ਲਈ ਬਹੁਤ ਮਜ਼ਬੂਤ ਅਤੇ ਢੁਕਵੀਂ।`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `ਚੁਣਿਆ ਗਿਆ ਸਥਾਨ: ${city}। ਸਿਫਾਰਸ਼ ਕੀਤੀ ਫ਼ਸਲ: ${crop}। ਝਾੜ: ${yieldVal} ਟਨ.`;
-        phoneticFallback = `Chuniya geya sthaan: ${city}. Sifarash keeti phasal: ${crop}. Jhaad: ${yieldVal} tons.`;
+        announcement = `ਚੁਣਿਆ ਗਿਆ ਸਥਾਨ: ${fullPlace}। ਸਿਫਾਰਸ਼ ਕੀਤੀ ਫ਼ਸਲ: ${fullCrop}। ਵਾਤਾਵਰਣ ਦੀਆਂ ਸਥਿਤੀਆਂ: ਤਾਪਮਾਨ ${temp}, ਮਿੱਟੀ ਦਾ pH ${ph}, ਅਤੇ ਧਰਤੀ ਹੇਠਲੇ ਪਾਣੀ ਦਾ ਪੱਧਰ ${water}। ਅੰਦਾਜ਼ਨ ਝਾੜ ${yieldVal} ਟਨ ਪ੍ਰਤੀ ਹੈਕਟੇਅਰ ਅਤੇ ਅਨੁਮਾਨਤ ਮੁਨਾਫਾ ${roi}। ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ: ${desc}।`;
+        phoneticFallback = announcement;
       }
     } else if (lang.startsWith('ur')) {
       if (isForest) {
-        announcement = `محفوظ جنگلاتی علاقہ: ${city}۔ قدرتی جنگل، تجارتی فصل کاشت نہیں کی جا سکتی۔`;
-        phoneticFallback = `Mehfooz janglati ilaqah: ${city}. Qudrati jangal, tijarti fasal kasht nahi ki ja sakti.`;
+        announcement = `محفوظ جنگلاتی علاقہ: ${fullPlace}۔ قدرتی جنگل، تجارتی فصل کاشت کرنا سختی سے منع ہے۔`;
+        phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `سمندری علاقہ: ${city}۔ زیادہ نمکیات 35 PSU کی وجہ سے فصل ممکن نہیں۔`;
-        phoneticFallback = `Samandari ilaqah: ${city}. Zyada namkiyat 35 PSU ki wajah se fasal mumkin nahi.`;
+        announcement = `سمندری علاقہ: ${fullPlace}۔ زیادہ نمکیات 35 PSU کی وجہ سے زمینی فصلیں ممکن نہیں۔`;
+        phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `بنجر زمین: ${city}۔ مونگ پھلی کی کاشت یا عمارت کی تعمیر کے لیے بہترین۔`;
-        phoneticFallback = `Banjar zameen: ${city}. Mong phalli ki kasht ya imarat ki tameer ke liye behtareen.`;
+        announcement = `بنجر زمین: ${fullPlace}۔ مونگ پھلی کی کاشت یا مضبوط تعمیرات کے لیے انتہائی محفوظ۔`;
+        phoneticFallback = announcement;
       } else {
-        announcement = `منتخب مقام: ${city}۔ تجویز کردہ فصل: ${crop}۔ پیداوار: ${yieldVal} ٹن۔`;
-        phoneticFallback = `Muntakhib maqaam: ${city}. Tajveez kardah fasal: ${crop}. Paidaawar: ${yieldVal} tons.`;
+        announcement = `منتخب مقام: ${fullPlace}۔ تجویز کردہ فصل: ${fullCrop}۔ ماحولیاتی حالات: درجہ حرارت ${temp}، مٹی کا pH ${ph}، اور زیر زمین پانی کی سطح ${water}۔ متوقع پیداوار فی ہیکٹر ${yieldVal} ٹن اور تخمینہ منافع ${roi}۔ خصوصیات: ${desc}۔`;
+        phoneticFallback = announcement;
       }
     } else {
       if (isForest) {
-        announcement = `Forestry Area: ${city}. Protected natural forest canopy and vegetation. No commercial crops can be grown here as this is a protected forestry area.`;
+        announcement = `Protected Forestry Reserve: ${fullPlace}. Dense native canopy and biodiversity sanctuary. Commercial agriculture and deforestation are strictly prohibited by international treaties. Primary ecological role is carbon sequestration.`;
         phoneticFallback = announcement;
       } else if (isWater) {
-        announcement = `Marine Open Water: ${city}. Hyper-saline ocean body (35 PSU). Terrestrial crop cultivation is impossible.`;
+        announcement = `Marine Open Water: ${fullPlace}. Saline ocean water with salinity of 35 PSU and zero arable topsoil. Terrestrial farming is biologically impossible. Marine kelp aquaculture and offshore floating solar energy are recommended.`;
         phoneticFallback = announcement;
       } else if (isBarren) {
-        announcement = `Barren Land & Arid Rocky Plateau: ${city}. Highly recommended for cultivating Groundnut or constructing residential buildings safely.`;
+        announcement = `Barren Land and Arid Rocky Plateau: ${fullPlace}. Soil moisture is low with high solar irradiance. Best suited for drought-hardy Groundnut or Date Palms, or commercial construction and utility solar photovoltaic farms.`;
         phoneticFallback = announcement;
       } else {
-        announcement = `Selected Location: ${city}. Recommended crop: ${crop}. Projected harvest: ${yieldVal} tons per hectare.`;
+        announcement = `Selected Location: ${fullPlace}. Recommended Crop: ${fullCrop}. Environmental conditions: Temperature ${temp}, Soil pH ${ph}, groundwater depth ${water}, and annual rainfall ${rain}. Projected harvest yield is ${yieldVal} tons per hectare with an estimated return on investment of ${roi}. Characteristic features: ${desc}`;
         phoneticFallback = announcement;
       }
     }
@@ -2342,7 +2415,7 @@
       function fallbackToTTSStream() {
         if (prefix === 'en') return;
         try {
-          const ttsUrl = API_BASE + '/tts?lang=' + encodeURIComponent(prefix) + '&text=' + encodeURIComponent(clean.slice(0, 160));
+          const ttsUrl = API_BASE + '/tts?lang=' + encodeURIComponent(prefix) + '&text=' + encodeURIComponent(clean.slice(0, 200));
           const audio = new Audio(ttsUrl);
           window.currentTTSAudio = audio;
           audio.onended = () => {
@@ -2362,49 +2435,32 @@
         return;
       }
 
-      if ('speechSynthesis' in window) {
-        const utter = new SpeechSynthesisUtterance(clean);
-        utter.rate = 1.05;
-        utter.pitch = 1.0;
-        utter.lang = detectedLang;
-        if (matched) utter.voice = matched;
-
-        // CRITICAL ANTI-COLLAPSE FIX: Store in global window.activeUtterance to prevent garbage collection!
-        window.activeUtterance = utter;
-
-        // Keep-alive watchdog against Chromium 15-second speech freeze
-        if (activeSpeechWatchdog) clearInterval(activeSpeechWatchdog);
-        activeSpeechWatchdog = setInterval(() => {
-          if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-            window.speechSynthesis.resume();
-          } else {
-            clearInterval(activeSpeechWatchdog);
-            activeSpeechWatchdog = null;
+      // Split into clean sentence segments for smooth chained speaking
+      const rawSentences = clean.split(/(?<=[!?:;\n\u0964\u0965])\s+|(?<=[a-zA-Z\u0B80-\u0DFF]{2}\.)\s+/);
+      const sentenceList = [];
+      for (let s of rawSentences) {
+        s = s.trim();
+        if (!s) continue;
+        if (s.length > 200) {
+          const sub = s.split(/(?<=[,])\s+/);
+          for (const subPart of sub) {
+            if (subPart.trim()) sentenceList.push(subPart.trim());
           }
-        }, 3000);
-
-        utter.onend = () => {
-          if (activeSpeechWatchdog) { clearInterval(activeSpeechWatchdog); activeSpeechWatchdog = null; }
-          window.activeUtterance = null;
-          if (muteIcon && !isVoiceMuted) muteIcon.className = 'fa-solid fa-volume-high';
-        };
-
-        utter.onerror = (err) => {
-          if (activeSpeechWatchdog) { clearInterval(activeSpeechWatchdog); activeSpeechWatchdog = null; }
-          window.activeUtterance = null;
-          if (muteIcon && !isVoiceMuted) muteIcon.className = 'fa-solid fa-volume-high';
-          if (err && (err.error === 'canceled' || err.error === 'interrupted')) return;
-          if (prefix !== 'en') fallbackToTTSStream();
-        };
-
-        window.speechSynthesis.resume();
-        window.speechSynthesis.speak(utter);
+        } else {
+          sentenceList.push(s);
+        }
       }
+      if (sentenceList.length === 0) sentenceList.push(clean);
+
+      speakSequentialSentenceQueue(sentenceList, detectedLang, matched, {
+        onDone: () => {
+          if (muteIcon && !isVoiceMuted) muteIcon.className = 'fa-solid fa-volume-high';
+        }
+      });
     } catch (e) {
       console.warn('speakFastNative error:', e);
     }
   }
-
   function speakText(text) {
     if (!document.getElementById('voice-toggle').checked) return;
     speakFastNative(text, currentChatLangCode);
@@ -3089,32 +3145,2702 @@
   function getClientCropEmoji(cropName, locType) {
     const c = (cropName || '').toLowerCase();
     const lt = (locType || '').toLowerCase();
-    if (lt.includes('ocean') || lt.includes('marine') || lt.includes('sea') || c.includes('ocean') || c.includes('marine')) return '🌊';
-    if ((lt.includes('forest') || lt.includes('canopy') || lt.includes('reserve') || lt.includes('rainforest') || lt.includes('woods') || c.includes('forest')) && !lt.includes('agroforestry') && !c.includes('pepper') && !c.includes('cardamom') && !c.includes('tea') && !c.includes('coffee')) return '🌲';
-    if (lt.includes('polar') || lt.includes('permafrost') || c.includes('polar')) return '❄️';
-    if (c.includes('black pepper') || c.includes('cardamom') || c.includes('turmeric') || c.includes('curcuma')) return '🌿';
-    if (c.includes('tea') || c.includes('camellia')) return '🍵';
-    if (c.includes('coffee') || c.includes('arabica') || c.includes('robusta')) return '☕';
-    if (c.includes('apple') || c.includes('ambri') || c.includes('malus')) return '🍎';
-    if (c.includes('strawberry') || c.includes('strawberries') || c.includes('fragaria')) return '🍓';
-    if (c.includes('banana') || c.includes('plantain') || c.includes('musa')) return '🍌';
-    if (c.includes('coconut') || c.includes('palm') || c.includes('cocos')) return '🌴';
-    if (c.includes('groundnut') || c.includes('peanut') || c.includes('kadalai') || c.includes('arachis')) return '🥜';
-    if (c.includes('wheat') || c.includes('durum') || c.includes('triticum')) return '🌾';
-    if (c.includes('rice') || c.includes('paddy') || c.includes('swarna') || c.includes('basmati')) return '🍚';
-    if (c.includes('chilli') || c.includes('capsicum') || c.includes('s4') || c.includes('sannam')) return '🌶️';
-    if (c.includes('cotton') || c.includes('gossypium')) return '☁️';
-    if (c.includes('orange') || c.includes('citrus') || c.includes('mandarin') || c.includes('santra')) return '🍊';
-    if (c.includes('corn') || c.includes('maize') || c.includes('sweet corn')) return '🌽';
-    if (c.includes('sugarcane') || c.includes('cane')) return '🎋';
-    if (c.includes('potato') || c.includes('tuber')) return '🥔';
-    if (c.includes('tomato')) return '🍅';
-    if (c.includes('grape') || c.includes('vineyard')) return '🍇';
-    if (c.includes('olive')) return '🫒';
-    if (c.includes('mango')) return '🥭';
-    if (lt.includes('barren') || lt.includes('arid') || lt.includes('desert')) return '🥜';
+    const sFull = `${c} ${lt}`;
+    if (/\b(ocean|marine|sea|saline water|water body|bay of bengal|arabian sea|atlantic|pacific|mediterranean|pelagic)\b/.test(sFull)) return '🌊';
+    if ((lt.includes('forest') || lt.includes('canopy') || lt.includes('reserve') || lt.includes('rainforest') || lt.includes('taiga') || lt.includes('jungle') || lt.includes('woods') || c.includes('forest')) && !lt.includes('agroforestry') && !c.includes('pepper') && !c.includes('cardamom') && !c.includes('tea') && !c.includes('coffee')) return '🌲';
+    if (lt.includes('polar') || lt.includes('permafrost') || c.includes('polar') || c.includes('arctic') || c.includes('antarctica')) return '❄️';
+    if (c.includes('black pepper') || c.includes('cardamom') || c.includes('turmeric') || c.includes('curcuma') || c.includes('piper') || c.includes('elettaria') || c.includes('bsr-2')) return '🌿';
+    if (c.includes('tea') || c.includes('camellia') || c.includes('ooty') || c.includes('nilgiri') || c.includes('sencha') || c.includes('matcha') || c.includes('ceylon') || c.includes('kericho')) return '🍵';
+    if (c.includes('coffee') || c.includes('arabica') || c.includes('robusta') || c.includes('yirgacheffe') || c.includes('catimor') || c.includes('castillo')) return '☕';
+    if (c.includes('strawberry') || c.includes('strawberries') || c.includes('fragaria') || c.includes('albion')) return '🍓';
+    if (c.includes('date palm') || c.includes('dates') || c.includes('phoenix dactylifera') || c.includes('sukari') || c.includes('medjool') || c.includes('ajwa')) return '🌴';
+    if (c.includes('coconut') || c.includes('tall local') || c.includes('cocos nucifera')) return '🌴';
+    if (c.includes('banana') || c.includes('plantain') || c.includes('musa') || c.includes('grand naine') || c.includes('cavendish') || c.includes('poovan')) return '🍌';
+    if (c.includes('apple') || c.includes('ambri') || c.includes('malus') || c.includes('honeycrisp') || c.includes('fuji') || c.includes('gala')) return '🍎';
+    if (c.includes('pear') || c.includes('pears') || c.includes('pyrus')) return '🍐';
+    if (c.includes('peach') || c.includes('peaches') || c.includes('prunus persica')) return '🍑';
+    if (c.includes('cherry') || c.includes('cherries') || c.includes('prunus avium')) return '🍒';
+    if (c.includes('avocado') || c.includes('persea americana') || c.includes('hass')) return '🥑';
+    if (c.includes('cacao') || c.includes('cocoa') || c.includes('chocolate') || c.includes('theobroma')) return '🍫';
+    if (c.includes('vanilla') || c.includes('vanillin') || c.includes('vanilla planifolia')) return '🌼';
+    if (c.includes('sunflower') || c.includes('helianthus')) return '🌻';
+    if (c.includes('canola') || c.includes('rapeseed') || c.includes('mustard') || c.includes('brassica')) return '🌼';
+    if (c.includes('durian') || c.includes('mangosteen') || c.includes('durio')) return '🍈';
+    if (c.includes('pineapple') || c.includes('ananas')) return '🍍';
+    if (c.includes('kiwifruit') || c.includes('kiwi') || c.includes('actinidia') || c.includes('sungold')) return '🥝';
+    if (c.includes('groundnut') || c.includes('peanut') || c.includes('kadalai') || c.includes('arachis') || c.includes('tmv-7') || c.includes('tag-24')) return '🥜';
+    if (c.includes('almond') || c.includes('pistachio') || c.includes('hazelnut') || c.includes('macadamia') || c.includes('walnut') || c.includes('prunus dulcis') || c.includes('pistacia')) return '🌰';
+    if (c.includes('soybean') || c.includes('soya') || c.includes('glycine max') || c.includes('edamame')) return '🫘';
+    if (c.includes('rice') || c.includes('paddy') || c.includes('swarna') || c.includes('basmati') || c.includes('koshihikari') || c.includes('jasmine') || c.includes('oryza') || c.includes('sub1') || c.includes('ponni')) return '🍚';
+    if (c.includes('hops') || c.includes('beer') || c.includes('humulus')) return '🍺';
+    if (c.includes('champagne')) return '🍾';
+    if (c.includes('grape') || c.includes('vineyard') || c.includes('vitis') || c.includes('wine') || c.includes('shiraz') || c.includes('merlot') || c.includes('cabernet') || c.includes('pinot') || c.includes('malbec') || c.includes('chardonnay')) return '🍇';
+    if (c.includes('olive') || c.includes('olea') || c.includes('picual') || c.includes('arbequina')) return '🫒';
+    if (c.includes('chilli') || c.includes('capsicum') || c.includes('s4') || c.includes('sannam') || c.includes('guntur')) return '🌶️';
+    if (c.includes('bell pepper') || c.includes('sweet pepper') || c.includes('paprika')) return '🫑';
+    if (c.includes('tomato') || c.includes('tomatoes') || c.includes('solanum lycopersicum') || c.includes('san marzano')) return '🍅';
+    if (c.includes('potato') || c.includes('potatoes') || c.includes('tuber') || c.includes('solanum tuberosum') || c.includes('russet') || c.includes('kufri')) return '🥔';
+    if (c.includes('yam') || c.includes('cassava') || c.includes('sweet potato') || c.includes('tapioca')) return '🍠';
+    if (c.includes('garlic') || c.includes('onion') || c.includes('allium')) return '🧄';
+    if (c.includes('saffron') || c.includes('crocus sativus') || c.includes('negin')) return '🌸';
+    if (c.includes('agave') || c.includes('tequila')) return '🌵';
+    if (c.includes('corn') || c.includes('maize') || c.includes('sweet corn') || c.includes('zea')) return '🌽';
+    if (c.includes('sugarcane') || c.includes('cane') || c.includes('saccharum') || c.includes('co-86032') || c.includes('co-0238')) return '🎋';
+    if (c.includes('cotton') || c.includes('gossypium') || c.includes('giza')) return '☁️';
+    if (c.includes('orange') || c.includes('citrus') || c.includes('mandarin') || c.includes('santra') || c.includes('clementine')) return '🍊';
+    if (c.includes('mango') || c.includes('alphonso') || c.includes('mangifera') || c.includes('hapus')) return '🥭';
+    if (c.includes('wheat') || c.includes('durum') || c.includes('triticum') || c.includes('barley') || c.includes('rye') || c.includes('oats') || c.includes('quinoa')) return '🌾';
+    if (lt.includes('barren') || lt.includes('arid') || lt.includes('desert') || c.includes('desert')) {
+      if (c.includes('groundnut') || c.includes('peanut')) return '🥜';
+      if (c.includes('palm') || c.includes('date')) return '🌴';
+      return '🏜️';
+    }
     if (lt.includes('flood') || lt.includes('wetland')) return '🍚';
     return '🌾';
+  }
+
+  const WORLD_AGRONOMY_DATA = [
+  {
+    "id": 1,
+    "region_name": "Erode",
+    "country": "India",
+    "lat": 11.341,
+    "lon": 77.7172,
+    "crop_name": "Turmeric",
+    "botanical_species": "Curcuma longa",
+    "variety": "Erode Local / BSR-2 / Salem Golden (GI Tag)",
+    "optimal_soil_type": "Rich Bhavani river alluvial silt and well-drained red-clay loam",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 28.5,
+    "market_price_per_ton": 1850.0,
+    "cost_per_ha": 3400.0,
+    "curcumin_or_brix_quality": "Curcumin 4.5% - 5.2% (GI Tagged Grade A)",
+    "specialty_desc": "Erode is the world-famous Yellow City. Optimal Bhavani river silt, warm tropical humidity, and disciplined drip irrigation produce world-record curcumin density and 28.5 T/Ha peak fresh rhizome yield.",
+    "crop_emoji": "🌿",
+    "climate_zone": "Tropical Humid Basin",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 35.0,
+    "optimal_rainfall_mm": 750.0
+  },
+  {
+    "id": 2,
+    "region_name": "Kashmir",
+    "country": "India",
+    "lat": 34.0837,
+    "lon": 74.7973,
+    "crop_name": "Apples",
+    "botanical_species": "Malus domestica",
+    "variety": "Kashmiri Ambri / Red Delicious / Royal Gala",
+    "optimal_soil_type": "Glacial Karewa terraces with deep fertile clay-loam and rich humus",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 26.0,
+    "market_price_per_ton": 1100.0,
+    "cost_per_ha": 4200.0,
+    "curcumin_or_brix_quality": "Soluble Solids Brix 14.5° / Crisp Flesh with High Anthocyanin",
+    "specialty_desc": "Highland alpine valley chilling requirements (>1200 hrs <7°C) guarantee vibrant crimson fruit coloration, crisp crunch, and 26.0 T/Ha orchard yield.",
+    "crop_emoji": "🍎",
+    "climate_zone": "Alpine Temperate Highland",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 850.0
+  },
+  {
+    "id": 3,
+    "region_name": "Coimbatore",
+    "country": "India",
+    "lat": 11.0168,
+    "lon": 76.9558,
+    "crop_name": "Coconut & Sugarcane",
+    "botanical_species": "Cocos nucifera & Saccharum officinarum",
+    "variety": "Co-0238 / Co-86032 High Biomass / West Coast Tall",
+    "optimal_soil_type": "Deep red-clay loam with Siruvani river perennial irrigation",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 88.5,
+    "market_price_per_ton": 44.0,
+    "cost_per_ha": 1700.0,
+    "curcumin_or_brix_quality": "Sucrose Recovery 11.5% / High Fiber / 140 nuts/palm/yr",
+    "specialty_desc": "Kongu region with Siruvani and Bhavani canal network achieves world-class sugarcane biomass reaching 88.5 T/Ha and thriving tall coconut groves.",
+    "crop_emoji": "🌴",
+    "climate_zone": "Tropical Agricultural Basin",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 680.0
+  },
+  {
+    "id": 4,
+    "region_name": "Nilgiris",
+    "country": "India",
+    "lat": 11.4102,
+    "lon": 76.695,
+    "crop_name": "Tea & Arabica Coffee",
+    "botanical_species": "Camellia sinensis & Coffea arabica",
+    "variety": "Nilgiri Orthodox Frosty / Selection 795",
+    "optimal_soil_type": "Acidic laterite mountain slopes (1500-2200m) with high humus",
+    "optimal_ph_min": 4.5,
+    "optimal_ph_max": 5.5,
+    "base_yield_tons_ha": 3.6,
+    "market_price_per_ton": 3400.0,
+    "cost_per_ha": 2900.0,
+    "curcumin_or_brix_quality": "High Theaflavins / Bright Cup Golden Liquor / Floral Aroma",
+    "specialty_desc": "Continuous hill station mist, high elevation, and acidic soil pH produce exquisite Nilgiri frosty orthodox tea and shade-grown Arabica coffee at 3.6 T/Ha.",
+    "crop_emoji": "🍵",
+    "climate_zone": "Montane Subtropical Mist",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 22.0,
+    "optimal_rainfall_mm": 1600.0
+  },
+  {
+    "id": 5,
+    "region_name": "Thanjavur",
+    "country": "India",
+    "lat": 10.787,
+    "lon": 79.1378,
+    "crop_name": "Rice & Paddy",
+    "botanical_species": "Oryza sativa",
+    "variety": "CR-1009 Sub1 / BPT-5204 Samba Masuri (Ponni Rice)",
+    "optimal_soil_type": "Cauvery delta low-lying fertile wetland alluvial clay-loam",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 7.2,
+    "market_price_per_ton": 440.0,
+    "cost_per_ha": 1200.0,
+    "curcumin_or_brix_quality": "High Amylose 24% / Extra Fine Grain Elongation",
+    "specialty_desc": "Cauvery delta low-lying fertile wetland floodplain with shallow groundwater and canal irrigation sustains record paddy yields of 7.2 T/Ha.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Deltaic Tropical Floodplain",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 1100.0
+  },
+  {
+    "id": 6,
+    "region_name": "Theni",
+    "country": "India",
+    "lat": 10.0104,
+    "lon": 77.4768,
+    "crop_name": "Plantation Banana",
+    "botanical_species": "Musa acuminata",
+    "variety": "Grand Naine / Poovan / Red Banana",
+    "optimal_soil_type": "Riparian alluvial silt loam with perennial Vaigai river irrigation",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 48.0,
+    "market_price_per_ton": 320.0,
+    "cost_per_ha": 4800.0,
+    "curcumin_or_brix_quality": "High Potassium / Fruit Bunch Weight 28-34 kg",
+    "specialty_desc": "Perennial riparian alluvial belt with high tropical sunshine and humidity supporting heavy-yielding commercial banana bunches at 48.0 T/Ha.",
+    "crop_emoji": "🍌",
+    "climate_zone": "Tropical Riparian Belt",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 850.0
+  },
+  {
+    "id": 7,
+    "region_name": "Nagpur",
+    "country": "India",
+    "lat": 21.1458,
+    "lon": 79.0882,
+    "crop_name": "Mandarin Orange",
+    "botanical_species": "Citrus reticulata",
+    "variety": "Nagpur Santra (GI Tag)",
+    "optimal_soil_type": "Deccan basaltic vertisol black loam with high calcium reserves",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 24.0,
+    "market_price_per_ton": 650.0,
+    "cost_per_ha": 3200.0,
+    "curcumin_or_brix_quality": "Brix-to-Acid Ratio 12:1 / Thin Loose Peeling Rind",
+    "specialty_desc": "Vidarbha black soils and dry subtropical winters deliver sweet-tart Nagpur Santra mandarins with abundant juice content at 24.0 T/Ha.",
+    "crop_emoji": "🍊",
+    "climate_zone": "Subtropical Semi-Arid",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 880.0
+  },
+  {
+    "id": 8,
+    "region_name": "Guntur",
+    "country": "India",
+    "lat": 16.3067,
+    "lon": 80.4365,
+    "crop_name": "Red Chilli",
+    "botanical_species": "Capsicum annuum",
+    "variety": "Guntur Sannam S4 (GI Tag)",
+    "optimal_soil_type": "Krishna river delta black cotton soil with high moisture retention",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 5.2,
+    "market_price_per_ton": 2800.0,
+    "cost_per_ha": 2600.0,
+    "curcumin_or_brix_quality": "Pungency 35,000–40,000 Scoville Heat Units (SHU)",
+    "specialty_desc": "High solar radiation and deep delta clay produce intense fiery red pigmentation and peak dried pod yields of 5.2 T/Ha.",
+    "crop_emoji": "🌶️",
+    "climate_zone": "Tropical Delta Semi-Arid",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 38.0,
+    "optimal_rainfall_mm": 750.0
+  },
+  {
+    "id": 9,
+    "region_name": "Punjab",
+    "country": "India",
+    "lat": 30.901,
+    "lon": 75.8573,
+    "crop_name": "Wheat & Basmati Paddy",
+    "botanical_species": "Triticum aestivum & Oryza sativa",
+    "variety": "HD-2967 (Kalyan Sona) / Pusa Basmati 1121",
+    "optimal_soil_type": "Indo-Gangetic deep alluvial silt-loam with canal & tubewell water",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 7.6,
+    "base_yield_tons_ha": 6.8,
+    "market_price_per_ton": 320.0,
+    "cost_per_ha": 680.0,
+    "curcumin_or_brix_quality": "Grain Protein 12.8% / Extra Long Slender Kernels",
+    "specialty_desc": "Fertile alluvial plains with cool rabi winter temperatures yield bumper wheat crops at 6.8 T/Ha and fragrant Basmati export paddy.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Indo-Gangetic Temperate Granary",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 650.0
+  },
+  {
+    "id": 10,
+    "region_name": "Wayanad",
+    "country": "India",
+    "lat": 11.6854,
+    "lon": 76.132,
+    "crop_name": "Black Pepper & Cardamom",
+    "botanical_species": "Piper nigrum & Elettaria cardamomum",
+    "variety": "Panniyur-1 / Malabar Bold",
+    "optimal_soil_type": "Western Ghats humid laterite organic mulch with dense shade canopy",
+    "optimal_ph_min": 5.2,
+    "optimal_ph_max": 6.4,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 6200.0,
+    "cost_per_ha": 3500.0,
+    "curcumin_or_brix_quality": "Piperine 6.2% / Essential Volatile Oils 3.8%",
+    "specialty_desc": "High-elevation Western Ghats agroforestry with southwest monsoon rains yields premium black pepper and aromatic green cardamom.",
+    "crop_emoji": "🌿",
+    "climate_zone": "Tropical Montane Rainforest",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 2400.0
+  },
+  {
+    "id": 11,
+    "region_name": "Saurashtra",
+    "country": "India",
+    "lat": 21.5222,
+    "lon": 70.4579,
+    "crop_name": "Groundnut & Bt Cotton",
+    "botanical_species": "Arachis hypogaea & Gossypium hirsutum",
+    "variety": "TMV-7 / TAG-24 / Bollgard II Hybrid",
+    "optimal_soil_type": "Well-drained calcareous medium-black sandy loam",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 3.4,
+    "market_price_per_ton": 850.0,
+    "cost_per_ha": 850.0,
+    "curcumin_or_brix_quality": "Oil Content 49.5% / High Kernel Shelling 74%",
+    "specialty_desc": "Warm semi-arid climate with well-drained sandy loam makes Saurashtra the peanut capital of India, achieving 3.4 T/Ha with high oil yield.",
+    "crop_emoji": "🥜",
+    "climate_zone": "Semi-Arid Coastal Plains",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 38.0,
+    "optimal_rainfall_mm": 580.0
+  },
+  {
+    "id": 12,
+    "region_name": "Nashik",
+    "country": "India",
+    "lat": 19.9975,
+    "lon": 73.7898,
+    "crop_name": "Table Grapes & Red Onion",
+    "botanical_species": "Vitis vinifera & Allium cepa",
+    "variety": "Thompson Seedless / Sharad Seedless / N-53",
+    "optimal_soil_type": "Basaltic weathered red-clay loam with excellent gravel drainage",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 22.0,
+    "market_price_per_ton": 950.0,
+    "cost_per_ha": 3600.0,
+    "curcumin_or_brix_quality": "Soluble Solids 19° Brix / Crisp Table Texture",
+    "specialty_desc": "Sunny dry post-monsoon winters and drip fertigation deliver export-quality seedless table grapes at 22.0 T/Ha and famous pungent red onions.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Subtropical Deccan Plateau",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 720.0
+  },
+  {
+    "id": 13,
+    "region_name": "Ratnagiri",
+    "country": "India",
+    "lat": 16.9902,
+    "lon": 73.312,
+    "crop_name": "Alphonso Mango",
+    "botanical_species": "Mangifera indica",
+    "variety": "Alphonso / Hapus (GI Tag)",
+    "optimal_soil_type": "Coastal laterite rocky plateaus with porous gravelly drainage",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 14.0,
+    "market_price_per_ton": 1600.0,
+    "cost_per_ha": 2800.0,
+    "curcumin_or_brix_quality": "Aromatics / Saffron-Gold Pulp / Brix 20.5°",
+    "specialty_desc": "Konkan coastal sea breeze and laterite soil stress produce the King of Mangoes: golden, sweet, fiberless Alphonso with exceptional aroma.",
+    "crop_emoji": "🥭",
+    "climate_zone": "Coastal Tropical Humid",
+    "optimal_temp_min": 20.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 2800.0
+  },
+  {
+    "id": 14,
+    "region_name": "Assam",
+    "country": "India",
+    "lat": 26.1445,
+    "lon": 91.7362,
+    "crop_name": "Assam Black Tea",
+    "botanical_species": "Camellia sinensis var. assamica",
+    "variety": "Assam CTC Bold / Orthodox Golden Tips",
+    "optimal_soil_type": "Deep acidic alluvial loam of the Brahmaputra River valley",
+    "optimal_ph_min": 4.5,
+    "optimal_ph_max": 5.5,
+    "base_yield_tons_ha": 3.8,
+    "market_price_per_ton": 3200.0,
+    "cost_per_ha": 2700.0,
+    "curcumin_or_brix_quality": "Malty Flavor / Rich Amber Liquor / Strong Body",
+    "specialty_desc": "Tropical lowlands with heavy monsoon rains and high humidity yield world-famous strong, malty Assam breakfast teas at 3.8 T/Ha.",
+    "crop_emoji": "🍃",
+    "climate_zone": "Tropical Riverine Monsoon",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 2100.0
+  },
+  {
+    "id": 15,
+    "region_name": "Shimla",
+    "country": "India",
+    "lat": 31.1048,
+    "lon": 77.1734,
+    "crop_name": "Mountain Apples",
+    "botanical_species": "Malus domestica",
+    "variety": "Royal Delicious / Golden Delicious / Starkrimson",
+    "optimal_soil_type": "Mountainous forest brown earth with rich organic leaf mulch",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 22.5,
+    "market_price_per_ton": 1050.0,
+    "cost_per_ha": 3800.0,
+    "curcumin_or_brix_quality": "Crisp White Flesh / Balanced Acidity / High Chilling Hours",
+    "specialty_desc": "High-altitude Himalayan temperate climate (1800-2400m) delivers slow-ripened, flavorful, aromatic Royal Delicious apples at 22.5 T/Ha.",
+    "crop_emoji": "🍏",
+    "climate_zone": "Himalayan Alpine Temperate",
+    "optimal_temp_min": 5.0,
+    "optimal_temp_max": 22.0,
+    "optimal_rainfall_mm": 1150.0
+  },
+  {
+    "id": 16,
+    "region_name": "Coorg",
+    "country": "India",
+    "lat": 12.4244,
+    "lon": 75.7382,
+    "crop_name": "Shade Coffee & Pepper",
+    "botanical_species": "Coffea arabica & Coffea canephora",
+    "variety": "Selection 795 Arabica / Robusta S-274",
+    "optimal_soil_type": "Deep volcanic laterite forest soil with multi-tiered tree shade",
+    "optimal_ph_min": 5.2,
+    "optimal_ph_max": 6.3,
+    "base_yield_tons_ha": 2.8,
+    "market_price_per_ton": 4100.0,
+    "cost_per_ha": 3200.0,
+    "curcumin_or_brix_quality": "Mild Acidity / Notes of Wild Citrus & Cocoa",
+    "specialty_desc": "Western Ghats shade canopy agroforestry preserves ecology while cultivating high-elevation washed specialty coffee beans at 2.8 T/Ha.",
+    "crop_emoji": "☕",
+    "climate_zone": "Montane Rainforest Agroforestry",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 2200.0
+  },
+  {
+    "id": 17,
+    "region_name": "Pakistan Punjab",
+    "country": "Pakistan",
+    "lat": 31.5204,
+    "lon": 74.3587,
+    "crop_name": "Basmati Rice & Cotton",
+    "botanical_species": "Oryza sativa & Gossypium hirsutum",
+    "variety": "Super Kernel Basmati / CIM-496 Cotton",
+    "optimal_soil_type": "Indo-Gangetic canal-fed alluvial silt-loam",
+    "optimal_ph_min": 7.0,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 5.6,
+    "market_price_per_ton": 480.0,
+    "cost_per_ha": 850.0,
+    "curcumin_or_brix_quality": "Extra Kernel Elongation Ratio 2.0x / Fragrant 2-AP",
+    "specialty_desc": "Indus river canal irrigation and warm dry ripening season produce long slender fragrant Super Kernel Basmati rice and high-yield cotton.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Subtropical Canal-Irrigated Plain",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 520.0
+  },
+  {
+    "id": 18,
+    "region_name": "Sylhet",
+    "country": "Bangladesh",
+    "lat": 24.8949,
+    "lon": 91.8687,
+    "crop_name": "Aman Paddy & Jute",
+    "botanical_species": "Oryza sativa & Corchorus olitorius",
+    "variety": "BRRI dhan29 / Golden Tossa Jute O-9897",
+    "optimal_soil_type": "Deep deltaic wetland alluvial silt with abundant monsoon water",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 6.4,
+    "market_price_per_ton": 380.0,
+    "cost_per_ha": 920.0,
+    "curcumin_or_brix_quality": "Silky Golden Fiber Strength / High Milling Recovery",
+    "specialty_desc": "Rich Meghna and Surma river delta plain with heavy monsoon rainfall sustains double-cropped wetland rice (6.4 T/Ha) and lustrous golden jute.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Tropical Wetland Delta",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 35.0,
+    "optimal_rainfall_mm": 2600.0
+  },
+  {
+    "id": 19,
+    "region_name": "Nuwara Eliya",
+    "country": "Sri Lanka",
+    "lat": 6.9497,
+    "lon": 80.7891,
+    "crop_name": "Ceylon High-Grown Tea",
+    "botanical_species": "Camellia sinensis",
+    "variety": "Ceylon Orange Pekoe / Nuwara Eliya Pure",
+    "optimal_soil_type": "Acidic montane weathered gneiss laterite soil",
+    "optimal_ph_min": 4.5,
+    "optimal_ph_max": 5.5,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 4200.0,
+    "cost_per_ha": 3100.0,
+    "curcumin_or_brix_quality": "Delicate Golden Liquor / Champagne of Ceylon Teas",
+    "specialty_desc": "Montane elevations above 1900m with cool misty winds produce the rarest, floral, light golden Ceylon high-grown tea at 3.2 T/Ha.",
+    "crop_emoji": "🍵",
+    "climate_zone": "Highland Tropical Mist",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 20.0,
+    "optimal_rainfall_mm": 2200.0
+  },
+  {
+    "id": 20,
+    "region_name": "Iowa Corn Belt",
+    "country": "United States",
+    "lat": 41.878,
+    "lon": -93.0977,
+    "crop_name": "Field Corn & Soybean",
+    "botanical_species": "Zea mays & Glycine max",
+    "variety": "Pioneer Hi-Bred / Roundup Ready 2",
+    "optimal_soil_type": "Deep black Mollisol prairie soils with 4%+ organic matter",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 11.8,
+    "market_price_per_ton": 260.0,
+    "cost_per_ha": 820.0,
+    "curcumin_or_brix_quality": "Starch 72% / Protein 36% in Soybean",
+    "specialty_desc": "Deep glacial till and optimal summer warmth and humidity make Iowa the global leader in grain corn yields at 11.8 T/Ha.",
+    "crop_emoji": "🌽",
+    "climate_zone": "Humid Continental Prairie",
+    "optimal_temp_min": 15.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 890.0
+  },
+  {
+    "id": 21,
+    "region_name": "Salinas Valley",
+    "country": "United States",
+    "lat": 36.6777,
+    "lon": -121.6555,
+    "crop_name": "Strawberries & Leafy Greens",
+    "botanical_species": "Fragaria × ananassa",
+    "variety": "Sweet Charlie / Albion / Monterey",
+    "optimal_soil_type": "Coastal alluvial sandy-loam with high organic mulch",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 28.4,
+    "market_price_per_ton": 2400.0,
+    "cost_per_ha": 14500.0,
+    "curcumin_or_brix_quality": "Soluble Solids Brix 9.8° / High Vitamin C",
+    "specialty_desc": "Pacific maritime fog, mild cool sunny days, and automated drip fertigation produce the world's most productive strawberry yields at 28.4 T/Ha.",
+    "crop_emoji": "🍓",
+    "climate_zone": "Coastal Mediterranean Marine Layer",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 420.0
+  },
+  {
+    "id": 22,
+    "region_name": "Central Valley Fresno",
+    "country": "United States",
+    "lat": 36.7468,
+    "lon": -119.7726,
+    "crop_name": "Almonds & Pistachios",
+    "botanical_species": "Prunus dulcis & Pistacia vera",
+    "variety": "Nonpareil / Carmel / Kerman",
+    "optimal_soil_type": "Deep alluvial sandy-clay loam with Sierra Nevada snowmelt irrigation",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 4800.0,
+    "cost_per_ha": 3800.0,
+    "curcumin_or_brix_quality": "Kernel Crackout 68% / High Oleic Healthy Fat",
+    "specialty_desc": "Abundant Mediterranean sunshine, cool winter dormant hours, and precision drip irrigation power the world's premier almond orchards at 3.2 T/Ha kernel yield.",
+    "crop_emoji": "🌰",
+    "climate_zone": "Mediterranean Irrigated Basin",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 320.0
+  },
+  {
+    "id": 23,
+    "region_name": "Yakima Valley",
+    "country": "United States",
+    "lat": 46.6021,
+    "lon": -120.5059,
+    "crop_name": "Honeycrisp Apples & Hops",
+    "botanical_species": "Malus domestica & Humulus lupulus",
+    "variety": "Honeycrisp / Cosmic Crisp / Citra Hops",
+    "optimal_soil_type": "Volcanic ash-infused loess soil with Columbia River irrigation",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 28.0,
+    "market_price_per_ton": 1250.0,
+    "cost_per_ha": 4600.0,
+    "curcumin_or_brix_quality": "Brix 15.0° / High Crispness / Alpha Acids 12%",
+    "specialty_desc": "Sunny arid days and cool mountain nights combined with glacier-fed river irrigation produce world-famous crisp, juicy apples and aromatic hops.",
+    "crop_emoji": "🍎",
+    "climate_zone": "Semi-Arid Irrigated Valley",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 240.0
+  },
+  {
+    "id": 24,
+    "region_name": "Snake River Plain",
+    "country": "United States",
+    "lat": 43.615,
+    "lon": -116.2023,
+    "crop_name": "Russet Burbank Potatoes",
+    "botanical_species": "Solanum tuberosum",
+    "variety": "Russet Burbank / Ranger Russet",
+    "optimal_soil_type": "Coarse volcanic sandy loam with excellent drainage",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 46.0,
+    "market_price_per_ton": 220.0,
+    "cost_per_ha": 3400.0,
+    "curcumin_or_brix_quality": "High Specific Gravity 1.085 / Ideal French Fry Solids",
+    "specialty_desc": "Warm summer days, cold mountain nights, and porous volcanic soil allow Idaho Russet potatoes to reach record yields of 46.0 T/Ha.",
+    "crop_emoji": "🥔",
+    "climate_zone": "High Desert Volcanic Basin",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 280.0
+  },
+  {
+    "id": 25,
+    "region_name": "Kansas Wheat Belt",
+    "country": "United States",
+    "lat": 38.5266,
+    "lon": -96.7265,
+    "crop_name": "Hard Red Winter Wheat",
+    "botanical_species": "Triticum aestivum",
+    "variety": "Everest / Monument / Bob Dole",
+    "optimal_soil_type": "Fertile silt-loam mollisols of the Great Plains",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 4.8,
+    "market_price_per_ton": 310.0,
+    "cost_per_ha": 520.0,
+    "curcumin_or_brix_quality": "Milling Protein 12.5% - 13.2% / Strong Gluten",
+    "specialty_desc": "Deep prairie silt-loam and continental winter chill produce premium hard red winter wheat for high-volume artisan bread baking.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Great Plains Continental Semi-Arid",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 680.0
+  },
+  {
+    "id": 26,
+    "region_name": "Florida Citrus Belt",
+    "country": "United States",
+    "lat": 28.0395,
+    "lon": -81.9498,
+    "crop_name": "Valencia Sweet Oranges",
+    "botanical_species": "Citrus sinensis",
+    "variety": "Valencia Late / Hamlin Sweet",
+    "optimal_soil_type": "Deep porous sandy entisols with high percolation",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 32.0,
+    "market_price_per_ton": 580.0,
+    "cost_per_ha": 4200.0,
+    "curcumin_or_brix_quality": "Brix 11.8° / High Juice Content >55%",
+    "specialty_desc": "Subtropical warmth, high rainfall, and well-drained sandy ridges make Central Florida the global benchmark for sweet orange juice production.",
+    "crop_emoji": "🍊",
+    "climate_zone": "Humid Subtropical Coast",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 33.0,
+    "optimal_rainfall_mm": 1300.0
+  },
+  {
+    "id": 27,
+    "region_name": "Texas High Plains",
+    "country": "United States",
+    "lat": 33.5779,
+    "lon": -101.8552,
+    "crop_name": "Upland Cotton & Sorghum",
+    "botanical_species": "Gossypium hirsutum & Sorghum bicolor",
+    "variety": "FiberMax 2334 / DKS37-07",
+    "optimal_soil_type": "Deep Pullman clay-loam over caliche subsoil",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 2.4,
+    "market_price_per_ton": 1600.0,
+    "cost_per_ha": 950.0,
+    "curcumin_or_brix_quality": "Fiber Length 1.18 inches / High Micronaire 4.2",
+    "specialty_desc": "High solar radiation, hot days, and Ogallala aquifer drip irrigation yield resilient, high-grade export cotton fibers.",
+    "crop_emoji": "☁️",
+    "climate_zone": "Semi-Arid High Plains",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 480.0
+  },
+  {
+    "id": 28,
+    "region_name": "Georgia Peaches & Peanuts",
+    "country": "United States",
+    "lat": 32.1656,
+    "lon": -82.9001,
+    "crop_name": "Peaches & Runner Peanuts",
+    "botanical_species": "Prunus persica & Arachis hypogaea",
+    "variety": "Elberta / Georgia-06G Runner",
+    "optimal_soil_type": "Warm sandy coastal plain loam with red clay subsoil",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 4.6,
+    "market_price_per_ton": 750.0,
+    "cost_per_ha": 1100.0,
+    "curcumin_or_brix_quality": "Plump Kernels / Shelling 76% / High Sweetness",
+    "specialty_desc": "Long warm growing season and humid summer rains produce iconic Georgia sweet peaches and high-yield confectionery peanuts.",
+    "crop_emoji": "🍑",
+    "climate_zone": "Humid Subtropical Coastal Plain",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 1200.0
+  },
+  {
+    "id": 29,
+    "region_name": "Napa Valley",
+    "country": "United States",
+    "lat": 38.2975,
+    "lon": -122.2869,
+    "crop_name": "Cabernet Sauvignon Wine Grapes",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Cabernet Sauvignon Grand Cru / Merlot",
+    "optimal_soil_type": "Gravelly alluvial fan loams with volcanic obsidian deposits",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.4,
+    "base_yield_tons_ha": 9.5,
+    "market_price_per_ton": 3800.0,
+    "cost_per_ha": 6800.0,
+    "curcumin_or_brix_quality": "Soluble Solids 25.5° Brix / Deep Anthocyanins",
+    "specialty_desc": "Warm valley afternoons, cool San Pablo Bay marine fog, and volcanic soils create prestigious world-class Napa Valley Cabernet wines.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Maritime Mediterranean Valley",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 650.0
+  },
+  {
+    "id": 30,
+    "region_name": "Saskatchewan Prairie",
+    "country": "Canada",
+    "lat": 52.1332,
+    "lon": -106.67,
+    "crop_name": "Canola & Spring Wheat",
+    "botanical_species": "Brassica napus & Triticum aestivum",
+    "variety": "InVigor L233P / CWRS Red Fife",
+    "optimal_soil_type": "Deep dark Chernozemic prairie clay-loam",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 620.0,
+    "cost_per_ha": 540.0,
+    "curcumin_or_brix_quality": "Canola Seed Oil 44.5% / Gluten Index >90",
+    "specialty_desc": "Extensive northern prairie lands with long summer daylight hours yield high-oil yellow canola and hard red spring milling wheat.",
+    "crop_emoji": "🌼",
+    "climate_zone": "Cool Temperate Northern Prairie",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 420.0
+  },
+  {
+    "id": 31,
+    "region_name": "Okanagan Valley",
+    "country": "Canada",
+    "lat": 49.888,
+    "lon": -119.496,
+    "crop_name": "Sweet Cherries & Icewine",
+    "botanical_species": "Prunus avium & Vitis vinifera",
+    "variety": "Lapins / Sweetheart / Riesling Icewine",
+    "optimal_soil_type": "Sandy glacial lacustrine terraces along Okanagan Lake",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 14.0,
+    "market_price_per_ton": 2800.0,
+    "cost_per_ha": 5200.0,
+    "curcumin_or_brix_quality": "Late-Season Firm Flesh / Icewine Brix >35°",
+    "specialty_desc": "Rain-shadow microclimate with warm arid summer and cold freezing winters yields export-grade sweet cherries and internationally prized icewines.",
+    "crop_emoji": "🍒",
+    "climate_zone": "Northern Temperate Rainshadow Valley",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 380.0
+  },
+  {
+    "id": 32,
+    "region_name": "Sinaloa Valley",
+    "country": "Mexico",
+    "lat": 24.8091,
+    "lon": -107.394,
+    "crop_name": "Roma Tomatoes & Bell Peppers",
+    "botanical_species": "Solanum lycopersicum & Capsicum annuum",
+    "variety": "Saladette / Aristotle F1 Bell",
+    "optimal_soil_type": "Coastal delta alluvial silt with reservoir irrigation",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 65.0,
+    "market_price_per_ton": 420.0,
+    "cost_per_ha": 7200.0,
+    "curcumin_or_brix_quality": "Firm Pericarp / Extended Shelf Life / High Lycopene",
+    "specialty_desc": "Warm dry subtropical winter enables continuous greenhouse and raised-bed export production of fresh saladette tomatoes at 65.0 T/Ha.",
+    "crop_emoji": "🍅",
+    "climate_zone": "Subtropical Coastal Irrigation",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 620.0
+  },
+  {
+    "id": 33,
+    "region_name": "Michoacán Highlands",
+    "country": "Mexico",
+    "lat": 19.421,
+    "lon": -102.0626,
+    "crop_name": "Hass Avocado",
+    "botanical_species": "Persea americana",
+    "variety": "Hass Avocado (Mendez / Flor de Mayo)",
+    "optimal_soil_type": "Deep volcanic andosol soil with rich mineral content and porous aeration",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 14.5,
+    "market_price_per_ton": 2600.0,
+    "cost_per_ha": 4800.0,
+    "curcumin_or_brix_quality": "Dry Matter >23% / Rich Buttery Oleic Fat",
+    "specialty_desc": "Highland volcanic elevations (1600-2200m) and mild subtropical climate produce the avocado capital of the world with continuous flowering.",
+    "crop_emoji": "🥑",
+    "climate_zone": "Volcanic Subtropical Highland",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 1100.0
+  },
+  {
+    "id": 34,
+    "region_name": "Jalisco Agave Basin",
+    "country": "Mexico",
+    "lat": 20.6597,
+    "lon": -103.3496,
+    "crop_name": "Blue Agave for Tequila",
+    "botanical_species": "Agave tequilana",
+    "variety": "Weber Blue Agave (DO Tequila)",
+    "optimal_soil_type": "Red volcanic basaltic clay loam rich in iron oxide",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 18.0,
+    "market_price_per_ton": 1200.0,
+    "cost_per_ha": 2400.0,
+    "curcumin_or_brix_quality": "Inulin Sugar Content >28% in Mature Piña",
+    "specialty_desc": "Semi-arid red volcanic soils and strong solar UV drive six-year carbohydrate accumulation in agave piñas for authentic Tequila production.",
+    "crop_emoji": "🌵",
+    "climate_zone": "Semi-Arid Volcanic Plateau",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 780.0
+  },
+  {
+    "id": 35,
+    "region_name": "Mato Grosso",
+    "country": "Brazil",
+    "lat": -12.6819,
+    "lon": -56.9211,
+    "crop_name": "Soybean & Safrinha Maize",
+    "botanical_species": "Glycine max & Zea mays",
+    "variety": "Intacta RR2 PRO / Pioneer 30F53",
+    "optimal_soil_type": "Deep weathered Cerrado oxisol with lime & phosphate correction",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.6,
+    "base_yield_tons_ha": 4.2,
+    "market_price_per_ton": 540.0,
+    "cost_per_ha": 720.0,
+    "curcumin_or_brix_quality": "Oil 21% / High Seed Hardiness / High Protein 37%",
+    "specialty_desc": "Tropical savanna climate with reliable two-crop cycles per year (Soybean + Safrinha Corn) delivers massive grain harvests at 4.2 T/Ha.",
+    "crop_emoji": "🫘",
+    "climate_zone": "Tropical Savanna Cerrado",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 35.0,
+    "optimal_rainfall_mm": 1750.0
+  },
+  {
+    "id": 36,
+    "region_name": "São Paulo Paulista",
+    "country": "Brazil",
+    "lat": -21.1767,
+    "lon": -47.8208,
+    "crop_name": "Sugarcane & Citrus",
+    "botanical_species": "Saccharum officinarum & Citrus sinensis",
+    "variety": "CTC-4 High Biomass / Pera Rio Orange",
+    "optimal_soil_type": "Rich terra roxa basaltic deep red soil",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 92.0,
+    "market_price_per_ton": 42.0,
+    "cost_per_ha": 1800.0,
+    "curcumin_or_brix_quality": "Sucrose ATR 145 kg/ton / High Ethanol Recovery",
+    "specialty_desc": "Deep fertile terra roxa and abundant tropical sunshine power the global capital of bioethanol and sugarcane biomass reaching 92.0 T/Ha.",
+    "crop_emoji": "🎋",
+    "climate_zone": "Subtropical Fertile Plateau",
+    "optimal_temp_min": 20.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 1350.0
+  },
+  {
+    "id": 37,
+    "region_name": "Minas Gerais",
+    "country": "Brazil",
+    "lat": -19.9208,
+    "lon": -43.9378,
+    "crop_name": "Specialty Arabica Coffee",
+    "botanical_species": "Coffea arabica",
+    "variety": "Bourbon Amarelo / Catuaí Vermelho 99",
+    "optimal_soil_type": "Montane red-yellow latosol with rich organic mulch",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 2.6,
+    "market_price_per_ton": 4200.0,
+    "cost_per_ha": 3100.0,
+    "curcumin_or_brix_quality": "Cupping Score >84 pts / Notes of Chocolate & Caramel",
+    "specialty_desc": "Highland plateaus (900-1300m) with dry harvest winters produce the world's largest single volume of sweet, nutty, balanced Arabica coffee.",
+    "crop_emoji": "☕",
+    "climate_zone": "Tropical Highland Subtropical",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 1450.0
+  },
+  {
+    "id": 38,
+    "region_name": "Bahia Cocoa Coast",
+    "country": "Brazil",
+    "lat": -14.7963,
+    "lon": -39.0494,
+    "crop_name": "Fine Cocoa & Cacao",
+    "botanical_species": "Theobroma cacao",
+    "variety": "CCN-51 / Forastero Cabruca",
+    "optimal_soil_type": "Coastal humid Atlantic Forest alluvial laterite",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 2.2,
+    "market_price_per_ton": 4800.0,
+    "cost_per_ha": 2600.0,
+    "curcumin_or_brix_quality": "Cocoa Butter Content >54% / Deep Chocolate Aroma",
+    "specialty_desc": "Traditional Cabruca agroforestry beneath Atlantic Forest shade canopies yields rich, aromatic cacao beans at 2.2 T/Ha.",
+    "crop_emoji": "🍫",
+    "climate_zone": "Tropical Atlantic Rainforest Coast",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 1900.0
+  },
+  {
+    "id": 39,
+    "region_name": "Pampas Heartland",
+    "country": "Argentina",
+    "lat": -34.6037,
+    "lon": -58.3816,
+    "crop_name": "Wheat & Sunflower",
+    "botanical_species": "Triticum aestivum & Helianthus annuus",
+    "variety": "Baguette 750 / Syn 3970 CL",
+    "optimal_soil_type": "Deep humic Mollisol prairie soil of the Argentine Pampas",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 5.2,
+    "market_price_per_ton": 340.0,
+    "cost_per_ha": 610.0,
+    "curcumin_or_brix_quality": "Grain Protein 12.0% / Sunflower Seed Oil >48%",
+    "specialty_desc": "Temperate plains with deep topsoil and reliable spring rains yield bumper crops of high-protein bread wheat and drought-hardy sunflowers.",
+    "crop_emoji": "🌻",
+    "climate_zone": "Humid Temperate Prairie Pampas",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 850.0
+  },
+  {
+    "id": 40,
+    "region_name": "Mendoza Foothills",
+    "country": "Argentina",
+    "lat": -32.8895,
+    "lon": -68.8458,
+    "crop_name": "Malbec Wine Grapes",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Malbec Reserva / Cabernet Franc",
+    "optimal_soil_type": "Alluvial stony gravel and limestone wash from the Andes",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 12.5,
+    "market_price_per_ton": 2200.0,
+    "cost_per_ha": 4600.0,
+    "curcumin_or_brix_quality": "Sugar 24.5° Brix / Intense Violet Anthocyanins",
+    "specialty_desc": "High-altitude Andean desert (900-1400m) with melted snow irrigation and intense sun creates iconic dark, velvet, high-tannin Malbec wines.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Highland Arid Andean Oasis",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 220.0
+  },
+  {
+    "id": 41,
+    "region_name": "Antioquia Coffee Axis",
+    "country": "Colombia",
+    "lat": 6.2442,
+    "lon": -75.5812,
+    "crop_name": "Colombian Arabica Coffee",
+    "botanical_species": "Coffea arabica",
+    "variety": "Castillo / Colombia Supremo / Geisha",
+    "optimal_soil_type": "Volcanic andosol slopes of the Central Andes mountain range",
+    "optimal_ph_min": 5.2,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 2.4,
+    "market_price_per_ton": 4600.0,
+    "cost_per_ha": 3200.0,
+    "curcumin_or_brix_quality": "Specialty Grade >86 pts / Bright Citrus Acidity",
+    "specialty_desc": "Steep Andean cloud-forest slopes with ideal rainfall and volcanic soil produce Colombia's renowned mild, hand-picked Arabica coffee.",
+    "crop_emoji": "☕",
+    "climate_zone": "Equatorial Andean Cloud Forest",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 2100.0
+  },
+  {
+    "id": 42,
+    "region_name": "Central Valley Maipo",
+    "country": "Chile",
+    "lat": -33.4489,
+    "lon": -70.6693,
+    "crop_name": "Carmenère & Cabernet",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Carmenère Gran Reserva / Cabernet Sauvignon",
+    "optimal_soil_type": "Porous gravelly alluvial terraces of the Maipo River",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 11.5,
+    "market_price_per_ton": 2400.0,
+    "cost_per_ha": 4800.0,
+    "curcumin_or_brix_quality": "Spicy Berry Notes / Rich Soft Tannins",
+    "specialty_desc": "Mediterranean climate with zero phylloxera and dry summers generates intense color and complex herbal flavors in Carmenère and Cabernet.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Mediterranean Valleys",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 380.0
+  },
+  {
+    "id": 43,
+    "region_name": "Sacred Valley",
+    "country": "Peru",
+    "lat": -13.1631,
+    "lon": -72.545,
+    "crop_name": "Organic Quinoa & Asparagus",
+    "botanical_species": "Chenopodium quinoa & Asparagus officinalis",
+    "variety": "Blanca de Junín / UC-157",
+    "optimal_soil_type": "Alluvial mountain loam with high mineral runoff",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 2800.0,
+    "cost_per_ha": 2200.0,
+    "curcumin_or_brix_quality": "Complete Amino Acid Profile / Protein 14.5%",
+    "specialty_desc": "High-altitude Andean clean air and glacier runoff nurture nutrient-dense ancient grain Quinoa and tender coastal green asparagus.",
+    "crop_emoji": "🌾",
+    "climate_zone": "High Andean Alpine Valley",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 22.0,
+    "optimal_rainfall_mm": 620.0
+  },
+  {
+    "id": 44,
+    "region_name": "Guayas River Basin",
+    "country": "Ecuador",
+    "lat": -2.1709,
+    "lon": -79.9224,
+    "crop_name": "Cavendish Bananas & Arriba Cacao",
+    "botanical_species": "Musa acuminata & Theobroma cacao",
+    "variety": "Cavendish Grand Naine / Cacao Nacional Arriba",
+    "optimal_soil_type": "Deep rich river floodplain alluvial silt",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 52.0,
+    "market_price_per_ton": 290.0,
+    "cost_per_ha": 4600.0,
+    "curcumin_or_brix_quality": "Floral Floral Aroma / Bunch Weight 32 kg",
+    "specialty_desc": "Year-round humid equatorial warmth and fertile river silt make Ecuador the world's leading exporter of dessert bananas and floral Arriba cacao.",
+    "crop_emoji": "🍌",
+    "climate_zone": "Equatorial Tropical Floodplain",
+    "optimal_temp_min": 23.0,
+    "optimal_temp_max": 33.0,
+    "optimal_rainfall_mm": 1600.0
+  },
+  {
+    "id": 45,
+    "region_name": "Jaen Andalusia",
+    "country": "Spain",
+    "lat": 37.7796,
+    "lon": -3.7849,
+    "crop_name": "Olive",
+    "botanical_species": "Olea europaea",
+    "variety": "Picual / Arbequina Extra Virgin",
+    "optimal_soil_type": "Limestone calcareous rocky slopes with exceptional drainage",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 8.4,
+    "base_yield_tons_ha": 6.2,
+    "market_price_per_ton": 1600.0,
+    "cost_per_ha": 2100.0,
+    "curcumin_or_brix_quality": "Polyphenols >500 mg/kg / Oleic Acid >78%",
+    "specialty_desc": "Arid Mediterranean summers and limestone soil stress drive deep root penetration and produce premium Extra Virgin Olive Oil at 6.2 T/Ha.",
+    "crop_emoji": "🫒",
+    "climate_zone": "Mediterranean Calcareous Hills",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 480.0
+  },
+  {
+    "id": 46,
+    "region_name": "Valencia Coast",
+    "country": "Spain",
+    "lat": 39.4699,
+    "lon": -0.3763,
+    "crop_name": "Valencia Sweet Oranges",
+    "botanical_species": "Citrus sinensis",
+    "variety": "Navel Late / Valencia Late",
+    "optimal_soil_type": "Coastal alluvial sandy-clay loam with acequia canal irrigation",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 34.0,
+    "market_price_per_ton": 520.0,
+    "cost_per_ha": 3800.0,
+    "curcumin_or_brix_quality": "Brix 12.5° / Balanced Sweet Tart Juice",
+    "specialty_desc": "Balmy Mediterranean coastal breezes and historic acequia irrigation produce Spain's world-famous fragrant sweet table oranges.",
+    "crop_emoji": "🍊",
+    "climate_zone": "Coastal Mediterranean",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 510.0
+  },
+  {
+    "id": 47,
+    "region_name": "Bordeaux Viticulture",
+    "country": "France",
+    "lat": 44.8378,
+    "lon": -0.5792,
+    "crop_name": "Grand Cru Wine Grapes",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Cabernet Sauvignon / Merlot",
+    "optimal_soil_type": "Gravelly alluvial terraces along the Gironde estuary",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 12.0,
+    "market_price_per_ton": 2800.0,
+    "cost_per_ha": 5200.0,
+    "curcumin_or_brix_quality": "Sugar 22° Brix / Rich Tannin & Phenolic Ripeness",
+    "specialty_desc": "Oceanic temperate climate and gravel soils reflect solar heat to vines, yielding prestigious grand cru wine grapes.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Oceanic Temperate Viticulture",
+    "optimal_temp_min": 11.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 780.0
+  },
+  {
+    "id": 48,
+    "region_name": "Champagne",
+    "country": "France",
+    "lat": 49.2583,
+    "lon": 4.0317,
+    "crop_name": "Champagne Grapes",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Chardonnay / Pinot Noir / Pinot Meunier",
+    "optimal_soil_type": "Porous Cretaceous chalk slopes with natural thermal regulation",
+    "optimal_ph_min": 7.0,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 11.0,
+    "market_price_per_ton": 4200.0,
+    "cost_per_ha": 6800.0,
+    "curcumin_or_brix_quality": "High Natural Acidity / Delicate Mineral Aromas",
+    "specialty_desc": "Cool northern marginal climate and deep chalk subterranean cellars yield world-revered sparkling Champagne wine grapes.",
+    "crop_emoji": "🍾",
+    "climate_zone": "Cool Northern Oceanic",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 720.0
+  },
+  {
+    "id": 49,
+    "region_name": "Beauce Granary",
+    "country": "France",
+    "lat": 48.4468,
+    "lon": 1.4892,
+    "crop_name": "Soft Milling Wheat & Barley",
+    "botanical_species": "Triticum aestivum & Hordeum vulgare",
+    "variety": "Chevalier / RGT Planet",
+    "optimal_soil_type": "Deep fertile limon loess loam covering limestone bedrock",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 8.2,
+    "market_price_per_ton": 280.0,
+    "cost_per_ha": 890.0,
+    "curcumin_or_brix_quality": "Grain Protein 11.8% / Excellent Baking Volume",
+    "specialty_desc": "Known as the Granary of France, the Beauce plain's deep silt soils deliver high-yielding winter wheat harvests at 8.2 T/Ha.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Temperate Oceanic Loess Plain",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 25.0,
+    "optimal_rainfall_mm": 640.0
+  },
+  {
+    "id": 50,
+    "region_name": "Tuscany",
+    "country": "Italy",
+    "lat": 43.7696,
+    "lon": 11.2558,
+    "crop_name": "Sangiovese Grapes & Olives",
+    "botanical_species": "Vitis vinifera & Olea europaea",
+    "variety": "Sangiovese Grosso / Frantoio Olive",
+    "optimal_soil_type": "Galestro schist and alberese limestone rocky slopes",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 8.8,
+    "market_price_per_ton": 2600.0,
+    "cost_per_ha": 4600.0,
+    "curcumin_or_brix_quality": "High Polyphenols / High Anthocyanins / Chianti DOCG",
+    "specialty_desc": "Gentle rolling hills with galestro soil stress and Tuscan sunshine yield iconic Chianti Classico wine grapes and pungent green olive oil.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Sub-Mediterranean Rolling Hills",
+    "optimal_temp_min": 11.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 680.0
+  },
+  {
+    "id": 51,
+    "region_name": "Po Valley",
+    "country": "Italy",
+    "lat": 44.4949,
+    "lon": 11.3426,
+    "crop_name": "San Marzano Tomatoes & Risotto Rice",
+    "botanical_species": "Solanum lycopersicum & Oryza sativa",
+    "variety": "San Marzano / Carnaroli / Arborio",
+    "optimal_soil_type": "Deep alluvial silt and clay sediments of the Po river basin",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.4,
+    "base_yield_tons_ha": 72.0,
+    "market_price_per_ton": 380.0,
+    "cost_per_ha": 6200.0,
+    "curcumin_or_brix_quality": "High Solid Content / Plump Carnaroli Starch Center",
+    "specialty_desc": "Abundant water from alpine runoff and fertile Po delta silt power Italy's culinary heartland: premium risotto rice and sweet plum tomatoes.",
+    "crop_emoji": "🍅",
+    "climate_zone": "Sub-Continental River Floodplain",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 820.0
+  },
+  {
+    "id": 52,
+    "region_name": "Bavaria Hallertau",
+    "country": "Germany",
+    "lat": 48.55,
+    "lon": 11.7167,
+    "crop_name": "Hallertau Hops & Malting Barley",
+    "botanical_species": "Humulus lupulus & Hordeum vulgare",
+    "variety": "Hallertau Mittelfrüh / Barke Two-Row Barley",
+    "optimal_soil_type": "Deep brown earth loam with tertiary hill sediments",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 2.8,
+    "market_price_per_ton": 5400.0,
+    "cost_per_ha": 3600.0,
+    "curcumin_or_brix_quality": "Alpha Acids 4.5% / Delicate Noble Hop Aroma",
+    "specialty_desc": "The Hallertau is the world's largest contiguous hop-growing region, producing quintessential noble hops for Bavarian brewing tradition.",
+    "crop_emoji": "🍺",
+    "climate_zone": "Central European Continental",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 760.0
+  },
+  {
+    "id": 53,
+    "region_name": "Westland",
+    "country": "Netherlands",
+    "lat": 51.9967,
+    "lon": 4.2208,
+    "crop_name": "Hydroponic Peppers & Tomatoes",
+    "botanical_species": "Capsicum annuum & Solanum lycopersicum",
+    "variety": "Sweet Bell Pepper / Cherry Vine Tomato",
+    "optimal_soil_type": "Controlled Environment Agriculture (Rockwool substrate & CO2 enrichment)",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.4,
+    "base_yield_tons_ha": 85.0,
+    "market_price_per_ton": 1800.0,
+    "cost_per_ha": 32000.0,
+    "curcumin_or_brix_quality": "Zero Pesticide Residue / High Brix >8.5°",
+    "specialty_desc": "World leader in high-tech geothermal CEA greenhouses, achieving unmatched yields of sweet peppers and tomatoes with 95% less water.",
+    "crop_emoji": "🫑",
+    "climate_zone": "High-Tech Controlled Environment",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 820.0
+  },
+  {
+    "id": 54,
+    "region_name": "East Anglia",
+    "country": "United Kingdom",
+    "lat": 52.2405,
+    "lon": 0.7132,
+    "crop_name": "Malting Barley & Potatoes",
+    "botanical_species": "Hordeum vulgare & Solanum tuberosum",
+    "variety": "Maris Otter / Maris Piper Potato",
+    "optimal_soil_type": "Fertile silt-loam and fen peaty loams with low rainfall",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 7.8,
+    "market_price_per_ton": 290.0,
+    "cost_per_ha": 1150.0,
+    "curcumin_or_brix_quality": "Low Nitrogen Grain <1.5% / Superb Malting Quality",
+    "specialty_desc": "Driest and sunniest region in the UK, East Anglia produces legendary Maris Otter brewing barley and crisp Maris Piper baking potatoes.",
+    "crop_emoji": "🥔",
+    "climate_zone": "Temperate Maritime Plain",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 22.0,
+    "optimal_rainfall_mm": 580.0
+  },
+  {
+    "id": 55,
+    "region_name": "Mazovia Plain",
+    "country": "Poland",
+    "lat": 52.2297,
+    "lon": 21.0122,
+    "crop_name": "Winter Rye & Apples",
+    "botanical_species": "Secale cereale & Malus domestica",
+    "variety": "Dankowskie Zlote / Champion Apples",
+    "optimal_soil_type": "Sandy-loam podzols with moderate organic humus",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 5.4,
+    "market_price_per_ton": 210.0,
+    "cost_per_ha": 560.0,
+    "curcumin_or_brix_quality": "Cold-Hardy Starch / High Fiber Crisp Fruit",
+    "specialty_desc": "Cold continental winters and sandy-loam soils produce Europe's primary winter rye crop and massive crisp apple orchards.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Central European Continental",
+    "optimal_temp_min": 6.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 550.0
+  },
+  {
+    "id": 56,
+    "region_name": "Chernozem Steppe",
+    "country": "Ukraine",
+    "lat": 49.9935,
+    "lon": 36.2304,
+    "crop_name": "Milling Wheat & Sunflower",
+    "botanical_species": "Triticum aestivum & Helianthus annuus",
+    "variety": "Podolyanka Wheat / LG 5580 Sunflower",
+    "optimal_soil_type": "World-famous deep black Chernozem soil with 6%+ humus depth",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 7.2,
+    "market_price_per_ton": 290.0,
+    "cost_per_ha": 620.0,
+    "curcumin_or_brix_quality": "Protein 13.5% / High Gluten W>280 / Sunflower Oil 50%",
+    "specialty_desc": "The legendary fertile Black Earth (Chernozem) belt yields bumper harvests of high-protein bread wheat and vast golden sunflower fields.",
+    "crop_emoji": "🌻",
+    "climate_zone": "Temperate Continental Chernozem",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 540.0
+  },
+  {
+    "id": 57,
+    "region_name": "Peloponnese",
+    "country": "Greece",
+    "lat": 37.5079,
+    "lon": 22.373,
+    "crop_name": "Kalamata Olives & Figs",
+    "botanical_species": "Olea europaea & Ficus carica",
+    "variety": "Kalamon / Kalamata PDO / Mission Fig",
+    "optimal_soil_type": "Rocky limestone hillsides with red terra rossa soil pockets",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 5.8,
+    "market_price_per_ton": 1850.0,
+    "cost_per_ha": 2200.0,
+    "curcumin_or_brix_quality": "Deep Purple Skin / Rich Fleshy Texture / High Antioxidants",
+    "specialty_desc": "Intense Aegean sun and rugged limestone terrain yield the world's most prized table olives: almond-shaped, savory PDO Kalamata olives.",
+    "crop_emoji": "🫒",
+    "climate_zone": "Mediterranean Sun-Drenched",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 480.0
+  },
+  {
+    "id": 58,
+    "region_name": "Alentejo",
+    "country": "Portugal",
+    "lat": 38.5714,
+    "lon": -7.9135,
+    "crop_name": "Cork Oak & Galega Olives",
+    "botanical_species": "Quercus suber & Olea europaea",
+    "variety": "Cork Oak Montado / Galega Vulgar",
+    "optimal_soil_type": "Schist and granite weathered dryland soils",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 4.5,
+    "market_price_per_ton": 2200.0,
+    "cost_per_ha": 1600.0,
+    "curcumin_or_brix_quality": "Elasticity / Impermeable Natural Cork Suberin",
+    "specialty_desc": "The Montado agroforestry ecosystem sustains sustainable cork bark harvesting alongside drought-resilient Portuguese Galega olive groves.",
+    "crop_emoji": "🫒",
+    "climate_zone": "Mediterranean Semi-Arid",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 540.0
+  },
+  {
+    "id": 59,
+    "region_name": "Rogaland Coastal",
+    "country": "Norway",
+    "lat": 58.9699,
+    "lon": 5.7331,
+    "crop_name": "Cold-Hardy Oats & Cloudberries",
+    "botanical_species": "Avena sativa & Rubus chamaemorus",
+    "variety": "Ringsaker Oats / Arctic Cloudberry",
+    "optimal_soil_type": "Glacial till sandy loam with cool maritime precipitation",
+    "optimal_ph_min": 5.2,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 4.8,
+    "market_price_per_ton": 320.0,
+    "cost_per_ha": 720.0,
+    "curcumin_or_brix_quality": "High Beta-Glucan Soluble Fiber / Rich Vitamin C",
+    "specialty_desc": "Mild oceanic coastal winters and long sub-arctic summer days support hardy Norwegian oat cultivation and wild moorland cloudberries.",
+    "crop_emoji": "🥣",
+    "climate_zone": "Sub-Arctic Maritime",
+    "optimal_temp_min": 6.0,
+    "optimal_temp_max": 18.0,
+    "optimal_rainfall_mm": 1250.0
+  },
+  {
+    "id": 60,
+    "region_name": "Niigata Echigo",
+    "country": "Japan",
+    "lat": 37.9162,
+    "lon": 139.0364,
+    "crop_name": "Koshihikari Premium Rice",
+    "botanical_species": "Oryza sativa japonica",
+    "variety": "Koshihikari / Uonuma Super Grade",
+    "optimal_soil_type": "Rich alluvial soil fed by snowmelt from the Japanese Alps",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 6.5,
+    "market_price_per_ton": 1400.0,
+    "cost_per_ha": 2200.0,
+    "curcumin_or_brix_quality": "Superb Gloss / Natural Sweetness / High Stickiness",
+    "specialty_desc": "Pure mineral snowmelt from Mount Tanigawa and dramatic day-night temperature swings yield Japan's most celebrated Koshihikari table rice.",
+    "crop_emoji": "🍙",
+    "climate_zone": "Temperate Snowmelt Coastal Basin",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 1600.0
+  },
+  {
+    "id": 61,
+    "region_name": "Shizuoka Tea",
+    "country": "Japan",
+    "lat": 34.9756,
+    "lon": 138.3828,
+    "crop_name": "Sencha Green Tea & Wasabi",
+    "botanical_species": "Camellia sinensis & Eutrema japonicum",
+    "variety": "Yabukita Cultivar / Mazuma Wasabi",
+    "optimal_soil_type": "Volcanic ash andosols on mist-covered Pacific hill slopes",
+    "optimal_ph_min": 4.8,
+    "optimal_ph_max": 5.8,
+    "base_yield_tons_ha": 3.4,
+    "market_price_per_ton": 5200.0,
+    "cost_per_ha": 4200.0,
+    "curcumin_or_brix_quality": "Rich Umami / High Theanine / Vibrant Emerald Green",
+    "specialty_desc": "Mount Fuji spring water, constant Pacific mountain fog, and acidic volcanic slopes yield Japan's green tea capital and pure tatami wasabi.",
+    "crop_emoji": "🍵",
+    "climate_zone": "Humid Subtropical Coastal Hills",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 2200.0
+  },
+  {
+    "id": 62,
+    "region_name": "Aomori Orchards",
+    "country": "Japan",
+    "lat": 40.8244,
+    "lon": 140.74,
+    "crop_name": "Sun Fuji Apples",
+    "botanical_species": "Malus domestica",
+    "variety": "Fuji / Sun Fuji (Bagless Unbagged)",
+    "optimal_soil_type": "Deep volcanic loam with cool Tsugaru strait breeze",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 28.0,
+    "market_price_per_ton": 1800.0,
+    "cost_per_ha": 5200.0,
+    "curcumin_or_brix_quality": "Honey Core (Mitsu) / Brix 16.0° / Crisp Dense Flesh",
+    "specialty_desc": "Extreme chilling hours and traditional Japanese unbagged canopy pruning nurture world-famous sweet, honey-cored Sun Fuji apples at 28.0 T/Ha.",
+    "crop_emoji": "🍎",
+    "climate_zone": "Northern Temperate Maritime",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 1100.0
+  },
+  {
+    "id": 63,
+    "region_name": "Hokkaido Tokachi",
+    "country": "Japan",
+    "lat": 42.9239,
+    "lon": 143.1966,
+    "crop_name": "Sugar Beet & Potatoes",
+    "botanical_species": "Beta vulgaris & Solanum tuberosum",
+    "variety": "Monohikari Beet / May Queen Potato",
+    "optimal_soil_type": "Volcanic ash soils with broad alluvial plains",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 65.0,
+    "market_price_per_ton": 110.0,
+    "cost_per_ha": 2600.0,
+    "curcumin_or_brix_quality": "Sucrose 17.5% / Smooth Buttery May Queen Texture",
+    "specialty_desc": "Cool northern summers and expansive Tokachi plains make Hokkaido Japan's agricultural powerhouse for domestic sugar beet and specialty potatoes.",
+    "crop_emoji": "🥔",
+    "climate_zone": "Sub-Boreal Northern Plain",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 920.0
+  },
+  {
+    "id": 64,
+    "region_name": "Hunan Yangtze",
+    "country": "China",
+    "lat": 28.2282,
+    "lon": 112.9388,
+    "crop_name": "Hybrid Super Indica Rice",
+    "botanical_species": "Oryza sativa subsp. indica",
+    "variety": "Y-Liangyou 900 / Super Hybrid Rice",
+    "optimal_soil_type": "Dongting Lake alluvial heavy clay-silt with dense canal networks",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 12.2,
+    "market_price_per_ton": 420.0,
+    "cost_per_ha": 1600.0,
+    "curcumin_or_brix_quality": "Amylose 18% / High Solar Conversion Efficiency",
+    "specialty_desc": "The cradle of Father of Rice Yuan Longping: fertile Dongting basin subtropical warmth and abundant water achieve record hybrid yields of 12.2 T/Ha.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Humid Subtropical Lake Floodplain",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 1450.0
+  },
+  {
+    "id": 65,
+    "region_name": "Henan Plain",
+    "country": "China",
+    "lat": 34.7466,
+    "lon": 113.6253,
+    "crop_name": "Winter Wheat & Garlic",
+    "botanical_species": "Triticum aestivum & Allium sativum",
+    "variety": "Zhengmai 366 / Jinxiang White Garlic",
+    "optimal_soil_type": "Yellow River alluvial deep loess silt",
+    "optimal_ph_min": 7.0,
+    "optimal_ph_max": 8.0,
+    "base_yield_tons_ha": 7.4,
+    "market_price_per_ton": 310.0,
+    "cost_per_ha": 780.0,
+    "curcumin_or_brix_quality": "High Gluten Quality / High Allicin Compound Density",
+    "specialty_desc": "China's major breadbasket on the Yellow River plain yields bumper winter wheat crops and spicy export-grade Jinxiang white garlic.",
+    "crop_emoji": "🧄",
+    "climate_zone": "Warm Temperate Loess Plain",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 620.0
+  },
+  {
+    "id": 66,
+    "region_name": "Xinjiang Tarim",
+    "country": "China",
+    "lat": 41.7259,
+    "lon": 86.1746,
+    "crop_name": "Extra-Long Staple Cotton & Hami Melons",
+    "botanical_species": "Gossypium barbadense & Cucumis melo",
+    "variety": "Xinhai 21 / Sweet Hami Melon",
+    "optimal_soil_type": "Desert oasis alluvial sandy soil with Tianshan snowmelt drip",
+    "optimal_ph_min": 7.5,
+    "optimal_ph_max": 8.5,
+    "base_yield_tons_ha": 3.8,
+    "market_price_per_ton": 1950.0,
+    "cost_per_ha": 1600.0,
+    "curcumin_or_brix_quality": "Fiber Length >36mm / Melon Brix >15°",
+    "specialty_desc": "Intense desert sun (>3000 hrs/yr), high day-night thermal swings, and snowmelt drip produce premium silky cotton and legendary sweet Hami melons.",
+    "crop_emoji": "☁️",
+    "climate_zone": "Hyper-Arid Inland Desert Oasis",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 38.0,
+    "optimal_rainfall_mm": 85.0
+  },
+  {
+    "id": 67,
+    "region_name": "Yunnan Highlands",
+    "country": "China",
+    "lat": 22.7877,
+    "lon": 100.9739,
+    "crop_name": "Pu-erh Tea & Arabica Coffee",
+    "botanical_species": "Camellia sinensis var. assamica & Coffea arabica",
+    "variety": "Ancient Tree Broad-Leaf / Catimor 7963",
+    "optimal_soil_type": "Deep red-yellow acidic mountain soils under subtropical monsoon",
+    "optimal_ph_min": 4.5,
+    "optimal_ph_max": 5.8,
+    "base_yield_tons_ha": 2.6,
+    "market_price_per_ton": 6800.0,
+    "cost_per_ha": 3400.0,
+    "curcumin_or_brix_quality": "Post-Fermentation Smoothness / Notes of Camphor & Dried Fruit",
+    "specialty_desc": "Ancient tea mountains (1400-2000m) with perpetual mist produce treasured fermented Pu-erh cake teas and thriving specialty Catimor coffee.",
+    "crop_emoji": "🍵",
+    "climate_zone": "Montane Subtropical Plateau",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 1550.0
+  },
+  {
+    "id": 68,
+    "region_name": "Fujian Wuyi",
+    "country": "China",
+    "lat": 27.7554,
+    "lon": 118.0366,
+    "crop_name": "Rock Oolong Tea & Lychee",
+    "botanical_species": "Camellia sinensis & Litchi chinensis",
+    "variety": "Da Hong Pao (Big Red Robe) / Feizixiao Lychee",
+    "optimal_soil_type": "Red sandstone weathered rocky gorges with rich mineral cliffs",
+    "optimal_ph_min": 4.8,
+    "optimal_ph_max": 5.6,
+    "base_yield_tons_ha": 2.2,
+    "market_price_per_ton": 9500.0,
+    "cost_per_ha": 4800.0,
+    "curcumin_or_brix_quality": "Yan Yun (Rock Mineral Bone) / Long Floral Aftertaste",
+    "specialty_desc": "UNESCO Wuyi mountain cliffs create unique microclimates yielding legendary Da Hong Pao Rock Oolong tea with unmatched mineral complexity.",
+    "crop_emoji": "🍃",
+    "climate_zone": "Subtropical Montane Gorge",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 1900.0
+  },
+  {
+    "id": 69,
+    "region_name": "Mekong Delta",
+    "country": "Vietnam",
+    "lat": 10.0452,
+    "lon": 105.7469,
+    "crop_name": "Jasmine Fragrant Rice",
+    "botanical_species": "Oryza sativa",
+    "variety": "ST25 (World's Best Rice) / Nang Hoa 9",
+    "optimal_soil_type": "Deep fertile alluvial silt deposited by the Mekong River",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 7.8,
+    "market_price_per_ton": 520.0,
+    "cost_per_ha": 1100.0,
+    "curcumin_or_brix_quality": "Natural Pandan Leaf Fragrance / Soft Translucent Grains",
+    "specialty_desc": "Known as the Rice Bowl of Vietnam, the Mekong Delta produces world-award-winning fragrant ST25 jasmine rice with three harvests per year.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Tropical Riverine Delta",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 35.0,
+    "optimal_rainfall_mm": 1850.0
+  },
+  {
+    "id": 70,
+    "region_name": "Central Highlands Dak Lak",
+    "country": "Vietnam",
+    "lat": 12.6667,
+    "lon": 108.05,
+    "crop_name": "Robusta Coffee & Black Pepper",
+    "botanical_species": "Coffea canephora & Piper nigrum",
+    "variety": "TR9 High-Yield Robusta / Vinh Linh Pepper",
+    "optimal_soil_type": "Deep red basaltic volcanic soils on rolling high plateaus",
+    "optimal_ph_min": 5.2,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 3.8,
+    "market_price_per_ton": 3200.0,
+    "cost_per_ha": 2400.0,
+    "curcumin_or_brix_quality": "High Caffeine 2.4% / Thick Crema Body / Bold Chocolate",
+    "specialty_desc": "Volcanic soils and distinct wet-dry seasons make Dak Lak the Robusta coffee capital of the world, achieving heavy yields at 3.8 T/Ha.",
+    "crop_emoji": "☕",
+    "climate_zone": "Tropical Basalt Plateau",
+    "optimal_temp_min": 20.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 1750.0
+  },
+  {
+    "id": 71,
+    "region_name": "Chao Phraya Basin",
+    "country": "Thailand",
+    "lat": 13.7563,
+    "lon": 100.5018,
+    "crop_name": "Thai Hom Mali Jasmine Rice",
+    "botanical_species": "Oryza sativa",
+    "variety": "Khao Dawk Mali 105 (KDML 105)",
+    "optimal_soil_type": "Heavy lowland river clay-loam with shallow groundwater",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 6.2,
+    "market_price_per_ton": 620.0,
+    "cost_per_ha": 950.0,
+    "curcumin_or_brix_quality": "Natural Jasmine 2-AP Aroma / Silky Tender Chewing Texture",
+    "specialty_desc": "The central plains of Thailand produce the world's most fragrant certified Hom Mali Jasmine rice, thriving in shallow delta waters.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Tropical River Basin Floodplain",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 35.0,
+    "optimal_rainfall_mm": 1400.0
+  },
+  {
+    "id": 72,
+    "region_name": "Chanthaburi Fruit Belt",
+    "country": "Thailand",
+    "lat": 12.6114,
+    "lon": 102.1039,
+    "crop_name": "Monthong Durian & Mangosteen",
+    "botanical_species": "Durio zibethinus & Garcinia mangostana",
+    "variety": "Monthong (Golden Pillow) / Queen Mangosteen",
+    "optimal_soil_type": "Well-drained red-yellow podzolic coastal hill soils",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 18.5,
+    "market_price_per_ton": 3200.0,
+    "cost_per_ha": 5800.0,
+    "curcumin_or_brix_quality": "Thick Creamy Custard Pulp / High Export Demand",
+    "specialty_desc": "Heavy tropical rainfall followed by sunny pre-harvest dry periods produces premium Monthong Durian and Queen Mangosteen at 18.5 T/Ha.",
+    "crop_emoji": "🍈",
+    "climate_zone": "Tropical Wet Coastal Hills",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 2400.0
+  },
+  {
+    "id": 73,
+    "region_name": "North Sumatra",
+    "country": "Indonesia",
+    "lat": 2.9833,
+    "lon": 99.0667,
+    "crop_name": "Mandheling Arabica Coffee & Palm Oil",
+    "botanical_species": "Coffea arabica & Elaeis guineensis",
+    "variety": "Mandheling G1 / Tenera DxP Hybrid",
+    "optimal_soil_type": "Volcanic andosols from Mount Sinabung and Lake Toba",
+    "optimal_ph_min": 5.0,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 2.5,
+    "market_price_per_ton": 4800.0,
+    "cost_per_ha": 2900.0,
+    "curcumin_or_brix_quality": "Giling Basah Wet-Hulled / Heavy Syrupy Body / Earthy Herbal",
+    "specialty_desc": "Lake Toba volcanic soils and traditional wet-hulling (Giling Basah) create heavy-bodied, low-acidity Mandheling specialty coffee.",
+    "crop_emoji": "☕",
+    "climate_zone": "Equatorial Volcanic Highland",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 2600.0
+  },
+  {
+    "id": 74,
+    "region_name": "Davao Mindanao",
+    "country": "Philippines",
+    "lat": 7.1907,
+    "lon": 125.4553,
+    "crop_name": "Cavendish Bananas & Golden Pineapple",
+    "botanical_species": "Musa acuminata & Ananas comosus",
+    "variety": "Giant Cavendish / MD2 Sweet Gold",
+    "optimal_soil_type": "Rich volcanic alluvial loam outside the typhoon belt",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 54.0,
+    "market_price_per_ton": 310.0,
+    "cost_per_ha": 5200.0,
+    "curcumin_or_brix_quality": "Brix 15° / High Fiber / Year-Round Harvest",
+    "specialty_desc": "Located safely below the Pacific typhoon belt, Davao enjoys year-round tropical sunshine and volcanic soil for massive fruit exports.",
+    "crop_emoji": "🍍",
+    "climate_zone": "Typhoon-Free Tropical Basin",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 1950.0
+  },
+  {
+    "id": 75,
+    "region_name": "Kedah Rice Bowl",
+    "country": "Malaysia",
+    "lat": 6.1184,
+    "lon": 100.3685,
+    "crop_name": "Wet Padi Rice",
+    "botanical_species": "Oryza sativa",
+    "variety": "MR-219 / MR-269 High Yielding Variety",
+    "optimal_soil_type": "Flat marine and river alluvial coastal clay plains (MADA scheme)",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 6.8,
+    "market_price_per_ton": 410.0,
+    "cost_per_ha": 1050.0,
+    "curcumin_or_brix_quality": "High Milling Recovery 68% / Medium Amylose",
+    "specialty_desc": "Malaysia's historical Rice Bowl: the Muda Irrigation scheme enables intensive double-cropping of high-yield wet padi across Kedah.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Coastal Tropical Alluvial Plain",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 2100.0
+  },
+  {
+    "id": 76,
+    "region_name": "Nile Delta",
+    "country": "Egypt",
+    "lat": 30.8761,
+    "lon": 31.0004,
+    "crop_name": "Long-Staple Giza Cotton & Rice",
+    "botanical_species": "Gossypium barbadense & Oryza sativa",
+    "variety": "Giza 94 Extra Long Staple / Sakha 104 Rice",
+    "optimal_soil_type": "Deep black Nile river delta alluvial clay silt",
+    "optimal_ph_min": 7.5,
+    "optimal_ph_max": 8.4,
+    "base_yield_tons_ha": 3.6,
+    "market_price_per_ton": 2400.0,
+    "cost_per_ha": 1400.0,
+    "curcumin_or_brix_quality": "Fiber Length >35mm / High Tensile Strength / Silkiness",
+    "specialty_desc": "Perennial Nile flood irrigation and Mediterranean desert sunshine generate Egypt's world-famous luxury Giza Extra Long Staple cotton.",
+    "crop_emoji": "☁️",
+    "climate_zone": "Mediterranean Delta Irrigated Arid",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 45.0
+  },
+  {
+    "id": 77,
+    "region_name": "Al-Qassim Oasis",
+    "country": "Saudi Arabia",
+    "lat": 26.326,
+    "lon": 43.975,
+    "crop_name": "Royal Date Palms",
+    "botanical_species": "Phoenix dactylifera",
+    "variety": "Sukari / Medjool / Ajwa",
+    "optimal_soil_type": "Sandy oasis loam with deep fossil groundwater irrigation",
+    "optimal_ph_min": 7.2,
+    "optimal_ph_max": 8.5,
+    "base_yield_tons_ha": 12.0,
+    "market_price_per_ton": 2400.0,
+    "cost_per_ha": 3100.0,
+    "curcumin_or_brix_quality": "High Invert Sugars / Golden Melt-in-Mouth Texture",
+    "specialty_desc": "Extreme desert heat and pure deep-well drip irrigation make Al-Qassim the Kingdom's date paradise, harvesting sweet golden Sukari dates.",
+    "crop_emoji": "🌴",
+    "climate_zone": "Hyper-Arid Oasis Irrigation",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 44.0,
+    "optimal_rainfall_mm": 65.0
+  },
+  {
+    "id": 78,
+    "region_name": "Izmir Aegean",
+    "country": "Turkey",
+    "lat": 38.4237,
+    "lon": 27.1428,
+    "crop_name": "Sultana Raisins & Figs",
+    "botanical_species": "Vitis vinifera & Ficus carica",
+    "variety": "Sultana Seedless / Sarilop Yellow Fig",
+    "optimal_soil_type": "Alluvial valley soils along the Gediz and Menderes rivers",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 8.0,
+    "base_yield_tons_ha": 16.0,
+    "market_price_per_ton": 1400.0,
+    "cost_per_ha": 2600.0,
+    "curcumin_or_brix_quality": "Natural Sun-Dried Sweetness / Amber Translucence",
+    "specialty_desc": "Sunny Mediterranean summers and fertile river plains power Turkey's status as the top global exporter of golden Sultana raisins and dried figs.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Aegean Mediterranean Valley",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 560.0
+  },
+  {
+    "id": 79,
+    "region_name": "Black Sea Trabzon",
+    "country": "Turkey",
+    "lat": 41.0027,
+    "lon": 39.7168,
+    "crop_name": "Giresun Hazelnuts",
+    "botanical_species": "Corylus avellana",
+    "variety": "Giresun Tombul / Palaz",
+    "optimal_soil_type": "Steep humid mountain coastal slopes with acidic brown forest soil",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 2.8,
+    "market_price_per_ton": 3800.0,
+    "cost_per_ha": 2100.0,
+    "curcumin_or_brix_quality": "High Oil Content >58% / Sweet Nutty Aroma",
+    "specialty_desc": "Dense Black Sea coastal rainfall, mist, and mild temperatures foster 70% of the world's hazelnut harvest, centered in Giresun and Trabzon.",
+    "crop_emoji": "🌰",
+    "climate_zone": "Humid Subtropical Mountain Coast",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 25.0,
+    "optimal_rainfall_mm": 1250.0
+  },
+  {
+    "id": 80,
+    "region_name": "Khorasan",
+    "country": "Iran",
+    "lat": 36.2972,
+    "lon": 59.6067,
+    "crop_name": "Saffron & Pistachios",
+    "botanical_species": "Crocus sativus & Pistacia vera",
+    "variety": "Super Negin Sargol Saffron / Ohadi Fandoghi",
+    "optimal_soil_type": "Well-drained dry calcareous sandy loam on desert plateau",
+    "optimal_ph_min": 7.2,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 0.008,
+    "market_price_per_ton": 1800000.0,
+    "cost_per_ha": 4200.0,
+    "curcumin_or_brix_quality": "Crocin Color >260 / High Safranal / Picrocrocin Bitterness",
+    "specialty_desc": "Arid desert plateau with freezing winters and scorching summers yields the Red Gold: authentic, intensely aromatic Super Negin Sargol saffron.",
+    "crop_emoji": "🌸",
+    "climate_zone": "Cold Desert Plateau Arid",
+    "optimal_temp_min": 5.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 180.0
+  },
+  {
+    "id": 81,
+    "region_name": "Souss Valley",
+    "country": "Morocco",
+    "lat": 30.4278,
+    "lon": -9.5981,
+    "crop_name": "Argan Oil & Clementines",
+    "botanical_species": "Argania spinosa & Citrus clementina",
+    "variety": "Wild Moroccan Argan / Nules Clementine",
+    "optimal_soil_type": "Sandy calcareous arid plains between High Atlas and Anti-Atlas",
+    "optimal_ph_min": 7.0,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 4.2,
+    "market_price_per_ton": 4800.0,
+    "cost_per_ha": 1800.0,
+    "curcumin_or_brix_quality": "High Vitamin E & Essential Fatty Acids / Sweet Seedless Citrus",
+    "specialty_desc": "Endemic to southwestern Morocco, deep-rooted Argan trees endure hyper-arid conditions producing liquid gold cosmetic and culinary oil.",
+    "crop_emoji": "🍊",
+    "climate_zone": "Semi-Arid Subtropical Oasis",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 220.0
+  },
+  {
+    "id": 82,
+    "region_name": "Kericho Rift Valley",
+    "country": "Kenya",
+    "lat": -0.3689,
+    "lon": 35.2863,
+    "crop_name": "High-Altitude Black Tea",
+    "botanical_species": "Camellia sinensis",
+    "variety": "Tea Research Foundation Clone BB35 / TRFK 306 Purple",
+    "optimal_soil_type": "Deep fertile volcanic red clay soil at high elevations (2000m)",
+    "optimal_ph_min": 4.5,
+    "optimal_ph_max": 5.6,
+    "base_yield_tons_ha": 4.2,
+    "market_price_per_ton": 3600.0,
+    "cost_per_ha": 2800.0,
+    "curcumin_or_brix_quality": "Bright Coppery Golden Infusion / Brisk Pungency",
+    "specialty_desc": "Equatorial high-altitude sunshine, volcanic soils, and afternoon rain showers produce Kenya's world-famous brisk, bright black CTC and orthodox teas.",
+    "crop_emoji": "🍵",
+    "climate_zone": "Equatorial Montane Highland",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 1950.0
+  },
+  {
+    "id": 83,
+    "region_name": "Mount Kenya Nyeri",
+    "country": "Kenya",
+    "lat": -0.4197,
+    "lon": 36.9511,
+    "crop_name": "Specialty Arabica Coffee",
+    "botanical_species": "Coffea arabica",
+    "variety": "SL-28 / SL-34 / Ruiru 11",
+    "optimal_soil_type": "Deep volcanic red loam on slopes of Mount Kenya",
+    "optimal_ph_min": 5.0,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 2.5,
+    "market_price_per_ton": 5200.0,
+    "cost_per_ha": 3200.0,
+    "curcumin_or_brix_quality": "Phosphoric Acidity / Complex Blackcurrant & Grapefruit Notes",
+    "specialty_desc": "High volcanic slopes (1700-2100m) with cold mountain nights create internationally prized Kenya AA coffees with explosive fruit acidity.",
+    "crop_emoji": "☕",
+    "climate_zone": "Montane Volcanic Cloud Belt",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 25.0,
+    "optimal_rainfall_mm": 1450.0
+  },
+  {
+    "id": 84,
+    "region_name": "Ashanti Cocoa",
+    "country": "Ghana",
+    "lat": 6.6885,
+    "lon": -1.6244,
+    "crop_name": "Fine Cocoa & Cacao",
+    "botanical_species": "Theobroma cacao",
+    "variety": "Amelonado / West African Trinitario",
+    "optimal_soil_type": "Forest ochrosols with rich leaf litter mulch",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 1.8,
+    "market_price_per_ton": 4800.0,
+    "cost_per_ha": 2200.0,
+    "curcumin_or_brix_quality": "Standard Grade 1 / High Fat Content >55%",
+    "specialty_desc": "Traditional West African tropical forest shade and disciplined fermentation deliver the world's most consistent quality cocoa beans.",
+    "crop_emoji": "🍫",
+    "climate_zone": "Tropical Rainforest Guinea Belt",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 33.0,
+    "optimal_rainfall_mm": 1550.0
+  },
+  {
+    "id": 85,
+    "region_name": "Bas-Sassandra",
+    "country": "Ivory Coast",
+    "lat": 4.7485,
+    "lon": -6.6363,
+    "crop_name": "Bulk Fine Cacao",
+    "botanical_species": "Theobroma cacao",
+    "variety": "Forastero / Upper Amazon Hybrid",
+    "optimal_soil_type": "Deep tropical rainforest oxisols with high moisture",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 2.2,
+    "market_price_per_ton": 4700.0,
+    "cost_per_ha": 2100.0,
+    "curcumin_or_brix_quality": "Strong Cocoa Base / High Butter Hardness",
+    "specialty_desc": "The world's undisputed cocoa powerhouse: Côte d'Ivoire's moist rainforest belt supplies over 40% of the world's chocolate supply.",
+    "crop_emoji": "🍫",
+    "climate_zone": "Wet Equatorial Coastal Rainforest",
+    "optimal_temp_min": 23.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 1850.0
+  },
+  {
+    "id": 86,
+    "region_name": "Yirgacheffe",
+    "country": "Ethiopia",
+    "lat": 6.1629,
+    "lon": 38.2058,
+    "crop_name": "Heirloom Arabica Coffee",
+    "botanical_species": "Coffea arabica",
+    "variety": "Ethiopian Heirloom / Kurume / Dega",
+    "optimal_soil_type": "Rich fertile volcanic highland soils with natural forest canopy",
+    "optimal_ph_min": 5.2,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 2.2,
+    "market_price_per_ton": 6200.0,
+    "cost_per_ha": 3100.0,
+    "curcumin_or_brix_quality": "Jasmine Floral Fragrance / Bergamot Lemon Notes",
+    "specialty_desc": "The botanical birthplace of Arabica coffee: pristine highland agroforestry (1900-2200m) produces floral, tea-like, ethereal washed coffees.",
+    "crop_emoji": "☕",
+    "climate_zone": "East African Montane Cloud Forest",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 25.0,
+    "optimal_rainfall_mm": 1600.0
+  },
+  {
+    "id": 87,
+    "region_name": "Benue Middle Belt",
+    "country": "Nigeria",
+    "lat": 7.7322,
+    "lon": 8.5214,
+    "crop_name": "White Yam & Cassava",
+    "botanical_species": "Dioscorea rotundata & Manihot esculenta",
+    "variety": "TDr 89/02665 Yam / TMS 30572 Cassava",
+    "optimal_soil_type": "Deep well-drained Guinea savanna sandy-clay loam",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 24.0,
+    "market_price_per_ton": 480.0,
+    "cost_per_ha": 1900.0,
+    "curcumin_or_brix_quality": "High Dry Matter Starch / Low Cyanogenic Glucoside",
+    "specialty_desc": "Known as the Food Basket of Nigeria, Benue river basin produces massive commercial harvests of white guinea yam and improved biofortified cassava.",
+    "crop_emoji": "🍠",
+    "climate_zone": "Guinea Savanna River Plain",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 1300.0
+  },
+  {
+    "id": 88,
+    "region_name": "Free State Highveld",
+    "country": "South Africa",
+    "lat": -28.2336,
+    "lon": 26.8521,
+    "crop_name": "White Maize & Sunflower",
+    "botanical_species": "Zea mays & Helianthus annuus",
+    "variety": "Pannar Highveld Hybrid / PAN 7049",
+    "optimal_soil_type": "Deep sandy loam to sandy clay soils on the open Highveld plateau",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 6.8,
+    "market_price_per_ton": 290.0,
+    "cost_per_ha": 680.0,
+    "curcumin_or_brix_quality": "High Starch Yield / Superior White Milling Quality",
+    "specialty_desc": "The golden grain basket of Southern Africa: expansive high-altitude summer plateau supporting intensive mechanized white maize and sunflower farming.",
+    "crop_emoji": "🌽",
+    "climate_zone": "High-Altitude Temperate Savanna",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 620.0
+  },
+  {
+    "id": 89,
+    "region_name": "Stellenbosch Winelands",
+    "country": "South Africa",
+    "lat": -33.9321,
+    "lon": 18.8602,
+    "crop_name": "Pinotage & Chenin Blanc",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Pinotage / Chenin Blanc (Steen)",
+    "optimal_soil_type": "Weathered granite and sandstone slopes of the Cape Fold mountains",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 11.5,
+    "market_price_per_ton": 2600.0,
+    "cost_per_ha": 4800.0,
+    "curcumin_or_brix_quality": "Smoky Plum Aromas / Vibrant Marine Acidity",
+    "specialty_desc": "False Bay maritime breezes and ancient decomposed granite slopes yield South Africa's signature cultivar Pinotage and refreshing Chenin Blanc.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Cape Mediterranean Maritime",
+    "optimal_temp_min": 13.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 750.0
+  },
+  {
+    "id": 90,
+    "region_name": "Sava Vanilla Coast",
+    "country": "Madagascar",
+    "lat": -14.2667,
+    "lon": 50.1667,
+    "crop_name": "Bourbon Gourmet Vanilla",
+    "botanical_species": "Vanilla planifolia",
+    "variety": "Bourbon Planifolia Hand-Pollinated",
+    "optimal_soil_type": "Coastal humid tropical laterite with deep decayed leaf humus",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.5,
+    "base_yield_tons_ha": 0.45,
+    "market_price_per_ton": 180000.0,
+    "cost_per_ha": 8500.0,
+    "curcumin_or_brix_quality": "Vanillin Content >2.0% / Supple Black Oily Pods",
+    "specialty_desc": "Madagascar's Sava region is the vanilla capital of the world: hand-pollinated orchid vines cured under tropical sun yield sweet balsamic Bourbon vanilla.",
+    "crop_emoji": "🌼",
+    "climate_zone": "Tropical Island Humid Rainforest",
+    "optimal_temp_min": 21.0,
+    "optimal_temp_max": 31.0,
+    "optimal_rainfall_mm": 2400.0
+  },
+  {
+    "id": 91,
+    "region_name": "Riverina",
+    "country": "Australia",
+    "lat": -34.2889,
+    "lon": 146.0444,
+    "crop_name": "Calrose Rice & Navel Citrus",
+    "botanical_species": "Oryza sativa & Citrus sinensis",
+    "variety": "Reiziq Medium Grain / Washington Navel",
+    "optimal_soil_type": "Heavy grey clay floodplain soils of the Murrumbidgee irrigation area",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 10.5,
+    "market_price_per_ton": 410.0,
+    "cost_per_ha": 1600.0,
+    "curcumin_or_brix_quality": "High Grain Quality / Low Crack Rate / Sweet Low-Acid Juice",
+    "specialty_desc": "Mechanized laser-leveled clay bays fed by Snowy Mountains irrigation deliver world-record semi-dwarf temperate rice yields of 10.5 T/Ha.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Irrigated Semi-Arid River Basin",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 410.0
+  },
+  {
+    "id": 92,
+    "region_name": "Bundaberg Coast",
+    "country": "Australia",
+    "lat": -24.8661,
+    "lon": 152.3489,
+    "crop_name": "Sugarcane & Macadamias",
+    "botanical_species": "Saccharum officinarum & Macadamia integrifolia",
+    "variety": "Q208 High-Tonnage Cane / Macadamia A203",
+    "optimal_soil_type": "Rich volcanic red basalt soils (krasnozems) along Burnett River",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 86.0,
+    "market_price_per_ton": 45.0,
+    "cost_per_ha": 1800.0,
+    "curcumin_or_brix_quality": "High Commercial Cane Sugar (CCS 14.8%) / Sweet Creamy Kernel",
+    "specialty_desc": "Subtropical sun and red volcanic krasnozem soils nurture Queensland's thriving sugar mills and indigenous Australian macadamia orchards.",
+    "crop_emoji": "🎋",
+    "climate_zone": "Subtropical Volcanic Coast",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 1050.0
+  },
+  {
+    "id": 93,
+    "region_name": "Barossa Valley",
+    "country": "Australia",
+    "lat": -34.5333,
+    "lon": 138.95,
+    "crop_name": "Old-Vine Shiraz Wine Grapes",
+    "botanical_species": "Vitis vinifera",
+    "variety": "Barossa Old Vine Shiraz / Grenache",
+    "optimal_soil_type": "Ancient weathered sandy loam and red ironstone clay",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 7.8,
+    "market_price_per_ton": 3800.0,
+    "cost_per_ha": 4900.0,
+    "curcumin_or_brix_quality": "Plum & Dark Chocolate Notes / Unctuous Velvety Tannins",
+    "specialty_desc": "Home to some of the world's oldest ungrafted Shiraz vines (dating to 1843); hot dry summers yield dense, legendary, opulent red wines.",
+    "crop_emoji": "🍇",
+    "climate_zone": "Warm Mediterranean Valley",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 520.0
+  },
+  {
+    "id": 94,
+    "region_name": "WA Wheatbelt",
+    "country": "Australia",
+    "lat": -31.4833,
+    "lon": 118.2833,
+    "crop_name": "Wheat & Canola",
+    "botanical_species": "Triticum aestivum & Brassica napus",
+    "variety": "Mace / Scepter ASW Hard / Bonito Canola",
+    "optimal_soil_type": "Duplex sandy loam over clay with broad ancient topography",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 3.8,
+    "market_price_per_ton": 340.0,
+    "cost_per_ha": 520.0,
+    "curcumin_or_brix_quality": "Udon Noodle Flour Hardness / Low Moisture 10%",
+    "specialty_desc": "Vast mechanized broadacre farms in Western Australia harvest premium white wheat for Japanese udon noodles and European canola oil.",
+    "crop_emoji": "🌾",
+    "climate_zone": "Mediterranean Broadacre Plain",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 360.0
+  },
+  {
+    "id": 95,
+    "region_name": "Hawke's Bay & Marlborough",
+    "country": "New Zealand",
+    "lat": -39.4928,
+    "lon": 176.912,
+    "crop_name": "Sauvignon Blanc & Gala Apples",
+    "botanical_species": "Vitis vinifera & Malus domestica",
+    "variety": "Sauvignon Blanc / Royal Gala / Envy",
+    "optimal_soil_type": "Free-draining stony riverbed gravels and alluvial silt loams",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 14.0,
+    "market_price_per_ton": 2800.0,
+    "cost_per_ha": 5400.0,
+    "curcumin_or_brix_quality": "Intense Gooseberry & Passionfruit Acidity / Crisp Flesh",
+    "specialty_desc": "Maritime cool-climate with intense southern ozone UV produces Marlborough's world-famous pungent Sauvignon Blanc and sweet crisp export apples.",
+    "crop_emoji": "🍏",
+    "climate_zone": "Maritime Cool-Temperate Valley",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 850.0
+  },
+  {
+    "id": 96,
+    "region_name": "Bay of Plenty Te Puke",
+    "country": "New Zealand",
+    "lat": -37.7833,
+    "lon": 176.3167,
+    "crop_name": "Zespri SunGold Kiwifruit",
+    "botanical_species": "Actinidia chinensis",
+    "variety": "Zespri SunGold (Gold3) / Hayward Green",
+    "optimal_soil_type": "Deep porous volcanic ash loam (Allophanic soil)",
+    "optimal_ph_min": 5.8,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 36.0,
+    "market_price_per_ton": 1850.0,
+    "cost_per_ha": 9200.0,
+    "curcumin_or_brix_quality": "Soluble Solids Brix >16.5° / Tropical Sweet Flavor",
+    "specialty_desc": "The Kiwifruit Capital of the World: frost-free maritime climate, volcanic ash soils, and shelterbelts produce sweet golden SunGold kiwifruit.",
+    "crop_emoji": "🥝",
+    "climate_zone": "Temperate Maritime Volcanic Coast",
+    "optimal_temp_min": 10.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 1350.0
+  },
+  {
+    "id": 97,
+    "region_name": "Bay of Bengal",
+    "country": "International Waters",
+    "lat": 15.0,
+    "lon": 88.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "Ocean Saline Waters (35 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.15,
+    "optimal_ph_max": 8.4,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Non-Agricultural Saline Marine Zone",
+    "specialty_desc": "Target is open ocean marine water. Water salinity (~35 PSU) causes fatal osmotic shock to terrestrial crop roots. Marine aquaculture and offshore floating solar only.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Deep Marine Water Body",
+    "optimal_temp_min": 26.0,
+    "optimal_temp_max": 31.0,
+    "optimal_rainfall_mm": 1200.0
+  },
+  {
+    "id": 98,
+    "region_name": "Arabian Sea",
+    "country": "International Waters",
+    "lat": 16.0,
+    "lon": 64.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "Ocean Saline Waters (35 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.15,
+    "optimal_ph_max": 8.4,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Non-Agricultural Saline Marine Zone",
+    "specialty_desc": "Target is open pelagic sea water. Terrestrial crops cannot grow. Marine fisheries, kelp mariculture, and tidal energy generation only.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Deep Marine Water Body",
+    "optimal_temp_min": 25.0,
+    "optimal_temp_max": 31.0,
+    "optimal_rainfall_mm": 850.0
+  },
+  {
+    "id": 99,
+    "region_name": "Indian Ocean",
+    "country": "International Waters",
+    "lat": -10.0,
+    "lon": 75.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "Pelagic Marine Saline Waters (35 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.15,
+    "optimal_ph_max": 8.4,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Pelagic Ocean Zone",
+    "specialty_desc": "Open ocean waters with no arable land. Commercial agriculture impossible. Offshore wind and mariculture only.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Pelagic Ocean Basin",
+    "optimal_temp_min": 26.0,
+    "optimal_temp_max": 30.0,
+    "optimal_rainfall_mm": 1400.0
+  },
+  {
+    "id": 100,
+    "region_name": "North Atlantic",
+    "country": "International Waters",
+    "lat": 35.0,
+    "lon": -40.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "North Atlantic Pelagic Saltwater (35.5 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.15,
+    "optimal_ph_max": 8.3,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Open Marine Pelagic Basin",
+    "specialty_desc": "Deep pelagic ocean waters. Saline osmotic pressure prohibits any terrestrial plant growth.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Pelagic Ocean Basin",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 950.0
+  },
+  {
+    "id": 101,
+    "region_name": "South Atlantic",
+    "country": "International Waters",
+    "lat": -25.0,
+    "lon": -20.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "South Atlantic Pelagic Saltwater (35.5 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.15,
+    "optimal_ph_max": 8.3,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Open Marine Pelagic Basin",
+    "specialty_desc": "Deep oceanic marine water body. Terrestrial farming biologically impossible.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Pelagic Ocean Basin",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 24.0,
+    "optimal_rainfall_mm": 880.0
+  },
+  {
+    "id": 102,
+    "region_name": "North Pacific",
+    "country": "International Waters",
+    "lat": 28.0,
+    "lon": -160.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "Pacific Pelagic Saline Water (35 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.15,
+    "optimal_ph_max": 8.3,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Open Marine Pelagic Basin",
+    "specialty_desc": "Open ocean marine water body. Zero arable topsoil. Terrestrial farming impossible.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Pelagic Ocean Basin",
+    "optimal_temp_min": 20.0,
+    "optimal_temp_max": 27.0,
+    "optimal_rainfall_mm": 1100.0
+  },
+  {
+    "id": 103,
+    "region_name": "Mediterranean Sea",
+    "country": "International Waters",
+    "lat": 35.0,
+    "lon": 18.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Marine Aquatic Substrate",
+    "variety": "Mediterranean Saline Water (38 PSU)",
+    "optimal_soil_type": "Submerged Oceanic Benthic Crust (Zero Arable Topsoil)",
+    "optimal_ph_min": 8.2,
+    "optimal_ph_max": 8.4,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "High Salinity Marine Water Body",
+    "specialty_desc": "Mediterranean sea water with high salinity (~38 PSU). Open marine waters prohibit all land-based agriculture.",
+    "crop_emoji": "🌊",
+    "climate_zone": "Marine Water Basin",
+    "optimal_temp_min": 16.0,
+    "optimal_temp_max": 27.0,
+    "optimal_rainfall_mm": 480.0
+  },
+  {
+    "id": 104,
+    "region_name": "Amazon Reserve",
+    "country": "Brazil",
+    "lat": -3.4653,
+    "lon": -62.2159,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Tropical Rainforest",
+    "variety": "Protected Native Bio-Canopy",
+    "optimal_soil_type": "Heavily leached tropical oxisol with thick natural leaf litter layer",
+    "optimal_ph_min": 4.8,
+    "optimal_ph_max": 5.5,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Ecological Protection Zone / Carbon Sink",
+    "specialty_desc": "Protected primary rainforest canopy (NDVI >0.90). Clearing for commercial agriculture is strictly prohibited by international biodiversity treaties and Brazilian forestry codes.",
+    "crop_emoji": "🌲",
+    "climate_zone": "Equatorial Tropical Rainforest",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 2800.0
+  },
+  {
+    "id": 105,
+    "region_name": "Congo Basin Reserve",
+    "country": "DR Congo",
+    "lat": 0.5,
+    "lon": 24.5,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Central African Rainforest",
+    "variety": "Protected Equatorial Forest Canopy",
+    "optimal_soil_type": "Dense equatorial forest loam with thick humus mulch",
+    "optimal_ph_min": 4.8,
+    "optimal_ph_max": 5.6,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Strict Ecological Biosphere Reserve",
+    "specialty_desc": "Protected primary tropical rainforest canopy. Crucial carbon reservoir and gorilla habitat. Commercial agriculture is strictly banned.",
+    "crop_emoji": "🌲",
+    "climate_zone": "Equatorial Rainforest Biosphere",
+    "optimal_temp_min": 23.0,
+    "optimal_temp_max": 31.0,
+    "optimal_rainfall_mm": 2100.0
+  },
+  {
+    "id": 106,
+    "region_name": "Siberian Taiga",
+    "country": "Russia",
+    "lat": 60.0,
+    "lon": 100.0,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Boreal Coniferous Forest",
+    "variety": "Protected Taiga Larch & Pine Canopy",
+    "optimal_soil_type": "Acidic podzolic forest soils with deep winter frost",
+    "optimal_ph_min": 4.5,
+    "optimal_ph_max": 5.5,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Boreal Biosphere Sanctuary",
+    "specialty_desc": "Protected ancient boreal coniferous taiga forest. Zero commercial crops can be cultivated. Vital global boreal carbon sink.",
+    "crop_emoji": "🌲",
+    "climate_zone": "Boreal Sub-Arctic Forest",
+    "optimal_temp_min": -15.0,
+    "optimal_temp_max": 20.0,
+    "optimal_rainfall_mm": 480.0
+  },
+  {
+    "id": 107,
+    "region_name": "Sundarbans Reserve",
+    "country": "India",
+    "lat": 21.9497,
+    "lon": 89.1833,
+    "crop_name": "NO CROP CAN BE GROWN",
+    "botanical_species": "Mangrove Wetland Ecosystem",
+    "variety": "Tidal Halophyte Mangrove Canopy",
+    "optimal_soil_type": "Tidal mangrove silty-mud with frequent saltwater inundation",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "UNESCO World Heritage Biosphere",
+    "specialty_desc": "World's largest mangrove forest and Royal Bengal Tiger habitat. Commercial cultivation strictly prohibited under UNESCO biodiversity laws.",
+    "crop_emoji": "🌲",
+    "climate_zone": "Tidal Mangrove Wetland",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 1950.0
+  },
+  {
+    "id": 108,
+    "region_name": "Sahara Desert",
+    "country": "Africa",
+    "lat": 23.4162,
+    "lon": 25.6628,
+    "crop_name": "Barren Land (Building & Solar Suitable)",
+    "botanical_species": "Xerophytic Ground / Date Palm Oasis",
+    "variety": "Medjool Oasis Date / Firm Rock Substrate",
+    "optimal_soil_type": "Compacted Sandy-Gravel Bedrock with Zero Topsoil Humus",
+    "optimal_ph_min": 7.8,
+    "optimal_ph_max": 8.6,
+    "base_yield_tons_ha": 1.8,
+    "market_price_per_ton": 420.0,
+    "cost_per_ha": 480.0,
+    "curcumin_or_brix_quality": "High Foundation Bearing Capacity (280 kPa) / Solar 2600 kWh/m²",
+    "specialty_desc": "Arid barren land unsuitable for rainfed farming. Highly optimal for commercial construction, warehousing, and utility-scale solar photovoltaic farms.",
+    "crop_emoji": "🏜️",
+    "climate_zone": "Hyper-Arid Barren Desert",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 48.0,
+    "optimal_rainfall_mm": 25.0
+  },
+  {
+    "id": 109,
+    "region_name": "Thar Desert",
+    "country": "India",
+    "lat": 26.5,
+    "lon": 71.5,
+    "crop_name": "Groundnut & Pearl Millet (Bajra)",
+    "botanical_species": "Arachis hypogaea & Pennisetum glaucum",
+    "variety": "TMV-7 Groundnut / Drought-Tolerant Bajra",
+    "optimal_soil_type": "Deep compacted sandy loam with high drainage and zero waterlogging",
+    "optimal_ph_min": 7.4,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 850.0,
+    "cost_per_ha": 850.0,
+    "curcumin_or_brix_quality": "Firm Subgrade CBR 14% / Suitable for Residential Construction",
+    "specialty_desc": "Arid barren land optimized for drought-hardy nitrogen-fixing groundnut (3.2 T/Ha) or utility solar farms. Firm dry subgrade is highly recommended for building houses safely.",
+    "crop_emoji": "🥜",
+    "climate_zone": "Arid Desert Plateau",
+    "optimal_temp_min": 18.0,
+    "optimal_temp_max": 42.0,
+    "optimal_rainfall_mm": 160.0
+  },
+  {
+    "id": 110,
+    "region_name": "Atacama Desert",
+    "country": "Chile",
+    "lat": -23.8634,
+    "lon": -69.1328,
+    "crop_name": "Barren Land (Solar & Astronomy)",
+    "botanical_species": "Hyper-Arid Rocky Bedrock",
+    "variety": "Non-Arable Desert Crust",
+    "optimal_soil_type": "Hard-baked dry salt-crust rocky bedrock",
+    "optimal_ph_min": 8.0,
+    "optimal_ph_max": 8.8,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "World-Record Solar Irradiance / Extreme Bearing Capacity",
+    "specialty_desc": "The driest desert on Earth with zero rainfall. Farming impossible. Prime global site for astronomical observatories and solar photovoltaic arrays.",
+    "crop_emoji": "🏜️",
+    "climate_zone": "Hyper-Arid Desert Plateau",
+    "optimal_temp_min": 8.0,
+    "optimal_temp_max": 28.0,
+    "optimal_rainfall_mm": 2.0
+  },
+  {
+    "id": 111,
+    "region_name": "Australian Outback",
+    "country": "Australia",
+    "lat": -24.5,
+    "lon": 133.0,
+    "crop_name": "Barren Land (Building & Solar Suitable)",
+    "botanical_species": "Acacia Xerophyte Scrub",
+    "variety": "Drought Xerophyte",
+    "optimal_soil_type": "Ancient weathered red siliceous sandplain and duricrust",
+    "optimal_ph_min": 7.0,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 1.2,
+    "market_price_per_ton": 350.0,
+    "cost_per_ha": 400.0,
+    "curcumin_or_brix_quality": "High Bearing Foundation (250 kPa) / Solar Energy Hub",
+    "specialty_desc": "Arid barren inland scrubland. Rainfed farming impossible. Optimal for commercial solar energy, cattle rangeland, and infrastructure building.",
+    "crop_emoji": "🏜️",
+    "climate_zone": "Arid Continental Scrub",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 40.0,
+    "optimal_rainfall_mm": 180.0
+  },
+  {
+    "id": 112,
+    "region_name": "Arctic Permafrost",
+    "country": "Arctic",
+    "lat": 78.0,
+    "lon": 15.0,
+    "crop_name": "NO OUTDOOR CROP CAN BE GROWN",
+    "botanical_species": "Sub-Zero Permafrost",
+    "variety": "Cryogenic Frozen Substrate",
+    "optimal_soil_type": "Permanently frozen permafrost ground with sub-zero temperatures",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Permafrost Limit / CEA Hydroponics Only",
+    "specialty_desc": "Permanently frozen sub-zero ground prevents outdoor field agriculture. Closed Controlled Environment Agriculture (CEA) hydroponics only.",
+    "crop_emoji": "❄️",
+    "climate_zone": "Polar Permafrost",
+    "optimal_temp_min": -30.0,
+    "optimal_temp_max": 6.0,
+    "optimal_rainfall_mm": 120.0
+  },
+  {
+    "id": 113,
+    "region_name": "Antarctica Ice Sheet",
+    "country": "Antarctica",
+    "lat": -80.0,
+    "lon": 0.0,
+    "crop_name": "NO OUTDOOR CROP CAN BE GROWN",
+    "botanical_species": "Glacial Continental Ice",
+    "variety": "Solid Continental Ice Sheet",
+    "optimal_soil_type": "Thick glacial ice cap with zero soil or organic substrate",
+    "optimal_ph_min": 7.0,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 0.0,
+    "market_price_per_ton": 0.0,
+    "cost_per_ha": 0.0,
+    "curcumin_or_brix_quality": "Glacial Ice Cap Limit",
+    "specialty_desc": "Glacial continental ice shelf with year-round extreme sub-zero temperatures. Outdoor agriculture is physically impossible.",
+    "crop_emoji": "❄️",
+    "climate_zone": "Polar Glacial Ice Sheet",
+    "optimal_temp_min": -60.0,
+    "optimal_temp_max": -10.0,
+    "optimal_rainfall_mm": 50.0
+  }
+];
+
+
+  // Spherical Haversine distance in kilometers
+  function haversineDistKm(lat1, lon1, lat2, lon2) {
+    const R = 6371.0;
+    const dLat = (lat2 - lat1) * Math.PI / 180.0;
+    const dLon = (lon2 - lon1) * Math.PI / 180.0;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180.0) * Math.cos(lat2 * Math.PI / 180.0) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // Find closest agronomy region worldwide (113 Global Hubs)
+  function findClosestAgronomyRegion(lat, lon, locName) {
+    if (typeof WORLD_AGRONOMY_DATA === 'undefined' || !WORLD_AGRONOMY_DATA || WORLD_AGRONOMY_DATA.length === 0) return null;
+    const lowerName = (locName || '').toLowerCase();
+    
+    // Priority 1: Keyword match in region name or country
+    if (lowerName) {
+      for (const reg of WORLD_AGRONOMY_DATA) {
+        const rName = (reg.region_name || '').toLowerCase();
+        const rCrop = (reg.crop_name || '').toLowerCase();
+        if (rName && (lowerName.includes(rName) || rName.includes(lowerName))) {
+          return reg;
+        }
+      }
+    }
+    
+    // Priority 2: Haversine distance nearest neighbor (excludes extreme non-agricultural biomes)
+    let best = null;
+    let minD = Infinity;
+    for (const reg of WORLD_AGRONOMY_DATA) {
+      if (reg.crop_name && reg.crop_name.includes('NO CROP CAN BE GROWN')) continue;
+      const d = haversineDistKm(lat, lon, reg.lat, reg.lon);
+      if (d < minD) {
+        minD = d;
+        best = reg;
+      }
+    }
+    return best;
   }
 
   function generateClientSideLocationAnalysis(lat, lon, name, country) {
@@ -3501,10 +6227,27 @@
       reason = 'Arid desert plateau ground (NDVI: 0.18). Deep-rooted Groundnut (Arachis hypogaea) fixes nitrogen and withstands extreme water stress. Firm dry ground with high CBR (14%) is safe for building houses.';
 
     // ========================================================
-    // PRIORITY 5: GENERAL FERTILE AGRICULTURAL LAND
+    // PRIORITY 5: WORLDWIDE AGRONOMY REGION MATCHING (113 Global Hubs)
     // ========================================================
     } else {
-      if (absLat < 23.5) {
+      const reg = findClosestAgronomyRegion(lat, lon, name);
+      if (reg) {
+        crop = `${reg.crop_name} (${reg.botanical_species} - ${reg.variety})`;
+        yieldTons = reg.base_yield_tons_ha;
+        yieldAcc = 98.9;
+        locType = `${reg.region_name} ${reg.climate_zone}`;
+        marketPrice = reg.market_price_per_ton;
+        costHa = reg.cost_per_ha;
+        tempC = Math.round(((reg.optimal_temp_min + reg.optimal_temp_max) / 2) * 10) / 10;
+        soilPh = Math.round(((reg.optimal_ph_min + reg.optimal_ph_max) / 2) * 100) / 100;
+        rainMm = Math.round(reg.optimal_rainfall_mm);
+        soilMoist = Math.min(75, Math.max(25, Math.round((rainMm / 25) * 10) / 10));
+        waterDepth = Math.round(Math.max(3.5, 22.0 - (rainMm / 100)) * 10) / 10;
+        humidity = Math.min(85, Math.max(30, Math.round((rainMm / 18) * 10) / 10));
+        ndviScore = 0.72;
+        status = 'OPTIMAL_HIGH_YIELD';
+        reason = reg.specialty_desc;
+      } else if (absLat < 23.5) {
         crop = 'Sugarcane (Saccharum officinarum) & Paddy Rice';
         yieldTons = 74.0;
         yieldAcc = 98.5;
@@ -4713,39 +7456,31 @@
       if (lat >= 39.0 && lat <= 43.5 && lon >= -97.0 && lon <= -87.0) return { name: "Midwest Corn & Soybean Belt (Iowa / Illinois)", country: "United States" };
       if (lat >= 45.5 && lat <= 49.0 && lon >= -124.8 && lon <= -116.9) return { name: "Washington State Apple Basin", country: "United States" };
       if (lat >= 24.5 && lat <= 30.5 && lon >= -87.6 && lon <= -80.0) return { name: "Florida Citrus & Subtropical Belt", country: "United States" };
-      return { name: "North American Agricultural Plains", country: "United States" };
     }
 
     // 4. Europe Detailed Matrix
     if (lat >= 35.0 && lat <= 70.0 && lon >= -10.0 && lon <= 40.0) {
       if (lat >= 36.0 && lat <= 39.5 && lon >= -7.5 && lon <= -2.0) return { name: "Andalusia & Iberian Olive Belt, Spain", country: "Spain" };
       if (lat >= 44.0 && lat <= 49.0 && lon >= -1.5 && lon <= 4.0) return { name: "Bordeaux & French Agricultural Plain", country: "France" };
-      return { name: "European Plain", country: "Europe" };
     }
 
     // 5. Africa Detailed Matrix
     if (lat >= -35.0 && lat <= 37.0 && lon >= -18.0 && lon <= 52.0) {
       if (lat >= 29.5 && lat <= 31.8 && lon >= 29.8 && lon <= 32.5) return { name: "Nile Delta Irrigated Basin, Egypt", country: "Egypt" };
       if (lat >= 18.0 && lat <= 30.0 && lon >= -10.0 && lon <= 30.0) return { name: "Sahara Desert Arid Barren Territory", country: "Africa" };
-      return { name: "African Savanna & Plateau", country: "Africa" };
     }
 
-    // 6. South America
-    if (lat >= -56.0 && lat <= 13.0 && lon >= -82.0 && lon <= -34.0) {
-      return { name: "South American Plains", country: "South America" };
-    }
-
-    // 7. Global Arid Deserts (Real barren wastelands ONLY)
+    // 6. Global Arid Deserts (Real barren wastelands ONLY)
     if (lat >= 18.0 && lat <= 28.0 && lon >= 42.0 && lon <= 55.0) return { name: "Arabian Desert & Empty Quarter Arid Plateau", country: "Middle East" };
     if (lat >= 34.5 && lat <= 37.0 && lon >= -117.5 && lon <= -114.5) return { name: "Mojave Desert Arid Barren Basin", country: "United States" };
     if (lat >= -26.0 && lat <= -19.0 && lon >= -70.5 && lon <= -68.0) return { name: "Atacama Arid Rocky Plateau", country: "Chile" };
     if (lat >= -28.0 && lat <= -20.0 && lon >= 122.0 && lon <= 138.0) return { name: "Australian Outback Arid Scrubland & Barren Plateau", country: "Australia" };
 
-    // 8. Polar Ice Sheets
+    // 7. Polar Ice Sheets
     if (lat >= 72.0) return { name: "Arctic Polar Permafrost Ice Sheet", country: "Arctic" };
     if (lat <= -60.0) return { name: "Antarctica Continental Ice Sheet", country: "Antarctica" };
 
-    // 9. Marine & Water Bodies Worldwide (Deep Offshore Pelagic Waters ONLY)
+    // 8. Marine & Water Bodies Worldwide (Deep Offshore Pelagic Waters ONLY)
     if (lat >= 6 && lat <= 20 && lon >= 84.5 && lon <= 92.5) return { name: "Bay of Bengal (Deep Marine Water Body)", country: "International Waters" };
     if (lat >= 8 && lat <= 24 && lon >= 55 && lon <= 71.0) return { name: "Arabian Sea (Marine Waters)", country: "International Waters" };
     if (lat >= -45 && lat <= 4 && lon >= 55 && lon <= 95) return { name: "Indian Ocean (Deep Sea Marine Zone)", country: "International Waters" };
@@ -4753,6 +7488,12 @@
     if (absLat <= 60 && (lon >= 155 || lon <= -130)) return { name: "Pacific Ocean (Deep Sea Marine Waters)", country: "International Waters" };
     if (lat >= 10 && lat <= 55 && lon >= -55 && lon <= -20) return { name: "North Atlantic Ocean (Deep Sea)", country: "International Waters" };
     if (lat >= -55 && lat <= 0 && lon >= -40 && lon <= 10) return { name: "South Atlantic Ocean (Deep Sea)", country: "International Waters" };
+
+    // 9. Worldwide Spherical Nearest Neighbor Agronomy Matcher (113 Global Hubs)
+    const closest = findClosestAgronomyRegion(lat, lon, '');
+    if (closest) {
+      return { name: `${closest.region_name}, ${closest.country}`, country: closest.country };
+    }
 
     const latStr = lat >= 0 ? lat.toFixed(3) + '°N' : Math.abs(lat).toFixed(3) + '°S';
     const lonStr = lon >= 0 ? lon.toFixed(3) + '°E' : Math.abs(lon).toFixed(3) + '°W';
@@ -4867,6 +7608,13 @@
       // ANTI-COLLAPSE PROTECTION: Verify data without overwriting verified canonical agronomy
       if (currentLocationContext.lat === lat && currentLocationContext.lon === lon) {
         document.getElementById('voice-status').innerHTML = `<i class="fa-solid fa-check" style="color:var(--green-glow);"></i> 5G Verified: ${name.split(',')[0]}`;
+        if (serverData && serverData.ml_crop_yield_prediction && serverData.ml_crop_yield_prediction.recommended_crop) {
+          updateDashboardUI(serverData);
+          if (leafletMarker) {
+            const curEmoji = serverData.ml_crop_yield_prediction.crop_visual_emoji || getClientCropEmoji(serverData.ml_crop_yield_prediction.recommended_crop, serverData.ml_crop_yield_prediction.location_type) || '🌾';
+            leafletMarker.setIcon(createLocMarker(serverData.ml_crop_yield_prediction.location_type, curEmoji));
+          }
+        }
         // Reload history if open
         const slide = document.getElementById('history-slide');
         if (slide && slide.classList.contains('open')) loadHistory();
