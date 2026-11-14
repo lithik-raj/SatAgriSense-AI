@@ -1282,110 +1282,135 @@
   function detectRegionalLanguage(locName, country, lat, lon) {
     const s = ((locName || '') + ' ' + (country || '')).toLowerCase();
     
-    // Strict Ocean / Marine Check -> English
-    if (s.includes('ocean') || s.includes('marine') || s.includes('sea') || s.includes('bay of bengal') || s.includes('arabian sea')) {
-      return { code: 'en-US', name: 'English (Ocean / Marine)' };
+    // Strict Ocean / Marine / Polar Check -> English
+    if (s.includes('ocean') || s.includes('marine') || s.includes('sea') || s.includes('bay of bengal') || s.includes('arabian sea') || s.includes('polar') || s.includes('permafrost') || s.includes('antarctica') || s.includes('arctic')) {
+      return { code: 'en-US', name: 'English (Ocean / Polar)' };
     }
 
-    // Tamil Nadu & Sri Lanka (Tamil regions)
-    if (s.includes('tamil nadu') || s.includes('chennai') || s.includes('coimbatore') || 
-        s.includes('madurai') || s.includes('erode') || s.includes('salem') || 
-        s.includes('tiruchirappalli') || s.includes('thanjavur') || s.includes('tirunelveli') || 
-        s.includes('vellore') || s.includes('tiruppur') || s.includes('dindigul') || s.includes('jaffna')) {
-      return { code: 'ta-IN', name: 'Tamil (தமிழ்)' };
+    // 1. High-Precision Coordinate Geofencing
+    if (typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)) {
+      // Karnataka, India -> Kannada (kn-IN)
+      if (lat >= 11.5 && lat <= 18.5 && lon >= 74.0 && lon <= 78.6) {
+        return { code: 'kn-IN', name: 'Kannada (ಕನ್ನಡ)' };
+      }
+      // Andhra Pradesh & Telangana, India -> Telugu (te-IN)
+      if (lat >= 13.5 && lat <= 19.9 && lon >= 77.0 && lon <= 84.8) {
+        return { code: 'te-IN', name: 'Telugu (తెలుగు)' };
+      }
+      // Kerala, India -> Malayalam (ml-IN)
+      if (lat >= 8.2 && lat <= 12.8 && lon >= 74.8 && lon <= 77.4) {
+        return { code: 'ml-IN', name: 'Malayalam (മലയാളം)' };
+      }
+      // Tamil Nadu, India -> Tamil (ta-IN)
+      if (lat >= 8.0 && lat <= 13.5 && lon >= 76.2 && lon <= 80.4) {
+        return { code: 'ta-IN', name: 'Tamil (தமிழ்)' };
+      }
+      // Maharashtra, India -> Marathi (mr-IN)
+      if (lat >= 15.6 && lat <= 22.0 && lon >= 72.6 && lon <= 80.9) {
+        return { code: 'mr-IN', name: 'Marathi (मराठी)' };
+      }
+      // Gujarat, India -> Gujarati (gu-IN)
+      if (lat >= 20.1 && lat <= 24.7 && lon >= 68.1 && lon <= 74.5) {
+        return { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' };
+      }
+      // West Bengal & Bangladesh -> Bengali (bn-IN)
+      if (lat >= 21.5 && lat <= 27.2 && lon >= 85.8 && lon <= 92.7) {
+        return { code: 'bn-IN', name: 'Bengali (বাংলা)' };
+      }
+      // Punjab & Haryana -> Punjabi (pa-IN)
+      if (lat >= 29.5 && lat <= 32.5 && lon >= 73.8 && lon <= 77.0) {
+        return { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' };
+      }
+      // North India / Hindi Belt
+      if (lat >= 21.0 && lat <= 36.0 && lon >= 73.0 && lon <= 88.0) {
+        return { code: 'hi-IN', name: 'Hindi (हिन्दी)' };
+      }
+      // France -> French (fr-FR)
+      if (lat >= 42.0 && lat <= 51.1 && lon >= -5.0 && lon <= 9.6) {
+        return { code: 'fr-FR', name: 'French (Français)' };
+      }
+      // Italy -> Italian (it-IT)
+      if (lat >= 36.5 && lat <= 47.1 && lon >= 6.6 && lon <= 18.5) {
+        return { code: 'it-IT', name: 'Italian (Italiano)' };
+      }
+      // Spain -> Spanish (es-ES)
+      if (lat >= 36.0 && lat <= 43.8 && lon >= -9.3 && lon <= 3.3) {
+        return { code: 'es-ES', name: 'Spanish (Español)' };
+      }
+      // Germany & Austria -> German (de-DE)
+      if (lat >= 47.3 && lat <= 55.1 && lon >= 5.9 && lon <= 15.0) {
+        return { code: 'de-DE', name: 'German (Deutsch)' };
+      }
+      // Japan -> Japanese (ja-JP)
+      if (lat >= 30.0 && lat <= 45.5 && lon >= 129.0 && lon <= 146.0) {
+        return { code: 'ja-JP', name: 'Japanese (日本語)' };
+      }
+      // Brazil -> Portuguese (pt-BR)
+      if (lat >= -33.7 && lat <= 5.3 && lon >= -73.9 && lon <= -34.8) {
+        return { code: 'pt-BR', name: 'Portuguese (Português)' };
+      }
+      // United States, UK, Canada, Australia -> English (en-US)
+      if ((lat >= 24.5 && lat <= 49.5 && lon >= -125.0 && lon <= -66.9) ||
+          (lat >= 49.8 && lat <= 59.0 && lon >= -8.5 && lon <= 1.8) ||
+          (lat <= -10.0 && lat >= -44.0 && lon >= 112.0 && lon <= 154.0)) {
+        return { code: 'en-US', name: 'English (Global)' };
+      }
     }
-    // Kerala
-    if (s.includes('kerala') || s.includes('kochi') || s.includes('thiruvananthapuram') || 
-        s.includes('kozhikode') || s.includes('palakkad') || s.includes('alappuzha') || 
-        s.includes('kannur') || s.includes('thrissur') || s.includes('wayanad') || s.includes('kollam')) {
-      return { code: 'ml-IN', name: 'Malayalam (മലയാളം)' };
-    }
-    // Andhra Pradesh & Telangana
-    if (s.includes('andhra') || s.includes('telangana') || s.includes('hyderabad') || 
-        s.includes('visakhapatnam') || s.includes('vijayawada') || s.includes('guntur') || 
-        s.includes('tirupati') || s.includes('warangal') || s.includes('amaravati')) {
-      return { code: 'te-IN', name: 'Telugu (తెలుగు)' };
-    }
-    // Karnataka
-    if (s.includes('karnataka') || s.includes('bengaluru') || s.includes('bangalore') || 
-        s.includes('mysuru') || s.includes('mysore') || s.includes('hubli') || 
-        s.includes('mangalore') || s.includes('belagavi') || s.includes('dharwad')) {
+
+    // 2. Keyword Fallback Verification
+    if (s.includes('karnataka') || s.includes('bengaluru') || s.includes('bangalore') || s.includes('mysuru') || s.includes('mysore') || s.includes('hubli') || s.includes('mangalore') || s.includes('belagavi') || s.includes('shimoga') || s.includes('mandya') || s.includes('chikkamagaluru') || s.includes('coorg') || s.includes('dharwad')) {
       return { code: 'kn-IN', name: 'Kannada (ಕನ್ನಡ)' };
     }
-    // Maharashtra
-    if (s.includes('maharashtra') || s.includes('mumbai') || s.includes('pune') || 
-        s.includes('nagpur') || s.includes('nashik') || s.includes('aurangabad') || 
-        s.includes('solapur') || s.includes('kolhapur')) {
-      return { code: 'mr-IN', name: 'Marathi (मराठी)' };
+    if (s.includes('andhra') || s.includes('telangana') || s.includes('hyderabad') || s.includes('visakhapatnam') || s.includes('vijayawada') || s.includes('guntur') || s.includes('tirupati') || s.includes('warangal') || s.includes('amaravati') || s.includes('anantapur') || s.includes('godavari') || s.includes('konaseema')) {
+      return { code: 'te-IN', name: 'Telugu (తెలుగు)' };
     }
-    // Gujarat
-    if (s.includes('gujarat') || s.includes('ahmedabad') || s.includes('surat') || 
-        s.includes('vadodara') || s.includes('rajkot') || s.includes('bhavnagar') || s.includes('gandhinagar')) {
-      return { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' };
+    if (s.includes('kerala') || s.includes('kochi') || s.includes('thiruvananthapuram') || s.includes('kozhikode') || s.includes('palakkad') || s.includes('alappuzha') || s.includes('kannur') || s.includes('thrissur') || s.includes('wayanad') || s.includes('kollam') || s.includes('kottayam') || s.includes('kuttanad')) {
+      return { code: 'ml-IN', name: 'Malayalam (മലയാളം)' };
     }
-    // West Bengal & Bangladesh
-    if (s.includes('bengal') || s.includes('kolkata') || s.includes('siliguri') || 
-        s.includes('asansol') || s.includes('bangladesh') || s.includes('dhaka') || s.includes('chittagong')) {
-      return { code: 'bn-IN', name: 'Bengali (বাংলা)' };
+    if (s.includes('tamil nadu') || s.includes('chennai') || s.includes('coimbatore') || s.includes('madurai') || s.includes('erode') || s.includes('salem') || s.includes('thanjavur') || s.includes('tiruppur') || s.includes('tirunelveli') || s.includes('dindigul') || s.includes('jaffna') || s.includes('sri lanka')) {
+      return { code: 'ta-IN', name: 'Tamil (தமிழ்)' };
     }
-    // Punjab & Haryana
-    if (s.includes('punjab') || s.includes('amritsar') || s.includes('ludhiana') || 
-        s.includes('jalandhar') || s.includes('patiala') || s.includes('bathinda') || s.includes('chandigarh')) {
-      return { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' };
-    }
-    // Pakistan
-    if (s.includes('pakistan') || s.includes('lahore') || s.includes('karachi') || 
-        s.includes('islamabad') || s.includes('peshawar') || s.includes('rawalpindi') || 
-        s.includes('faisalabad') || s.includes('multan')) {
-      return { code: 'ur-PK', name: 'Urdu (اردو)' };
-    }
-    // South Africa
-    if (s.includes('south africa') || s.includes('johannesburg') || s.includes('cape town') || 
-        s.includes('durban') || s.includes('pretoria') || s.includes('soweto') || s.includes('bloemfontein')) {
-      return { code: 'af-ZA', name: 'Afrikaans / Zulu' };
-    }
-    // Spain & Latin America
-    if (s.includes('spain') || s.includes('madrid') || s.includes('barcelona') || s.includes('valencia') || 
-        s.includes('seville') || s.includes('mexico') || s.includes('argentina') || s.includes('colombia') || 
-        s.includes('chile') || s.includes('peru')) {
-      return { code: 'es-ES', name: 'Spanish (Español)' };
-    }
-    // France
-    if (s.includes('france') || s.includes('paris') || s.includes('marseille') || 
-        s.includes('lyon') || s.includes('toulouse') || s.includes('bordeaux')) {
+    if (s.includes('france') || s.includes('french') || s.includes('paris') || s.includes('bordeaux') || s.includes('marseille') || s.includes('lyon') || s.includes('champagne') || s.includes('provence')) {
       return { code: 'fr-FR', name: 'French (Français)' };
     }
-    // Germany & Austria
-    if (s.includes('germany') || s.includes('berlin') || s.includes('munich') || 
-        s.includes('frankfurt') || s.includes('hamburg') || s.includes('austria') || s.includes('vienna')) {
+    if (s.includes('italy') || s.includes('italian') || s.includes('italia') || s.includes('rome') || s.includes('milan') || s.includes('florence') || s.includes('tuscany') || s.includes('naples') || s.includes('campania') || s.includes('venice')) {
+      return { code: 'it-IT', name: 'Italian (Italiano)' };
+    }
+    if (s.includes('spain') || s.includes('spanish') || s.includes('madrid') || s.includes('barcelona') || s.includes('valencia') || s.includes('seville') || s.includes('andalusia') || s.includes('mexico') || s.includes('argentina') || s.includes('colombia') || s.includes('chile') || s.includes('peru')) {
+      return { code: 'es-ES', name: 'Spanish (Español)' };
+    }
+    if (s.includes('germany') || s.includes('german') || s.includes('deutschland') || s.includes('berlin') || s.includes('munich') || s.includes('bavaria') || s.includes('austria') || s.includes('vienna')) {
       return { code: 'de-DE', name: 'German (Deutsch)' };
     }
-    // Arab countries & Middle East
-    if (s.includes('saudi') || s.includes('dubai') || s.includes('uae') || s.includes('egypt') || 
-        s.includes('qatar') || s.includes('riyadh') || s.includes('cairo') || s.includes('kuwait') || s.includes('oman')) {
-      return { code: 'ar-SA', name: 'Arabic (العربية)' };
-    }
-    // Japan
-    if (s.includes('japan') || s.includes('tokyo') || s.includes('kyoto') || s.includes('osaka') || s.includes('yokohama')) {
+    if (s.includes('japan') || s.includes('japanese') || s.includes('tokyo') || s.includes('kyoto') || s.includes('osaka') || s.includes('niigata') || s.includes('hokkaido')) {
       return { code: 'ja-JP', name: 'Japanese (日本語)' };
     }
-    // China
-    if (s.includes('china') || s.includes('beijing') || s.includes('shanghai') || s.includes('shenzhen') || s.includes('guangzhou')) {
-      return { code: 'zh-CN', name: 'Chinese (中文)' };
+    if (s.includes('brazil') || s.includes('brasil') || s.includes('portugal') || s.includes('sao paulo') || s.includes('rio de janeiro') || s.includes('mato grosso')) {
+      return { code: 'pt-BR', name: 'Portuguese (Português)' };
     }
-    // Russia
-    if (s.includes('russia') || s.includes('moscow') || s.includes('saint petersburg') || s.includes('siberia')) {
-      return { code: 'ru-RU', name: 'Russian (Русский)' };
+    if (s.includes('maharashtra') || s.includes('mumbai') || s.includes('pune') || s.includes('nagpur') || s.includes('nashik')) {
+      return { code: 'mr-IN', name: 'Marathi (मराठी)' };
     }
-    // Hindi Belt / North India / Kashmir / Default India
-    if (s.includes('india') || s.includes('delhi') || s.includes('kashmir') || s.includes('srinagar') || 
-        s.includes('uttar pradesh') || s.includes('lucknow') || s.includes('varanasi') || 
-        s.includes('bihar') || s.includes('patna') || s.includes('madhya pradesh') || 
-        s.includes('bhopal') || s.includes('indore') || s.includes('rajasthan') || 
-        s.includes('jaipur') || s.includes('haryana') || s.includes('uttarakhand') || s.includes('thar')) {
+    if (s.includes('gujarat') || s.includes('ahmedabad') || s.includes('surat') || s.includes('vadodara') || s.includes('rajkot')) {
+      return { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' };
+    }
+    if (s.includes('bengal') || s.includes('kolkata') || s.includes('bangladesh') || s.includes('dhaka')) {
+      return { code: 'bn-IN', name: 'Bengali (বাংলা)' };
+    }
+    if (s.includes('punjab') || s.includes('amritsar') || s.includes('ludhiana') || s.includes('chandigarh')) {
+      return { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' };
+    }
+    if (s.includes('pakistan') || s.includes('lahore') || s.includes('karachi') || s.includes('urdu')) {
+      return { code: 'ur-PK', name: 'Urdu (اردو)' };
+    }
+    if (s.includes('saudi') || s.includes('dubai') || s.includes('uae') || s.includes('egypt') || s.includes('cairo') || s.includes('qatar') || s.includes('riyadh')) {
+      return { code: 'ar-SA', name: 'Arabic (العربية)' };
+    }
+    if (s.includes('delhi') || s.includes('uttar pradesh') || s.includes('lucknow') || s.includes('bihar') || s.includes('patna') || s.includes('madhya pradesh') || s.includes('bhopal') || s.includes('rajasthan') || s.includes('jaipur') || s.includes('haryana') || s.includes('kashmir') || s.includes('srinagar')) {
       return { code: 'hi-IN', name: 'Hindi (हिन्दी)' };
     }
 
+    // English Common for America, UK, Australia, Canada and all global default points
     return { code: 'en-US', name: 'English (Global)' };
   }
 
@@ -1812,13 +1837,14 @@
         };
 
         utter.onerror = (e) => {
-          if (e && (e.error === 'canceled' || e.error === 'interrupted')) {
+          if (queueState.isCancelled) return;
+          // In Chromium, 'interrupted' is often fired spuriously during buffer refresh. Only cancel if user stopped explicitly.
+          if (e && e.error === 'canceled' && queueState.userStopped) {
             queueState.isCancelled = true;
             return;
           }
-          if (!window.activeSpeechQueue || window.activeSpeechQueue.isCancelled) return;
           queueState.currentIndex++;
-          setTimeout(speakNext, 80);
+          setTimeout(speakNext, 60);
         };
 
         window.speechSynthesis.resume();
@@ -2204,7 +2230,97 @@
     let phoneticFallback = '';
     let lang = (voiceLanguageMode === 'en') ? 'en' : (currentChatLangCode || 'en').toLowerCase();
 
-    if (lang.startsWith('ta')) {
+    if (lang.startsWith('kn')) {
+      if (isForest) {
+        announcement = `ರಕ್ಷಿತ ಅರಣ್ಯ ಪ್ರದೇಶ: ${fullPlace}। ನೈಸರ್ಗಿಕ ಅರಣ್ಯ ಮತ್ತು ಜೀವವೈವಿಧ್ಯ ತಾಣ. ವಾಣಿಜ್ಯ ಬೆಳೆ ಬೆಳೆಯಲು ಕಾನೂನಿನಲ್ಲಿ ಅವಕಾಶವಿಲ್ಲ.`;
+      } else if (isWater) {
+        announcement = `ಸಾಗರ ಪ್ರದೇಶ: ${fullPlace}। ನೀರಿನ ಲವಣಾಂಶ 35 PSU ಹೆಚ್ಚಿರುವುದರಿಂದ ಬೆಳೆ ಬೆಳೆಯಲಾಗುವುದಿಲ್ಲ.`;
+      } else if (isBarren) {
+        announcement = `ಬಂಜರು ಭೂಮಿ: ${fullPlace}। ಕಡಲೆಕಾಯಿ ಕೃಷಿಗೆ ಅಥವಾ ಮನೆ ನಿರ್ಮಾಣಕ್ಕೆ ಅತ್ಯಂತ ಸುರಕ್ಷಿತವಾಗಿದೆ.`;
+      } else {
+        announcement = `ಆಯ್ಕೆಮಾಡಿದ ಸ್ಥಳ: ${fullPlace}। ಶಿಫಾರಸು ಮಾಡಿದ ಬೆಳೆ: ${fullCrop}। ಪರಿಸರ ಪರಿಸ್ಥಿತಿಗಳು: ತಾಪಮಾನ ${temp}, ಮಣ್ಣಿನ pH ${ph}, ಮತ್ತು ಅಂತರ್ಜಲ ಮಟ್ಟ ${water}। ನಿರೀಕ್ಷಿತ ಇಳುವರಿ ಹೆಕ್ಟೇರಿಗೆ ${yieldVal} ಟನ್ ಮತ್ತು ಹೂಡಿಕೆಯ ಮೇಲಿನ ಆದಾಯ ${roi}। ಗುಣಲಕ್ಷಣಗಳು: ${desc}।`;
+      }
+    } else if (lang.startsWith('te')) {
+      if (isForest) {
+        announcement = `రక్షిత అటవీ ప్రాంతం: ${fullPlace}। సహజ అటవీ ప్రాంతం ಮತ್ತು జీవవైవిధ్య సంరక్షణ కేంద్రం. ఇక్కడ వాణిజ్య పంటల సాగు చట్టరీత్యా నిషేధించబడింది.`;
+      } else if (isWater) {
+        announcement = `సముద్ర ప్రాంతం: ${fullPlace}। అధిక లవణీయత 35 PSU వలన భూమి పంటలు పండవు.`;
+      } else if (isBarren) {
+        announcement = `బంజరు భూమి: ${fullPlace}। వేరుశనగ సాగుకు లేదా బలమైన పునాదితో నివాస గృహాల నిర్మాణానికి అత్యంత సురక్షితం.`;
+      } else {
+        announcement = `ఎంచుకున్న ప్రాంతం: ${fullPlace}। సిఫార్సు చేయబడిన పంట: ${fullCrop}। పర్యావరణ పరిస్థితులు: ఉష్ణోగ్రత ${temp}, నేల pH ${ph}, మరియు భూగర్భ జలాల లోతు ${water}। అంచనా వేసిన దిగుబడి హెక్టారుకు ${yieldVal} టన్నులు మరియు పెట్టుబడిపై రాబడి ${roi}। విశిష్టతలు: ${desc}।`;
+      }
+    } else if (lang.startsWith('ml')) {
+      if (isForest) {
+        announcement = `സംരക്ഷിത വനമേഖല: ${fullPlace}। സ്വാഭാവിക വനമാണ്, വാണിജ്യ വിളകൾ കൃഷി ചെയ്യാൻ കഴിയില്ല.`;
+      } else if (isWater) {
+        announcement = `സമുദ്ര പ്രദേശം: ${fullPlace}। ഉയർന്ന ലവണാംശം 35 PSU കാരണം കരയിലെ വിളകൾ വളരില്ല.`;
+      } else if (isBarren) {
+        announcement = `തരിശുഭൂമി: ${fullPlace}। നിലക്കടല കൃഷിക്കോ കെട്ടിട നിർമ്മാണത്തിനോ വളരെ സുരക്ഷിതമാണ്.`;
+      } else {
+        announcement = `തിരഞ്ഞെടുത്ത പ്രദേശം: ${fullPlace}। ശുപാർശ ചെയ്യുന്ന വിള: ${fullCrop}। പരിസ്ഥിതി സാഹചര്യങ്ങൾ: താപനില ${temp}, മണ്ണ് pH ${ph}, ഭൂഗർഭജല നിരപ്പ് ${water}। പ്രതീക്ഷിക്കുന്ന വിളവ് ഹെക്ടറിന് ${yieldVal} ടൺ, വരുമാനം ${roi}। സവിശേഷതകൾ: ${desc}।`;
+      }
+    } else if (lang.startsWith('fr')) {
+      if (isForest) {
+        announcement = `Réserve forestière protégée : ${fullPlace}. Canopée naturelle et sanctuaire de biodiversité. L'agriculture commerciale y est strictement interdite.`;
+      } else if (isWater) {
+        announcement = `Zone maritime : ${fullPlace}. Salinité de 35 PSU et absence de sol arable. Agriculture terrestre impossible.`;
+      } else if (isBarren) {
+        announcement = `Terrain aride : ${fullPlace}. Recommandé pour les cultures résistantes à la sécheresse ou la construction de bâtiments.`;
+      } else {
+        announcement = `Lieu sélectionné : ${fullPlace}. Culture recommandée : ${fullCrop}. Conditions environnementales : Température ${temp}, pH du sol ${ph}, profondeur de la nappe phréatique ${water}, et précipitations ${rain}. Rendement prévu de ${yieldVal} tonnes par hectare avec un retour sur investissement estimé à ${roi}. Caractéristiques : ${desc}.`;
+      }
+    } else if (lang.startsWith('it')) {
+      if (isForest) {
+        announcement = `Riserva forestale protetta: ${fullPlace}. Foreste primarie e santuario della biodiversità. L'agricoltura commerciale è vietata.`;
+      } else if (isWater) {
+        announcement = `Zona marina: ${fullPlace}. Acqua salina con 35 PSU e zero terreno coltivabile.`;
+      } else if (isBarren) {
+        announcement = `Terreno arido: ${fullPlace}. Ideale per arachidi resistenti alla siccità o per costruzioni sicure.`;
+      } else {
+        announcement = `Luogo selezionato: ${fullPlace}. Coltura raccomandata: ${fullCrop}. Condizioni ambientali: Temperatura ${temp}, pH del suolo ${ph}, profondità della falda ${water}, e precipitazioni ${rain}. Resa stimata di ${yieldVal} tonnellate per ettaro con un ROI del ${roi}. Caratteristiche: ${desc}.`;
+      }
+    } else if (lang.startsWith('es')) {
+      if (isForest) {
+        announcement = `Reserva forestal protegida: ${fullPlace}. Bosque primario y reserva de biodiversidad. La agricultura comercial está estrictamente prohibida.`;
+      } else if (isWater) {
+        announcement = `Zona marina: ${fullPlace}. Agua salina con 35 PSU sin suelo fértil. La agricultura terrestre es imposible.`;
+      } else if (isBarren) {
+        announcement = `Terreno árido: ${fullPlace}. Altamente seguro para el cultivo de cacahuate resistente a sequía o construcción de viviendas.`;
+      } else {
+        announcement = `Ubicación seleccionada: ${fullPlace}. Cultivo recomendado: ${fullCrop}. Condiciones ambientales: Temperatura ${temp}, pH del suelo ${ph}, profundidad del agua subterránea ${water}, y precipitación anual ${rain}. Rendimiento estimado de ${yieldVal} toneladas por hectárea con un retorno de inversión de ${roi}. Características: ${desc}.`;
+      }
+    } else if (lang.startsWith('de')) {
+      if (isForest) {
+        announcement = `Geschütztes Waldreservat: ${fullPlace}. Natürlicher Urwald. Gewerbliche Landwirtschaft ist streng verboten.`;
+      } else if (isWater) {
+        announcement = `Meeresgewässer: ${fullPlace}. Salzgehalt 35 PSU. Terrestrische Landwirtschaft ist unmöglich.`;
+      } else if (isBarren) {
+        announcement = `Ödland und Felsplateau: ${fullPlace}. Gut geeignet für trockenheitsresistente Erdnüsse oder sicheres Bauen.`;
+      } else {
+        announcement = `Ausgewählter Standort: ${fullPlace}. Empfohlene Feldfrucht: ${fullCrop}. Umweltbedingungen: Temperatur ${temp}, Boden-pH-Wert ${ph}, Grundwassertiefe ${water}, und Jahresniederschlag ${rain}. Erwarteter Ertrag ${yieldVal} Tonnen pro Hektar mit einer Rendite von ${roi}. Besonderheiten: ${desc}.`;
+      }
+    } else if (lang.startsWith('pt')) {
+      if (isForest) {
+        announcement = `Reserva florestal protegida: ${fullPlace}. Floresta primária e santuário biológico. Agricultura comercial proibida.`;
+      } else if (isWater) {
+        announcement = `Zona marítima: ${fullPlace}. Água salina de 35 PSU sem solo arável.`;
+      } else if (isBarren) {
+        announcement = `Terreno árido: ${fullPlace}. Ideal para amendoim resistente à seca ou construção civil segura.`;
+      } else {
+        announcement = `Localização selecionada: ${fullPlace}. Cultura recomendada: ${fullCrop}. Condições ambientais: Temperatura ${temp}, pH do solo ${ph}, profundidade do lençol freático ${water}, e precipitação ${rain}. Rendimento previsto de ${yieldVal} toneladas por hectare com retorno de investimento de ${roi}. Características: ${desc}.`;
+      }
+    } else if (lang.startsWith('ja')) {
+      if (isForest) {
+        announcement = `保護森林保護区: ${fullPlace}。原生林および生物多様性保護区であり、商業農業は厳しく禁止されています。`;
+      } else if (isWater) {
+        announcement = `海洋地域: ${fullPlace}。塩分濃度35 PSUのため、陸上作物の栽培は不可能です。`;
+      } else if (isBarren) {
+        announcement = `荒れ地・高原: ${fullPlace}。耐乾性落花生の栽培、または頑丈な建物建設に適しています。`;
+      } else {
+        announcement = `選択された地域: ${fullPlace}。推奨作物: ${fullCrop}。環境データ: 気温 ${temp}、土壌pH ${ph}、地下水位 ${water}、年間降水量 ${rain}。予想収穫量は1ヘクタールあたり ${yieldVal} トン、投資収益率は ${roi} です。特徴: ${desc}。`;
+      }
+    } else if (lang.startsWith('ta')) {
       if (isForest) {
         announcement = `பாதுகாக்கப்பட்ட வனப்பகுதி: ${fullPlace}। அடர்ந்த இயற்கை காடு மற்றும் பல்லுயிர் சரணாலயம். இங்கு வணிக ரீதியான விவசாய பயிர்கள் பயிரிட முற்றிலும் தடைசெய்யப்பட்டுள்ளது. இதன் முக்கிய சுற்றுச்சூழல் பயன்பாடு கார்பன் சேமிப்பு ஆகும்.`;
         phoneticFallback = announcement;
@@ -2218,7 +2334,7 @@
         announcement = `தேர்ந்தெடுக்கப்பட்ட இடம்: ${fullPlace}। பரிந்துரைக்கப்படும் பயிர்: ${fullCrop}। சுற்றுச்சூழல் காரணிகள்: வெப்பநிலை ${temp}, மண் கார அமிலத்தன்மை pH ${ph}, மற்றும் நிலத்தடி நீர் மட்டம் ${water}। எதிர்பார்க்கப்படும் விளைச்சல் எக்டேருக்கு ${yieldVal} டன் மற்றும் எதிர்பார்க்கப்படும் லாபம் ${roi}। சிறப்பம்சங்கள்: ${desc}।`;
         phoneticFallback = announcement;
       }
-    } else if (lang.startsWith('hi')) {
+    } else if (lang.startsWith('hi')) { 
       if (isForest) {
         announcement = `संरक्षित वन क्षेत्र: ${fullPlace}। यहाँ प्राकृतिक वनस्पति और जैव विविधता संरक्षित है। अंतरराष्ट्रीय पर्यावरण नियमों के तहत यहाँ व्यावसायिक खेती पूरी तरह प्रतिबंधित है।`;
         phoneticFallback = announcement;
@@ -2392,22 +2508,57 @@
         else if (/[\u0600-\u06FF]/.test(clean)) detectedLang = 'ur-PK';
       }
 
-      const prefix = detectedLang.split('-')[0].toLowerCase();
+      let prefix = detectedLang.split('-')[0].toLowerCase();
       const voices = (cachedSystemVoices && cachedSystemVoices.length > 0) ? cachedSystemVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
+      
+      // Check if system has a voice capable of speaking this language
+      const hasLanguageVoice = voices.some(v => {
+        const vl = v.lang.toLowerCase();
+        const vn = v.name.toLowerCase();
+        return vl.startsWith(prefix) || vn.includes(prefix);
+      });
+
+      // If user OS does not have a native voice for this language and not English, fall back smoothly to English
+      let actualLang = detectedLang;
+      let textReading = clean;
+      if (prefix !== 'en' && !hasLanguageVoice) {
+        // Fallback to English announcement with English voice so it never reads Kannada/French with default Hindi voice!
+        const enAnnounce = `Selected Location: ${currentLocationContext?.name || 'Target'}. Recommended Crop: ${lastMLData?.recommended_crop || 'High-Yield Variety'}. Expected yield: ${lastMLData?.predicted_yield_tons_ha || '4.5'} tons per hectare with an estimated return on investment of ${lastMLData?.economic_profit?.roi_percentage || '185%'}.`;
+        textReading = enAnnounce;
+        actualLang = 'en-US';
+        prefix = 'en';
+      }
+
+      // Expand technical abbreviations so speech synthesizer pronounces them naturally without tripping
+      textReading = textReading
+        .replace(/\bT\/Ha\b/gi, ' tons per hectare ')
+        .replace(/\b°C\b/g, ' degrees Celsius ')
+        .replace(/\bmm\/yr\b/gi, ' millimeters per year ')
+        .replace(/\bmm\b/gi, ' millimeters ')
+        .replace(/\bPSU\b/gi, ' P S U ')
+        .replace(/\bppm\b/gi, ' parts per million ')
+        .replace(/\bpH\b/g, ' p H ')
+        .replace(/\bROI\b/g, ' return on investment ');
+
       const matched = voices.find(v => {
         const vl = v.lang.toLowerCase();
         const vn = v.name.toLowerCase();
-        const isEnglish = vl.startsWith('en') || vn.includes('english');
-        if (prefix !== 'en' && isEnglish) return false;
+        if (prefix === 'en') return vl.startsWith('en') || vn.includes('english');
         return vl.startsWith(prefix) || 
-               (prefix === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana'))) ||
-               (prefix === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha'))) ||
-               (prefix === 'te' && (vn.includes('telugu') || vn.includes('mohan'))) ||
                (prefix === 'kn' && (vn.includes('kannada') || vn.includes('gagan'))) ||
+               (prefix === 'te' && (vn.includes('telugu') || vn.includes('mohan'))) ||
                (prefix === 'ml' && (vn.includes('malayalam') || vn.includes('midhun'))) ||
-               (prefix === 'bn' && (vn.includes('bengali') || vn.includes('bangla') || vn.includes('bashkar'))) ||
+               (prefix === 'ta' && (vn.includes('tamil') || vn.includes('valluvar') || vn.includes('latha'))) ||
+               (prefix === 'hi' && (vn.includes('hindi') || vn.includes('swara') || vn.includes('hemant') || vn.includes('kalpana'))) ||
+               (prefix === 'fr' && (vn.includes('french') || vn.includes('français') || vn.includes('paul') || vn.includes('julie'))) ||
+               (prefix === 'it' && (vn.includes('italian') || vn.includes('italiano') || vn.includes('cosimo') || vn.includes('elsa'))) ||
+               (prefix === 'es' && (vn.includes('spanish') || vn.includes('español') || vn.includes('helena') || vn.includes('laura'))) ||
+               (prefix === 'de' && (vn.includes('german') || vn.includes('deutsch') || vn.includes('stefan') || vn.includes('hedda'))) ||
+               (prefix === 'ja' && (vn.includes('japanese') || vn.includes('haruka') || vn.includes('ayumi'))) ||
+               (prefix === 'pt' && (vn.includes('portuguese') || vn.includes('português'))) ||
                (prefix === 'mr' && (vn.includes('marathi') || vn.includes('aarohi'))) ||
                (prefix === 'gu' && (vn.includes('gujarati') || vn.includes('dhwani'))) ||
+               (prefix === 'bn' && (vn.includes('bengali') || vn.includes('bangla') || vn.includes('bashkar'))) ||
                (prefix === 'pa' && (vn.includes('punjabi') || vn.includes('gurmukhi'))) ||
                (prefix === 'ur' && (vn.includes('urdu') || vn.includes('gul')));
       });
@@ -2592,7 +2743,19 @@
 
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('click', onGlobeClick);
+    
+    // Accurate click vs orbit drag detection
+    let globePointerDown = { x: 0, y: 0, time: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      globePointerDown = { x: e.clientX, y: e.clientY, time: Date.now() };
+    });
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      const dist = Math.hypot(e.clientX - globePointerDown.x, e.clientY - globePointerDown.y);
+      const elapsed = Date.now() - globePointerDown.time;
+      if (dist < 6 && elapsed < 500) {
+        onGlobeClick(e);
+      }
+    });
     window.addEventListener('resize', onWindowResize);
 
     update3DPinPosition(11.0168, 76.9558);
@@ -2636,7 +2799,7 @@
         glowMesh.material.color.setHex(colorHex);
       }
     }
-    // Orient 3D globe camera towards target pin so it is always front-facing
+    // Orient 3D globe camera only when explicitly requested (e.g. search box), never on manual click
     if (focusCamera && camera && controls) {
       const camDist = 200;
       const nx = x / R;
@@ -2658,13 +2821,20 @@
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObject(globeMesh);
     if (hits.length > 0) {
-      const p = hits[0].point;
-      const R = 80;
-      // Correct inverse formula matching Three.js SphereGeometry UV mapping:
-      // phi = acos(y/R), lat = 90 - phi; theta = atan2(z, -x), lon = theta_deg - 180
-      const lat = 90 - (Math.acos(Math.max(-1, Math.min(1, p.y / R))) * 180 / Math.PI);
-      const lon_raw = Math.atan2(p.z, -p.x) * 180 / Math.PI;
-      const lon = ((lon_raw + 360) % 360) - 180;
+      let lat, lon;
+      if (hits[0].uv) {
+        // High-precision UV mapping directly matches Earth texture equirectangular pixels
+        lat = (hits[0].uv.y - 0.5) * 180;
+        lon = (hits[0].uv.x - 0.5) * 360;
+      } else {
+        const p = hits[0].point;
+        const pLen = Math.max(1, p.length());
+        lat = 90 - (Math.acos(Math.max(-1, Math.min(1, p.y / pLen))) * 180 / Math.PI);
+        const lon_raw = Math.atan2(p.z, -p.x) * 180 / Math.PI;
+        lon = ((lon_raw + 360) % 360) - 180;
+      }
+      lat = Math.max(-85, Math.min(85, lat));
+      lon = ((lon + 180) % 360 + 360) % 360 - 180;
       
       // 0ms SUDDEN UPDATE: Instantly resolve exact geographic anchor and trigger dashboard refresh in 0ms!
       const geo = getExactGeographicLocationName(lat, lon);
@@ -3202,6 +3372,282 @@
   const WORLD_AGRONOMY_DATA = [
   {
     "id": 1,
+    "region_name": "Mandya",
+    "country": "India",
+    "lat": 12.522,
+    "lon": 76.897,
+    "crop_name": "Sugarcane & Finger Millet (Ragi)",
+    "botanical_species": "Saccharum officinarum & Eleusine coracana",
+    "variety": "Co-62175 & Indaf-9 (Ragi Karnataka Heartland)",
+    "optimal_soil_type": "Rich red sandy loam with KRS perennial canal fertigation",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.5,
+    "base_yield_tons_ha": 82.0,
+    "market_price_per_ton": 48.0,
+    "cost_per_ha": 1650.0,
+    "curcumin_or_brix_quality": "Sucrose Recovery 11.2% / Ragi Calcium Density 344mg/100g",
+    "specialty_desc": "Mandya is Karnataka's sugar capital and ragi bowl. Perennial KRS reservoir canal irrigation and red loamy soils produce world-class sugarcane biomass reaching 82.0 T/Ha and drought-hardy nutritious finger millet.",
+    "crop_emoji": "🎋",
+    "climate_zone": "Tropical Irrigated River Basin",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 720.0
+  },
+  {
+    "id": 2,
+    "region_name": "Chikkamagaluru",
+    "country": "India",
+    "lat": 13.3153,
+    "lon": 75.7754,
+    "crop_name": "Shade-Grown Arabica Coffee & Cardamom",
+    "botanical_species": "Coffea arabica & Elettaria cardamomum",
+    "variety": "Sln-795 / Chandragiri & Malabar Mysore Cardamom",
+    "optimal_soil_type": "Highland humic forest loam, acidic pH 5.4-6.2 with deep leaf mulch",
+    "optimal_ph_min": 5.4,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 2.8,
+    "market_price_per_ton": 3800.0,
+    "cost_per_ha": 2900.0,
+    "curcumin_or_brix_quality": "Cupping Score 86+ Specialty Grade / Bright Floral Citrus Acidity",
+    "specialty_desc": "The historic cradle of Indian coffee in the Baba Budan Giri mist hills. High altitudes (1100-1400m), double-canopy shade, and organic forest soils produce internationally celebrated high-cupping Arabica coffee.",
+    "crop_emoji": "☕",
+    "climate_zone": "Montane Subtropical Mist Valley",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 26.0,
+    "optimal_rainfall_mm": 1850.0
+  },
+  {
+    "id": 3,
+    "region_name": "Shimoga",
+    "country": "India",
+    "lat": 13.9299,
+    "lon": 75.5681,
+    "crop_name": "Arecanut & Robusta Coffee",
+    "botanical_species": "Areca catechu & Coffea canephora",
+    "variety": "Thirthahalli Local & Sln-274 Robusta",
+    "optimal_soil_type": "Deep red lateritic gravelly clay loam with organic mulch drainage",
+    "optimal_ph_min": 5.6,
+    "optimal_ph_max": 6.8,
+    "base_yield_tons_ha": 3.4,
+    "market_price_per_ton": 4200.0,
+    "cost_per_ha": 2700.0,
+    "curcumin_or_brix_quality": "Tannin Density 18% / Heavy Bunch Bearing Index",
+    "specialty_desc": "Western Ghats Malnad foothills with heavy southwest monsoon rainfall and well-drained terraced laterite soils yield premium chewable Thirthahalli commercial Arecanut at 3.4 T/Ha.",
+    "crop_emoji": "🌴",
+    "climate_zone": "Tropical Malnad Foothills",
+    "optimal_temp_min": 20.0,
+    "optimal_temp_max": 33.0,
+    "optimal_rainfall_mm": 2200.0
+  },
+  {
+    "id": 4,
+    "region_name": "Dharwad",
+    "country": "India",
+    "lat": 15.4589,
+    "lon": 75.0078,
+    "crop_name": "Cotton & Soybean",
+    "botanical_species": "Gossypium hirsutum & Glycine max",
+    "variety": "DCH-32 Hybrid Extra-Long Staple / JS-335",
+    "optimal_soil_type": "Deep black cotton vertisol with superior moisture retention",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 7.9,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 890.0,
+    "cost_per_ha": 820.0,
+    "curcumin_or_brix_quality": "Staple Length 36mm / Protein Content 41.5%",
+    "specialty_desc": "North Karnataka Deccan plateau with moisture-retentive black cotton vertisols delivers bumper yields of export-quality extra-long staple hybrid cotton and protein-packed soybeans.",
+    "crop_emoji": "☁️",
+    "climate_zone": "Deccan Semi-Arid Plateau",
+    "optimal_temp_min": 21.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 740.0
+  },
+  {
+    "id": 5,
+    "region_name": "Konaseema",
+    "country": "India",
+    "lat": 16.9891,
+    "lon": 82.2475,
+    "crop_name": "Paddy Rice & Coconut",
+    "botanical_species": "Oryza sativa & Cocos nucifera",
+    "variety": "BPT-5204 (Samba Mahsuri) & East Coast Tall",
+    "optimal_soil_type": "Rich deltaic alluvial clay silt with perennial Godavari canal water",
+    "optimal_ph_min": 6.2,
+    "optimal_ph_max": 7.4,
+    "base_yield_tons_ha": 6.8,
+    "market_price_per_ton": 380.0,
+    "cost_per_ha": 1150.0,
+    "curcumin_or_brix_quality": "Grain Slenderness Ratio 3.2 / 135 nuts/palm/year",
+    "specialty_desc": "Godavari deltaic irrigation paradise. Perennial river network and nutrient-laden delta sediment deliver premium superfine Samba Mahsuri rice at 6.8 T/Ha and thriving coastal coconut groves.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Deltaic Alluvial Fertile Granary",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 36.0,
+    "optimal_rainfall_mm": 1150.0
+  },
+  {
+    "id": 6,
+    "region_name": "Anantapur",
+    "country": "India",
+    "lat": 14.6819,
+    "lon": 77.6006,
+    "crop_name": "Groundnut & Sweet Orange (Mosambi)",
+    "botanical_species": "Arachis hypogaea & Citrus limetta",
+    "variety": "Kadiri-6 (K-6 Drought Hardy) & Sathgudi Mosambi",
+    "optimal_soil_type": "Red sandy loam and arid gravelly dryland soil",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.6,
+    "base_yield_tons_ha": 2.6,
+    "market_price_per_ton": 920.0,
+    "cost_per_ha": 750.0,
+    "curcumin_or_brix_quality": "Oil Yield 50.2% / High Kernel Weight 42g/100 seeds",
+    "specialty_desc": "Drought-hardy Rayalaseema plateau with intense solar irradiance and gravelly soil ideally suited for deep-taproot nitrogen-fixing Kadiri groundnuts and sweet citrus orchards.",
+    "crop_emoji": "🥜",
+    "climate_zone": "Semi-Arid Drought Plateau",
+    "optimal_temp_min": 23.0,
+    "optimal_temp_max": 39.0,
+    "optimal_rainfall_mm": 520.0
+  },
+  {
+    "id": 7,
+    "region_name": "Warangal",
+    "country": "India",
+    "lat": 17.9689,
+    "lon": 79.5941,
+    "crop_name": "Cotton & Hybrid Maize",
+    "botanical_species": "Gossypium hirsutum & Zea mays",
+    "variety": "Bollgard-II Bt Cotton & Pioneer Hybrid 3396",
+    "optimal_soil_type": "Mixed black and red sandy clay loam with canal lift irrigation",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 3.6,
+    "market_price_per_ton": 820.0,
+    "cost_per_ha": 780.0,
+    "curcumin_or_brix_quality": "Lint Shelling Ratio 35.5% / High Kernel Starch 72%",
+    "specialty_desc": "Telangana agro-belt supported by Godavari lift irrigation channels producing high-yield long-staple cotton and poultry-grade hybrid maize.",
+    "crop_emoji": "☁️",
+    "climate_zone": "Tropical Semi-Arid Agro Plains",
+    "optimal_temp_min": 22.0,
+    "optimal_temp_max": 37.0,
+    "optimal_rainfall_mm": 840.0
+  },
+  {
+    "id": 8,
+    "region_name": "Kottayam",
+    "country": "India",
+    "lat": 9.5916,
+    "lon": 76.5222,
+    "crop_name": "Natural Rubber & Tapioca",
+    "botanical_species": "Hevea brasiliensis & Manihot esculenta",
+    "variety": "RRII-105 High-Latex Strain & M-4 Cassava",
+    "optimal_soil_type": "Deep red lateritic undulating hill slopes with organic forest mulch",
+    "optimal_ph_min": 5.0,
+    "optimal_ph_max": 6.2,
+    "base_yield_tons_ha": 2.4,
+    "market_price_per_ton": 2100.0,
+    "cost_per_ha": 1400.0,
+    "curcumin_or_brix_quality": "Dry Rubber Content 34% / Starch Purity 88%",
+    "specialty_desc": "Kerala rubber capital accounting for India's highest natural latex output. Steady tropical humidity, warm temperatures, and terraced laterite hill slopes promote optimal latex flow at 2.4 T/Ha.",
+    "crop_emoji": "🌳",
+    "climate_zone": "Humid Tropical Plantation Belt",
+    "optimal_temp_min": 23.0,
+    "optimal_temp_max": 34.0,
+    "optimal_rainfall_mm": 2800.0
+  },
+  {
+    "id": 9,
+    "region_name": "Kuttanad",
+    "country": "India",
+    "lat": 9.4981,
+    "lon": 76.3388,
+    "crop_name": "Pokkali Salt-Resilient Rice & Prawns",
+    "botanical_species": "Oryza sativa",
+    "variety": "Pokkali Traditional Coastal Strain (GI Tag)",
+    "optimal_soil_type": "Hydromorphic saline coastal alluvium (Below Sea Level)",
+    "optimal_ph_min": 5.5,
+    "optimal_ph_max": 7.0,
+    "base_yield_tons_ha": 3.2,
+    "market_price_per_ton": 850.0,
+    "cost_per_ha": 950.0,
+    "curcumin_or_brix_quality": "Organic Micronutrient-Dense / Salinity Tolerant up to 8 dS/m",
+    "specialty_desc": "Globally Important Agricultural Heritage System (GIAHS) practiced 1.5 to 2 meters below sea level where organic rice cultivation alternates with marine prawn farming in backwater lagoons.",
+    "crop_emoji": "🍚",
+    "climate_zone": "Sub-Sea-Level Coastal Wetland",
+    "optimal_temp_min": 24.0,
+    "optimal_temp_max": 33.0,
+    "optimal_rainfall_mm": 2900.0
+  },
+  {
+    "id": 10,
+    "region_name": "Provence",
+    "country": "France",
+    "lat": 44.2,
+    "lon": 4.8,
+    "crop_name": "Lavender & Syrah Wine Grapes",
+    "botanical_species": "Lavandula angustifolia & Vitis vinifera",
+    "variety": "Fine Lavender AOP & Syrah Rhône",
+    "optimal_soil_type": "Limestone gravel and dry sun-drenched Garrigue hillside terraces",
+    "optimal_ph_min": 6.8,
+    "optimal_ph_max": 8.2,
+    "base_yield_tons_ha": 4.5,
+    "market_price_per_ton": 2600.0,
+    "cost_per_ha": 2200.0,
+    "curcumin_or_brix_quality": "Essential Oil Ester Content 42% / Deep Tannin Anthocyanins",
+    "specialty_desc": "Sun-drenched hills of Provence with intense Mediterranean light and limestone soils producing world-famous aromatic AOP lavender oil and concentrated Rhône Syrah red wines.",
+    "crop_emoji": "🌸",
+    "climate_zone": "Mediterranean Sun-Drenched Hills",
+    "optimal_temp_min": 12.0,
+    "optimal_temp_max": 31.0,
+    "optimal_rainfall_mm": 620.0
+  },
+  {
+    "id": 11,
+    "region_name": "Campania",
+    "country": "Italy",
+    "lat": 40.8518,
+    "lon": 14.2681,
+    "crop_name": "San Marzano Plum Tomatoes & Lemons",
+    "botanical_species": "Solanum lycopersicum & Citrus limon",
+    "variety": "San Marzano DOP & Sorrento Femminello",
+    "optimal_soil_type": "Rich volcanic alluvium from Mount Vesuvius with high potassium",
+    "optimal_ph_min": 6.0,
+    "optimal_ph_max": 7.2,
+    "base_yield_tons_ha": 58.0,
+    "market_price_per_ton": 380.0,
+    "cost_per_ha": 3100.0,
+    "curcumin_or_brix_quality": "Low Seed Ratio / High Dry Matter / Intense Sweet Savory Balance",
+    "specialty_desc": "Vesuvius volcanic soil rich in potassium and Mediterranean coastal breezes produce world-standard San Marzano DOP plum tomatoes and thick-rinded Sorrento lemons.",
+    "crop_emoji": "🍅",
+    "climate_zone": "Volcanic Mediterranean Coastal Plain",
+    "optimal_temp_min": 14.0,
+    "optimal_temp_max": 32.0,
+    "optimal_rainfall_mm": 780.0
+  },
+  {
+    "id": 12,
+    "region_name": "Valencia",
+    "country": "Spain",
+    "lat": 39.4699,
+    "lon": -0.3763,
+    "crop_name": "Valencia Sweet Oranges & Paella Rice",
+    "botanical_species": "Citrus sinensis & Oryza sativa",
+    "variety": "Valencia Late / Navel & Bomba Rice (DOP Arroz de Valencia)",
+    "optimal_soil_type": "Fertile coastal Huerta alluvial silt with acequia canal irrigation",
+    "optimal_ph_min": 6.5,
+    "optimal_ph_max": 7.8,
+    "base_yield_tons_ha": 38.0,
+    "market_price_per_ton": 420.0,
+    "cost_per_ha": 2800.0,
+    "curcumin_or_brix_quality": "High Juice 52% / High Amylose Bomba Absorption Ratio 1:3",
+    "specialty_desc": "The historic Huerta of Valencia watered by Turia irrigation ditches producing sweet thin-skinned Valencia oranges at 38 T/Ha and round Bomba rice for traditional paella.",
+    "crop_emoji": "🍊",
+    "climate_zone": "Mediterranean Coastal Huerta",
+    "optimal_temp_min": 13.0,
+    "optimal_temp_max": 33.0,
+    "optimal_rainfall_mm": 510.0
+  },
+  {
+    "id": 13,
     "region_name": "Erode",
     "country": "India",
     "lat": 11.341,
@@ -3224,7 +3670,7 @@
     "optimal_rainfall_mm": 750.0
   },
   {
-    "id": 2,
+    "id": 14,
     "region_name": "Kashmir",
     "country": "India",
     "lat": 34.0837,
@@ -3247,7 +3693,7 @@
     "optimal_rainfall_mm": 850.0
   },
   {
-    "id": 3,
+    "id": 15,
     "region_name": "Coimbatore",
     "country": "India",
     "lat": 11.0168,
@@ -3270,7 +3716,7 @@
     "optimal_rainfall_mm": 680.0
   },
   {
-    "id": 4,
+    "id": 16,
     "region_name": "Nilgiris",
     "country": "India",
     "lat": 11.4102,
@@ -3293,7 +3739,7 @@
     "optimal_rainfall_mm": 1600.0
   },
   {
-    "id": 5,
+    "id": 17,
     "region_name": "Thanjavur",
     "country": "India",
     "lat": 10.787,
@@ -3316,7 +3762,7 @@
     "optimal_rainfall_mm": 1100.0
   },
   {
-    "id": 6,
+    "id": 18,
     "region_name": "Theni",
     "country": "India",
     "lat": 10.0104,
@@ -3339,7 +3785,7 @@
     "optimal_rainfall_mm": 850.0
   },
   {
-    "id": 7,
+    "id": 19,
     "region_name": "Nagpur",
     "country": "India",
     "lat": 21.1458,
@@ -3362,7 +3808,7 @@
     "optimal_rainfall_mm": 880.0
   },
   {
-    "id": 8,
+    "id": 20,
     "region_name": "Guntur",
     "country": "India",
     "lat": 16.3067,
@@ -3385,7 +3831,7 @@
     "optimal_rainfall_mm": 750.0
   },
   {
-    "id": 9,
+    "id": 21,
     "region_name": "Punjab",
     "country": "India",
     "lat": 30.901,
@@ -3408,7 +3854,7 @@
     "optimal_rainfall_mm": 650.0
   },
   {
-    "id": 10,
+    "id": 22,
     "region_name": "Wayanad",
     "country": "India",
     "lat": 11.6854,
@@ -3431,7 +3877,7 @@
     "optimal_rainfall_mm": 2400.0
   },
   {
-    "id": 11,
+    "id": 23,
     "region_name": "Saurashtra",
     "country": "India",
     "lat": 21.5222,
@@ -3454,7 +3900,7 @@
     "optimal_rainfall_mm": 580.0
   },
   {
-    "id": 12,
+    "id": 24,
     "region_name": "Nashik",
     "country": "India",
     "lat": 19.9975,
@@ -3477,7 +3923,7 @@
     "optimal_rainfall_mm": 720.0
   },
   {
-    "id": 13,
+    "id": 25,
     "region_name": "Ratnagiri",
     "country": "India",
     "lat": 16.9902,
@@ -3500,7 +3946,7 @@
     "optimal_rainfall_mm": 2800.0
   },
   {
-    "id": 14,
+    "id": 26,
     "region_name": "Assam",
     "country": "India",
     "lat": 26.1445,
@@ -3523,7 +3969,7 @@
     "optimal_rainfall_mm": 2100.0
   },
   {
-    "id": 15,
+    "id": 27,
     "region_name": "Shimla",
     "country": "India",
     "lat": 31.1048,
@@ -3546,7 +3992,7 @@
     "optimal_rainfall_mm": 1150.0
   },
   {
-    "id": 16,
+    "id": 28,
     "region_name": "Coorg",
     "country": "India",
     "lat": 12.4244,
@@ -3569,7 +4015,7 @@
     "optimal_rainfall_mm": 2200.0
   },
   {
-    "id": 17,
+    "id": 29,
     "region_name": "Pakistan Punjab",
     "country": "Pakistan",
     "lat": 31.5204,
@@ -3592,7 +4038,7 @@
     "optimal_rainfall_mm": 520.0
   },
   {
-    "id": 18,
+    "id": 30,
     "region_name": "Sylhet",
     "country": "Bangladesh",
     "lat": 24.8949,
@@ -3615,7 +4061,7 @@
     "optimal_rainfall_mm": 2600.0
   },
   {
-    "id": 19,
+    "id": 31,
     "region_name": "Nuwara Eliya",
     "country": "Sri Lanka",
     "lat": 6.9497,
@@ -3638,7 +4084,7 @@
     "optimal_rainfall_mm": 2200.0
   },
   {
-    "id": 20,
+    "id": 32,
     "region_name": "Iowa Corn Belt",
     "country": "United States",
     "lat": 41.878,
@@ -3661,7 +4107,7 @@
     "optimal_rainfall_mm": 890.0
   },
   {
-    "id": 21,
+    "id": 33,
     "region_name": "Salinas Valley",
     "country": "United States",
     "lat": 36.6777,
@@ -3684,7 +4130,7 @@
     "optimal_rainfall_mm": 420.0
   },
   {
-    "id": 22,
+    "id": 34,
     "region_name": "Central Valley Fresno",
     "country": "United States",
     "lat": 36.7468,
@@ -3707,7 +4153,7 @@
     "optimal_rainfall_mm": 320.0
   },
   {
-    "id": 23,
+    "id": 35,
     "region_name": "Yakima Valley",
     "country": "United States",
     "lat": 46.6021,
@@ -3730,7 +4176,7 @@
     "optimal_rainfall_mm": 240.0
   },
   {
-    "id": 24,
+    "id": 36,
     "region_name": "Snake River Plain",
     "country": "United States",
     "lat": 43.615,
@@ -3753,7 +4199,7 @@
     "optimal_rainfall_mm": 280.0
   },
   {
-    "id": 25,
+    "id": 37,
     "region_name": "Kansas Wheat Belt",
     "country": "United States",
     "lat": 38.5266,
@@ -3776,7 +4222,7 @@
     "optimal_rainfall_mm": 680.0
   },
   {
-    "id": 26,
+    "id": 38,
     "region_name": "Florida Citrus Belt",
     "country": "United States",
     "lat": 28.0395,
@@ -3799,7 +4245,7 @@
     "optimal_rainfall_mm": 1300.0
   },
   {
-    "id": 27,
+    "id": 39,
     "region_name": "Texas High Plains",
     "country": "United States",
     "lat": 33.5779,
@@ -3822,7 +4268,7 @@
     "optimal_rainfall_mm": 480.0
   },
   {
-    "id": 28,
+    "id": 40,
     "region_name": "Georgia Peaches & Peanuts",
     "country": "United States",
     "lat": 32.1656,
@@ -3845,7 +4291,7 @@
     "optimal_rainfall_mm": 1200.0
   },
   {
-    "id": 29,
+    "id": 41,
     "region_name": "Napa Valley",
     "country": "United States",
     "lat": 38.2975,
@@ -3868,7 +4314,7 @@
     "optimal_rainfall_mm": 650.0
   },
   {
-    "id": 30,
+    "id": 42,
     "region_name": "Saskatchewan Prairie",
     "country": "Canada",
     "lat": 52.1332,
@@ -3891,7 +4337,7 @@
     "optimal_rainfall_mm": 420.0
   },
   {
-    "id": 31,
+    "id": 43,
     "region_name": "Okanagan Valley",
     "country": "Canada",
     "lat": 49.888,
@@ -3914,7 +4360,7 @@
     "optimal_rainfall_mm": 380.0
   },
   {
-    "id": 32,
+    "id": 44,
     "region_name": "Sinaloa Valley",
     "country": "Mexico",
     "lat": 24.8091,
@@ -3937,7 +4383,7 @@
     "optimal_rainfall_mm": 620.0
   },
   {
-    "id": 33,
+    "id": 45,
     "region_name": "Michoacán Highlands",
     "country": "Mexico",
     "lat": 19.421,
@@ -3960,7 +4406,7 @@
     "optimal_rainfall_mm": 1100.0
   },
   {
-    "id": 34,
+    "id": 46,
     "region_name": "Jalisco Agave Basin",
     "country": "Mexico",
     "lat": 20.6597,
@@ -3983,7 +4429,7 @@
     "optimal_rainfall_mm": 780.0
   },
   {
-    "id": 35,
+    "id": 47,
     "region_name": "Mato Grosso",
     "country": "Brazil",
     "lat": -12.6819,
@@ -4006,7 +4452,7 @@
     "optimal_rainfall_mm": 1750.0
   },
   {
-    "id": 36,
+    "id": 48,
     "region_name": "São Paulo Paulista",
     "country": "Brazil",
     "lat": -21.1767,
@@ -4029,7 +4475,7 @@
     "optimal_rainfall_mm": 1350.0
   },
   {
-    "id": 37,
+    "id": 49,
     "region_name": "Minas Gerais",
     "country": "Brazil",
     "lat": -19.9208,
@@ -4052,7 +4498,7 @@
     "optimal_rainfall_mm": 1450.0
   },
   {
-    "id": 38,
+    "id": 50,
     "region_name": "Bahia Cocoa Coast",
     "country": "Brazil",
     "lat": -14.7963,
@@ -4075,7 +4521,7 @@
     "optimal_rainfall_mm": 1900.0
   },
   {
-    "id": 39,
+    "id": 51,
     "region_name": "Pampas Heartland",
     "country": "Argentina",
     "lat": -34.6037,
@@ -4098,7 +4544,7 @@
     "optimal_rainfall_mm": 850.0
   },
   {
-    "id": 40,
+    "id": 52,
     "region_name": "Mendoza Foothills",
     "country": "Argentina",
     "lat": -32.8895,
@@ -4121,7 +4567,7 @@
     "optimal_rainfall_mm": 220.0
   },
   {
-    "id": 41,
+    "id": 53,
     "region_name": "Antioquia Coffee Axis",
     "country": "Colombia",
     "lat": 6.2442,
@@ -4144,7 +4590,7 @@
     "optimal_rainfall_mm": 2100.0
   },
   {
-    "id": 42,
+    "id": 54,
     "region_name": "Central Valley Maipo",
     "country": "Chile",
     "lat": -33.4489,
@@ -4167,7 +4613,7 @@
     "optimal_rainfall_mm": 380.0
   },
   {
-    "id": 43,
+    "id": 55,
     "region_name": "Sacred Valley",
     "country": "Peru",
     "lat": -13.1631,
@@ -4190,7 +4636,7 @@
     "optimal_rainfall_mm": 620.0
   },
   {
-    "id": 44,
+    "id": 56,
     "region_name": "Guayas River Basin",
     "country": "Ecuador",
     "lat": -2.1709,
@@ -4213,7 +4659,7 @@
     "optimal_rainfall_mm": 1600.0
   },
   {
-    "id": 45,
+    "id": 57,
     "region_name": "Jaen Andalusia",
     "country": "Spain",
     "lat": 37.7796,
@@ -4236,7 +4682,7 @@
     "optimal_rainfall_mm": 480.0
   },
   {
-    "id": 46,
+    "id": 58,
     "region_name": "Valencia Coast",
     "country": "Spain",
     "lat": 39.4699,
@@ -4259,7 +4705,7 @@
     "optimal_rainfall_mm": 510.0
   },
   {
-    "id": 47,
+    "id": 59,
     "region_name": "Bordeaux Viticulture",
     "country": "France",
     "lat": 44.8378,
@@ -4282,7 +4728,7 @@
     "optimal_rainfall_mm": 780.0
   },
   {
-    "id": 48,
+    "id": 60,
     "region_name": "Champagne",
     "country": "France",
     "lat": 49.2583,
@@ -4305,7 +4751,7 @@
     "optimal_rainfall_mm": 720.0
   },
   {
-    "id": 49,
+    "id": 61,
     "region_name": "Beauce Granary",
     "country": "France",
     "lat": 48.4468,
@@ -4328,7 +4774,7 @@
     "optimal_rainfall_mm": 640.0
   },
   {
-    "id": 50,
+    "id": 62,
     "region_name": "Tuscany",
     "country": "Italy",
     "lat": 43.7696,
@@ -4351,7 +4797,7 @@
     "optimal_rainfall_mm": 680.0
   },
   {
-    "id": 51,
+    "id": 63,
     "region_name": "Po Valley",
     "country": "Italy",
     "lat": 44.4949,
@@ -4374,7 +4820,7 @@
     "optimal_rainfall_mm": 820.0
   },
   {
-    "id": 52,
+    "id": 64,
     "region_name": "Bavaria Hallertau",
     "country": "Germany",
     "lat": 48.55,
@@ -4397,7 +4843,7 @@
     "optimal_rainfall_mm": 760.0
   },
   {
-    "id": 53,
+    "id": 65,
     "region_name": "Westland",
     "country": "Netherlands",
     "lat": 51.9967,
@@ -4420,7 +4866,7 @@
     "optimal_rainfall_mm": 820.0
   },
   {
-    "id": 54,
+    "id": 66,
     "region_name": "East Anglia",
     "country": "United Kingdom",
     "lat": 52.2405,
@@ -4443,7 +4889,7 @@
     "optimal_rainfall_mm": 580.0
   },
   {
-    "id": 55,
+    "id": 67,
     "region_name": "Mazovia Plain",
     "country": "Poland",
     "lat": 52.2297,
@@ -4466,7 +4912,7 @@
     "optimal_rainfall_mm": 550.0
   },
   {
-    "id": 56,
+    "id": 68,
     "region_name": "Chernozem Steppe",
     "country": "Ukraine",
     "lat": 49.9935,
@@ -4489,7 +4935,7 @@
     "optimal_rainfall_mm": 540.0
   },
   {
-    "id": 57,
+    "id": 69,
     "region_name": "Peloponnese",
     "country": "Greece",
     "lat": 37.5079,
@@ -4512,7 +4958,7 @@
     "optimal_rainfall_mm": 480.0
   },
   {
-    "id": 58,
+    "id": 70,
     "region_name": "Alentejo",
     "country": "Portugal",
     "lat": 38.5714,
@@ -4535,7 +4981,7 @@
     "optimal_rainfall_mm": 540.0
   },
   {
-    "id": 59,
+    "id": 71,
     "region_name": "Rogaland Coastal",
     "country": "Norway",
     "lat": 58.9699,
@@ -4558,7 +5004,7 @@
     "optimal_rainfall_mm": 1250.0
   },
   {
-    "id": 60,
+    "id": 72,
     "region_name": "Niigata Echigo",
     "country": "Japan",
     "lat": 37.9162,
@@ -4581,7 +5027,7 @@
     "optimal_rainfall_mm": 1600.0
   },
   {
-    "id": 61,
+    "id": 73,
     "region_name": "Shizuoka Tea",
     "country": "Japan",
     "lat": 34.9756,
@@ -4604,7 +5050,7 @@
     "optimal_rainfall_mm": 2200.0
   },
   {
-    "id": 62,
+    "id": 74,
     "region_name": "Aomori Orchards",
     "country": "Japan",
     "lat": 40.8244,
@@ -4627,7 +5073,7 @@
     "optimal_rainfall_mm": 1100.0
   },
   {
-    "id": 63,
+    "id": 75,
     "region_name": "Hokkaido Tokachi",
     "country": "Japan",
     "lat": 42.9239,
@@ -4650,7 +5096,7 @@
     "optimal_rainfall_mm": 920.0
   },
   {
-    "id": 64,
+    "id": 76,
     "region_name": "Hunan Yangtze",
     "country": "China",
     "lat": 28.2282,
@@ -4673,7 +5119,7 @@
     "optimal_rainfall_mm": 1450.0
   },
   {
-    "id": 65,
+    "id": 77,
     "region_name": "Henan Plain",
     "country": "China",
     "lat": 34.7466,
@@ -4696,7 +5142,7 @@
     "optimal_rainfall_mm": 620.0
   },
   {
-    "id": 66,
+    "id": 78,
     "region_name": "Xinjiang Tarim",
     "country": "China",
     "lat": 41.7259,
@@ -4719,7 +5165,7 @@
     "optimal_rainfall_mm": 85.0
   },
   {
-    "id": 67,
+    "id": 79,
     "region_name": "Yunnan Highlands",
     "country": "China",
     "lat": 22.7877,
@@ -4742,7 +5188,7 @@
     "optimal_rainfall_mm": 1550.0
   },
   {
-    "id": 68,
+    "id": 80,
     "region_name": "Fujian Wuyi",
     "country": "China",
     "lat": 27.7554,
@@ -4765,7 +5211,7 @@
     "optimal_rainfall_mm": 1900.0
   },
   {
-    "id": 69,
+    "id": 81,
     "region_name": "Mekong Delta",
     "country": "Vietnam",
     "lat": 10.0452,
@@ -4788,7 +5234,7 @@
     "optimal_rainfall_mm": 1850.0
   },
   {
-    "id": 70,
+    "id": 82,
     "region_name": "Central Highlands Dak Lak",
     "country": "Vietnam",
     "lat": 12.6667,
@@ -4811,7 +5257,7 @@
     "optimal_rainfall_mm": 1750.0
   },
   {
-    "id": 71,
+    "id": 83,
     "region_name": "Chao Phraya Basin",
     "country": "Thailand",
     "lat": 13.7563,
@@ -4834,7 +5280,7 @@
     "optimal_rainfall_mm": 1400.0
   },
   {
-    "id": 72,
+    "id": 84,
     "region_name": "Chanthaburi Fruit Belt",
     "country": "Thailand",
     "lat": 12.6114,
@@ -4857,7 +5303,7 @@
     "optimal_rainfall_mm": 2400.0
   },
   {
-    "id": 73,
+    "id": 85,
     "region_name": "North Sumatra",
     "country": "Indonesia",
     "lat": 2.9833,
@@ -4880,7 +5326,7 @@
     "optimal_rainfall_mm": 2600.0
   },
   {
-    "id": 74,
+    "id": 86,
     "region_name": "Davao Mindanao",
     "country": "Philippines",
     "lat": 7.1907,
@@ -4903,7 +5349,7 @@
     "optimal_rainfall_mm": 1950.0
   },
   {
-    "id": 75,
+    "id": 87,
     "region_name": "Kedah Rice Bowl",
     "country": "Malaysia",
     "lat": 6.1184,
@@ -4926,7 +5372,7 @@
     "optimal_rainfall_mm": 2100.0
   },
   {
-    "id": 76,
+    "id": 88,
     "region_name": "Nile Delta",
     "country": "Egypt",
     "lat": 30.8761,
@@ -4949,7 +5395,7 @@
     "optimal_rainfall_mm": 45.0
   },
   {
-    "id": 77,
+    "id": 89,
     "region_name": "Al-Qassim Oasis",
     "country": "Saudi Arabia",
     "lat": 26.326,
@@ -4972,7 +5418,7 @@
     "optimal_rainfall_mm": 65.0
   },
   {
-    "id": 78,
+    "id": 90,
     "region_name": "Izmir Aegean",
     "country": "Turkey",
     "lat": 38.4237,
@@ -4995,7 +5441,7 @@
     "optimal_rainfall_mm": 560.0
   },
   {
-    "id": 79,
+    "id": 91,
     "region_name": "Black Sea Trabzon",
     "country": "Turkey",
     "lat": 41.0027,
@@ -5018,7 +5464,7 @@
     "optimal_rainfall_mm": 1250.0
   },
   {
-    "id": 80,
+    "id": 92,
     "region_name": "Khorasan",
     "country": "Iran",
     "lat": 36.2972,
@@ -5041,7 +5487,7 @@
     "optimal_rainfall_mm": 180.0
   },
   {
-    "id": 81,
+    "id": 93,
     "region_name": "Souss Valley",
     "country": "Morocco",
     "lat": 30.4278,
@@ -5064,7 +5510,7 @@
     "optimal_rainfall_mm": 220.0
   },
   {
-    "id": 82,
+    "id": 94,
     "region_name": "Kericho Rift Valley",
     "country": "Kenya",
     "lat": -0.3689,
@@ -5087,7 +5533,7 @@
     "optimal_rainfall_mm": 1950.0
   },
   {
-    "id": 83,
+    "id": 95,
     "region_name": "Mount Kenya Nyeri",
     "country": "Kenya",
     "lat": -0.4197,
@@ -5110,7 +5556,7 @@
     "optimal_rainfall_mm": 1450.0
   },
   {
-    "id": 84,
+    "id": 96,
     "region_name": "Ashanti Cocoa",
     "country": "Ghana",
     "lat": 6.6885,
@@ -5133,7 +5579,7 @@
     "optimal_rainfall_mm": 1550.0
   },
   {
-    "id": 85,
+    "id": 97,
     "region_name": "Bas-Sassandra",
     "country": "Ivory Coast",
     "lat": 4.7485,
@@ -5156,7 +5602,7 @@
     "optimal_rainfall_mm": 1850.0
   },
   {
-    "id": 86,
+    "id": 98,
     "region_name": "Yirgacheffe",
     "country": "Ethiopia",
     "lat": 6.1629,
@@ -5179,7 +5625,7 @@
     "optimal_rainfall_mm": 1600.0
   },
   {
-    "id": 87,
+    "id": 99,
     "region_name": "Benue Middle Belt",
     "country": "Nigeria",
     "lat": 7.7322,
@@ -5202,7 +5648,7 @@
     "optimal_rainfall_mm": 1300.0
   },
   {
-    "id": 88,
+    "id": 100,
     "region_name": "Free State Highveld",
     "country": "South Africa",
     "lat": -28.2336,
@@ -5225,7 +5671,7 @@
     "optimal_rainfall_mm": 620.0
   },
   {
-    "id": 89,
+    "id": 101,
     "region_name": "Stellenbosch Winelands",
     "country": "South Africa",
     "lat": -33.9321,
@@ -5248,7 +5694,7 @@
     "optimal_rainfall_mm": 750.0
   },
   {
-    "id": 90,
+    "id": 102,
     "region_name": "Sava Vanilla Coast",
     "country": "Madagascar",
     "lat": -14.2667,
@@ -5271,7 +5717,7 @@
     "optimal_rainfall_mm": 2400.0
   },
   {
-    "id": 91,
+    "id": 103,
     "region_name": "Riverina",
     "country": "Australia",
     "lat": -34.2889,
@@ -5294,7 +5740,7 @@
     "optimal_rainfall_mm": 410.0
   },
   {
-    "id": 92,
+    "id": 104,
     "region_name": "Bundaberg Coast",
     "country": "Australia",
     "lat": -24.8661,
@@ -5317,7 +5763,7 @@
     "optimal_rainfall_mm": 1050.0
   },
   {
-    "id": 93,
+    "id": 105,
     "region_name": "Barossa Valley",
     "country": "Australia",
     "lat": -34.5333,
@@ -5340,7 +5786,7 @@
     "optimal_rainfall_mm": 520.0
   },
   {
-    "id": 94,
+    "id": 106,
     "region_name": "WA Wheatbelt",
     "country": "Australia",
     "lat": -31.4833,
@@ -5363,7 +5809,7 @@
     "optimal_rainfall_mm": 360.0
   },
   {
-    "id": 95,
+    "id": 107,
     "region_name": "Hawke's Bay & Marlborough",
     "country": "New Zealand",
     "lat": -39.4928,
@@ -5386,7 +5832,7 @@
     "optimal_rainfall_mm": 850.0
   },
   {
-    "id": 96,
+    "id": 108,
     "region_name": "Bay of Plenty Te Puke",
     "country": "New Zealand",
     "lat": -37.7833,
@@ -5409,7 +5855,7 @@
     "optimal_rainfall_mm": 1350.0
   },
   {
-    "id": 97,
+    "id": 109,
     "region_name": "Bay of Bengal",
     "country": "International Waters",
     "lat": 15.0,
@@ -5432,7 +5878,7 @@
     "optimal_rainfall_mm": 1200.0
   },
   {
-    "id": 98,
+    "id": 110,
     "region_name": "Arabian Sea",
     "country": "International Waters",
     "lat": 16.0,
@@ -5455,7 +5901,7 @@
     "optimal_rainfall_mm": 850.0
   },
   {
-    "id": 99,
+    "id": 111,
     "region_name": "Indian Ocean",
     "country": "International Waters",
     "lat": -10.0,
@@ -5478,7 +5924,7 @@
     "optimal_rainfall_mm": 1400.0
   },
   {
-    "id": 100,
+    "id": 112,
     "region_name": "North Atlantic",
     "country": "International Waters",
     "lat": 35.0,
@@ -5501,7 +5947,7 @@
     "optimal_rainfall_mm": 950.0
   },
   {
-    "id": 101,
+    "id": 113,
     "region_name": "South Atlantic",
     "country": "International Waters",
     "lat": -25.0,
@@ -5524,7 +5970,7 @@
     "optimal_rainfall_mm": 880.0
   },
   {
-    "id": 102,
+    "id": 114,
     "region_name": "North Pacific",
     "country": "International Waters",
     "lat": 28.0,
@@ -5547,7 +5993,7 @@
     "optimal_rainfall_mm": 1100.0
   },
   {
-    "id": 103,
+    "id": 115,
     "region_name": "Mediterranean Sea",
     "country": "International Waters",
     "lat": 35.0,
@@ -5570,7 +6016,7 @@
     "optimal_rainfall_mm": 480.0
   },
   {
-    "id": 104,
+    "id": 116,
     "region_name": "Amazon Reserve",
     "country": "Brazil",
     "lat": -3.4653,
@@ -5593,7 +6039,7 @@
     "optimal_rainfall_mm": 2800.0
   },
   {
-    "id": 105,
+    "id": 117,
     "region_name": "Congo Basin Reserve",
     "country": "DR Congo",
     "lat": 0.5,
@@ -5616,7 +6062,7 @@
     "optimal_rainfall_mm": 2100.0
   },
   {
-    "id": 106,
+    "id": 118,
     "region_name": "Siberian Taiga",
     "country": "Russia",
     "lat": 60.0,
@@ -5639,7 +6085,7 @@
     "optimal_rainfall_mm": 480.0
   },
   {
-    "id": 107,
+    "id": 119,
     "region_name": "Sundarbans Reserve",
     "country": "India",
     "lat": 21.9497,
@@ -5662,7 +6108,7 @@
     "optimal_rainfall_mm": 1950.0
   },
   {
-    "id": 108,
+    "id": 120,
     "region_name": "Sahara Desert",
     "country": "Africa",
     "lat": 23.4162,
@@ -5685,7 +6131,7 @@
     "optimal_rainfall_mm": 25.0
   },
   {
-    "id": 109,
+    "id": 121,
     "region_name": "Thar Desert",
     "country": "India",
     "lat": 26.5,
@@ -5708,7 +6154,7 @@
     "optimal_rainfall_mm": 160.0
   },
   {
-    "id": 110,
+    "id": 122,
     "region_name": "Atacama Desert",
     "country": "Chile",
     "lat": -23.8634,
@@ -5731,7 +6177,7 @@
     "optimal_rainfall_mm": 2.0
   },
   {
-    "id": 111,
+    "id": 123,
     "region_name": "Australian Outback",
     "country": "Australia",
     "lat": -24.5,
@@ -5754,7 +6200,7 @@
     "optimal_rainfall_mm": 180.0
   },
   {
-    "id": 112,
+    "id": 124,
     "region_name": "Arctic Permafrost",
     "country": "Arctic",
     "lat": 78.0,
@@ -5777,7 +6223,7 @@
     "optimal_rainfall_mm": 120.0
   },
   {
-    "id": 113,
+    "id": 125,
     "region_name": "Antarctica Ice Sheet",
     "country": "Antarctica",
     "lat": -80.0,
@@ -7400,6 +7846,33 @@
 
     // 1. India Regional & Agricultural Classification (Evaluated FIRST so land is never ocean)
     if (lat >= 8.0 && lat <= 37.0 && lon >= 68.0 && lon <= 97.5) {
+      // Karnataka Agro Hubs
+      if (lat >= 11.5 && lat <= 18.5 && lon >= 74.0 && lon <= 78.6) {
+        if (lat >= 12.0 && lat <= 13.0 && lon >= 76.2 && lon <= 77.4) return { name: "Mandya (Sugarcane & Ragi Heartland), Karnataka", country: "India" };
+        if (lat >= 12.2 && lat <= 13.6 && lon >= 75.2 && lon <= 76.2) return { name: "Chikkamagaluru & Coorg (Coffee & Pepper Belt), Karnataka", country: "India" };
+        if (lat >= 13.6 && lat <= 14.6 && lon >= 74.8 && lon <= 76.2) return { name: "Shimoga (Arecanut & Malnad Agro Basin), Karnataka", country: "India" };
+        if (lat >= 14.8 && lat <= 16.5 && lon >= 74.5 && lon <= 76.0) return { name: "Dharwad & Belagavi (Cotton & Soybean Tract), Karnataka", country: "India" };
+        if (lat >= 12.8 && lat <= 13.3 && lon >= 77.4 && lon <= 77.8) return { name: "Bengaluru Rural Horticulture Basin, Karnataka", country: "India" };
+        return { name: "Karnataka Fertile Agricultural Plateau", country: "India" };
+      }
+
+      // Andhra Pradesh & Telangana Agro Hubs
+      if (lat >= 13.5 && lat <= 19.9 && lon >= 77.0 && lon <= 84.8) {
+        if (lat >= 15.8 && lat <= 16.8 && lon >= 79.8 && lon <= 80.9) return { name: "Guntur (Chilli & Spice Capital), Andhra Pradesh", country: "India" };
+        if (lat >= 16.3 && lat <= 17.5 && lon >= 81.3 && lon <= 82.5) return { name: "Godavari Delta (Rice & Coconut Granary), Andhra Pradesh", country: "India" };
+        if (lat >= 13.8 && lat <= 15.2 && lon >= 76.8 && lon <= 78.2) return { name: "Anantapur (Groundnut & Citrus Plateau), Andhra Pradesh", country: "India" };
+        if (lat >= 17.0 && lat <= 19.5 && lon >= 78.0 && lon <= 80.5) return { name: "Warangal & Telangana Cotton-Maize Agro Basin", country: "India" };
+        return { name: "Andhra Pradesh & Telangana Agricultural Basin", country: "India" };
+      }
+
+      // Kerala Agro Hubs
+      if (lat >= 8.2 && lat <= 12.8 && lon >= 74.8 && lon <= 77.4) {
+        if (lat >= 11.2 && lat <= 12.0 && lon >= 75.8 && lon <= 76.5) return { name: "Wayanad (Malabar Pepper & Cardamom Reserve), Kerala", country: "India" };
+        if (lat >= 9.4 && lat <= 10.2 && lon >= 76.4 && lon <= 77.0) return { name: "Kottayam (Natural Rubber Heartland), Kerala", country: "India" };
+        if (lat >= 9.2 && lat <= 9.7 && lon >= 76.2 && lon <= 76.6) return { name: "Kuttanad (Below Sea Level Pokkali Rice Basin), Kerala", country: "India" };
+        return { name: "Kerala Coastal & Spice Plantation Belt", country: "India" };
+      }
+
       // Specific Agro Hubs in Tamil Nadu
       if (lat >= 8.0 && lat <= 13.5 && lon >= 76.2 && lon <= 80.3) {
         if (lat >= 11.1 && lat <= 11.8 && lon >= 77.2 && lon <= 78.0) return { name: "Erode (Turmeric GI Basin), Tamil Nadu", country: "India" };
@@ -7414,12 +7887,10 @@
         return { name: "Tamil Nadu Fertile Agricultural Plains", country: "India" };
       }
 
-      // Specific Agro Hubs across India
-      if (lat >= 15.8 && lat <= 16.8 && lon >= 80.0 && lon <= 81.0) return { name: "Guntur (Chilli & Spice Basin), Andhra Pradesh", country: "India" };
+      // Other Indian Agro Hubs
       if (lat >= 33.5 && lat <= 35.0 && lon >= 74.0 && lon <= 75.8) return { name: "Kashmir Apple Orchard Valley, J&K", country: "India" };
       if (lat >= 20.8 && lat <= 21.5 && lon >= 78.7 && lon <= 79.6) return { name: "Nagpur (Mandarin Orange Belt), Maharashtra", country: "India" };
       if (lat >= 29.5 && lat <= 32.5 && lon >= 73.8 && lon <= 76.9) return { name: "Punjab Fertile Wheat & Basmati Plain", country: "India" };
-      if (lat >= 11.4 && lat <= 12.0 && lon >= 75.8 && lon <= 76.5) return { name: "Wayanad (Malabar Pepper & Cardamom Reserve), Kerala", country: "India" };
       if (lat >= 21.4 && lat <= 22.8 && lon >= 88.0 && lon <= 90.5) return { name: "Sundarbans Mangrove Forest Reserve, West Bengal", country: "India" };
       if (lat >= 25.5 && lat <= 27.8 && lon >= 89.5 && lon <= 95.0) return { name: "Brahmaputra Floodplain Basin, Assam", country: "India" };
       
@@ -7429,9 +7900,8 @@
       if (lat >= 32.5 && lat <= 36.0 && lon >= 76.0 && lon <= 80.0) return { name: "Ladakh High-Altitude Cold Desert & Barren Plateau", country: "India" };
 
       // Coastal & Plateau Belts in India
-      if (lat >= 8.2 && lat <= 12.8 && lon >= 74.8 && lon <= 77.2) return { name: "Kerala Coastal & Plantation Belt", country: "India" };
       if (lat >= 20.5 && lat <= 24.7 && lon >= 69.5 && lon <= 74.0) return { name: "Gujarat Groundnut & Cotton Tract", country: "India" };
-      if (lat >= 15.6 && lat <= 20.5 && lon >= 74.0 && lon <= 78.5) return { name: "Deccan Plateau & Dryland", country: "India" };
+      if (lat >= 15.6 && lat <= 20.5 && lon >= 74.0 && lon <= 78.5) return { name: "Deccan Plateau & Dryland, Maharashtra", country: "India" };
       if (lat >= 24.0 && lat <= 30.4 && lon >= 77.0 && lon <= 84.6) return { name: "Uttar Pradesh Indo-Gangetic Fertile Basin", country: "India" };
 
       // Offshore Waters around Indian Subcontinent (Deep Pelagic Sea ONLY)
@@ -7564,7 +8034,7 @@
 
     // Update 3D pin immediately with exact biome color (Light Green for Agri, Dark Green for Forest)
     if (globeMesh) {
-      update3DPinPosition(lat, lon, locType);
+      update3DPinPosition(lat, lon, locType, false);
       if (controls) controls.autoRotate = false;
     }
 

@@ -137,6 +137,117 @@ def init_db():
             
             crop_knowledge_dataset = [
                 # ==========================================
+                # KARNATAKA & ANDHRA PRADESH & KERALA & MEDITERRANEAN
+                # ==========================================
+                (
+                    "Mandya", "India", 12.5220, 76.8970,
+                    "Sugarcane & Finger Millet (Ragi)", "Saccharum officinarum & Eleusine coracana", "Co-62175 & Indaf-9 (Ragi Karnataka Heartland)",
+                    "Rich red sandy loam with KRS perennial canal fertigation",
+                    6.2, 7.5, 82.0, 48.0, 1650.0,
+                    "Sucrose Recovery 11.2% / Ragi Calcium Density 344mg/100g",
+                    "Mandya is Karnataka's sugar capital and ragi bowl. Perennial KRS reservoir canal irrigation and red loamy soils produce world-class sugarcane biomass reaching 82.0 T/Ha and drought-hardy nutritious finger millet.",
+                    "🎋", "Tropical Irrigated River Basin", 22.0, 34.0, 720.0
+                ),
+                (
+                    "Chikkamagaluru", "India", 13.3153, 75.7754,
+                    "Shade-Grown Arabica Coffee & Cardamom", "Coffea arabica & Elettaria cardamomum", "Sln-795 / Chandragiri & Malabar Mysore Cardamom",
+                    "Highland humic forest loam, acidic pH 5.4-6.2 with deep leaf mulch",
+                    5.4, 6.2, 2.8, 3800.0, 2900.0,
+                    "Cupping Score 86+ Specialty Grade / Bright Floral Citrus Acidity",
+                    "The historic cradle of Indian coffee in the Baba Budan Giri mist hills. High altitudes (1100-1400m), double-canopy shade, and organic forest soils produce internationally celebrated high-cupping Arabica coffee.",
+                    "☕", "Montane Subtropical Mist Valley", 14.0, 26.0, 1850.0
+                ),
+                (
+                    "Shimoga", "India", 13.9299, 75.5681,
+                    "Arecanut & Robusta Coffee", "Areca catechu & Coffea canephora", "Thirthahalli Local & Sln-274 Robusta",
+                    "Deep red lateritic gravelly clay loam with organic mulch drainage",
+                    5.6, 6.8, 3.4, 4200.0, 2700.0,
+                    "Tannin Density 18% / Heavy Bunch Bearing Index",
+                    "Western Ghats Malnad foothills with heavy southwest monsoon rainfall and well-drained terraced laterite soils yield premium chewable Thirthahalli commercial Arecanut at 3.4 T/Ha.",
+                    "🌴", "Tropical Malnad Foothills", 20.0, 33.0, 2200.0
+                ),
+                (
+                    "Dharwad", "India", 15.4589, 75.0078,
+                    "Cotton & Soybean", "Gossypium hirsutum & Glycine max", "DCH-32 Hybrid Extra-Long Staple / JS-335",
+                    "Deep black cotton vertisol with superior moisture retention",
+                    6.8, 7.9, 3.2, 890.0, 820.0,
+                    "Staple Length 36mm / Protein Content 41.5%",
+                    "North Karnataka Deccan plateau with moisture-retentive black cotton vertisols delivers bumper yields of export-quality extra-long staple hybrid cotton and protein-packed soybeans.",
+                    "☁️", "Deccan Semi-Arid Plateau", 21.0, 36.0, 740.0
+                ),
+                (
+                    "Konaseema", "India", 16.9891, 82.2475,
+                    "Paddy Rice & Coconut", "Oryza sativa & Cocos nucifera", "BPT-5204 (Samba Mahsuri) & East Coast Tall",
+                    "Rich deltaic alluvial clay silt with perennial Godavari canal water",
+                    6.2, 7.4, 6.8, 380.0, 1150.0,
+                    "Grain Slenderness Ratio 3.2 / 135 nuts/palm/year",
+                    "Godavari deltaic irrigation paradise. Perennial river network and nutrient-laden delta sediment deliver premium superfine Samba Mahsuri rice at 6.8 T/Ha and thriving coastal coconut groves.",
+                    "🍚", "Deltaic Alluvial Fertile Granary", 24.0, 36.0, 1150.0
+                ),
+                (
+                    "Anantapur", "India", 14.6819, 77.6006,
+                    "Groundnut & Sweet Orange (Mosambi)", "Arachis hypogaea & Citrus limetta", "Kadiri-6 (K-6 Drought Hardy) & Sathgudi Mosambi",
+                    "Red sandy loam and arid gravelly dryland soil",
+                    6.0, 7.6, 2.6, 920.0, 750.0,
+                    "Oil Yield 50.2% / High Kernel Weight 42g/100 seeds",
+                    "Drought-hardy Rayalaseema plateau with intense solar irradiance and gravelly soil ideally suited for deep-taproot nitrogen-fixing Kadiri groundnuts and sweet citrus orchards.",
+                    "🥜", "Semi-Arid Drought Plateau", 23.0, 39.0, 520.0
+                ),
+                (
+                    "Warangal", "India", 17.9689, 79.5941,
+                    "Cotton & Hybrid Maize", "Gossypium hirsutum & Zea mays", "Bollgard-II Bt Cotton & Pioneer Hybrid 3396",
+                    "Mixed black and red sandy clay loam with canal lift irrigation",
+                    6.5, 7.8, 3.6, 820.0, 780.0,
+                    "Lint Shelling Ratio 35.5% / High Kernel Starch 72%",
+                    "Telangana agro-belt supported by Godavari lift irrigation channels producing high-yield long-staple cotton and poultry-grade hybrid maize.",
+                    "☁️", "Tropical Semi-Arid Agro Plains", 22.0, 37.0, 840.0
+                ),
+                (
+                    "Kottayam", "India", 9.5916, 76.5222,
+                    "Natural Rubber & Tapioca", "Hevea brasiliensis & Manihot esculenta", "RRII-105 High-Latex Strain & M-4 Cassava",
+                    "Deep red lateritic undulating hill slopes with organic forest mulch",
+                    5.0, 6.2, 2.4, 2100.0, 1400.0,
+                    "Dry Rubber Content 34% / Starch Purity 88%",
+                    "Kerala rubber capital accounting for India's highest natural latex output. Steady tropical humidity, warm temperatures, and terraced laterite hill slopes promote optimal latex flow at 2.4 T/Ha.",
+                    "🌳", "Humid Tropical Plantation Belt", 23.0, 34.0, 2800.0
+                ),
+                (
+                    "Kuttanad", "India", 9.4981, 76.3388,
+                    "Pokkali Salt-Resilient Rice & Prawns", "Oryza sativa", "Pokkali Traditional Coastal Strain (GI Tag)",
+                    "Hydromorphic saline coastal alluvium (Below Sea Level)",
+                    5.5, 7.0, 3.2, 850.0, 950.0,
+                    "Organic Micronutrient-Dense / Salinity Tolerant up to 8 dS/m",
+                    "Globally Important Agricultural Heritage System (GIAHS) practiced 1.5 to 2 meters below sea level where organic rice cultivation alternates with marine prawn farming in backwater lagoons.",
+                    "🍚", "Sub-Sea-Level Coastal Wetland", 24.0, 33.0, 2900.0
+                ),
+                (
+                    "Provence", "France", 44.2000, 4.8000,
+                    "Lavender & Syrah Wine Grapes", "Lavandula angustifolia & Vitis vinifera", "Fine Lavender AOP & Syrah Rhône",
+                    "Limestone gravel and dry sun-drenched Garrigue hillside terraces",
+                    6.8, 8.2, 4.5, 2600.0, 2200.0,
+                    "Essential Oil Ester Content 42% / Deep Tannin Anthocyanins",
+                    "Sun-drenched hills of Provence with intense Mediterranean light and limestone soils producing world-famous aromatic AOP lavender oil and concentrated Rhône Syrah red wines.",
+                    "🌸", "Mediterranean Sun-Drenched Hills", 12.0, 31.0, 620.0
+                ),
+                (
+                    "Campania", "Italy", 40.8518, 14.2681,
+                    "San Marzano Plum Tomatoes & Lemons", "Solanum lycopersicum & Citrus limon", "San Marzano DOP & Sorrento Femminello",
+                    "Rich volcanic alluvium from Mount Vesuvius with high potassium",
+                    6.0, 7.2, 58.0, 380.0, 3100.0,
+                    "Low Seed Ratio / High Dry Matter / Intense Sweet Savory Balance",
+                    "Vesuvius volcanic soil rich in potassium and Mediterranean coastal breezes produce world-standard San Marzano DOP plum tomatoes and thick-rinded Sorrento lemons.",
+                    "🍅", "Volcanic Mediterranean Coastal Plain", 14.0, 32.0, 780.0
+                ),
+                (
+                    "Valencia", "Spain", 39.4699, -0.3763,
+                    "Valencia Sweet Oranges & Paella Rice", "Citrus sinensis & Oryza sativa", "Valencia Late / Navel & Bomba Rice (DOP Arroz de Valencia)",
+                    "Fertile coastal Huerta alluvial silt with acequia canal irrigation",
+                    6.5, 7.8, 38.0, 420.0, 2800.0,
+                    "High Juice 52% / High Amylose Bomba Absorption Ratio 1:3",
+                    "The historic Huerta of Valencia watered by Turia irrigation ditches producing sweet thin-skinned Valencia oranges at 38 T/Ha and round Bomba rice for traditional paella.",
+                    "🍊", "Mediterranean Coastal Huerta", 13.0, 33.0, 510.0
+                ),
+                # ==========================================
                 # INDIA & SOUTH ASIA
                 # ==========================================
                 (
